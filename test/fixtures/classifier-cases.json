@@ -1,47 +1,74 @@
 [
   {
-    "id": "bounded-explanation",
+    "id": "t1-regex-explanation",
     "tier": 1,
+    "category": "explanation",
+    "difficulty": "clear",
+    "labelRationale": "Direct explanation of a supplied expression.",
     "prompt": "Explain what this regular expression matches: ^[a-z]+$"
   },
   {
-    "id": "bounded-summary",
+    "id": "t1-summary",
     "tier": 1,
+    "category": "transformation",
+    "difficulty": "clear",
+    "labelRationale": "Summarization of supplied text is bounded.",
     "prompt": "Summarize this paragraph in three bullet points: [provided text]"
   },
   {
-    "id": "simple-formatting",
+    "id": "t1-format-list",
     "tier": 1,
+    "category": "transformation",
+    "difficulty": "clear",
+    "labelRationale": "A deterministic formatting transformation.",
     "prompt": "Convert these names to a comma-separated list: Ada, Grace, Linus"
   },
   {
-    "id": "localized-typo",
+    "id": "t1-typo",
     "tier": 1,
+    "category": "mechanical-edit",
+    "difficulty": "clear",
+    "labelRationale": "A single specified text correction.",
     "prompt": "Fix the spelling mistake in this sentence: The recieve button is blue."
   },
   {
-    "id": "routine-small-edit",
+    "id": "t1-single-file-date",
     "tier": 1,
+    "category": "mechanical-edit",
+    "difficulty": "clear",
+    "labelRationale": "One specified local edit with an explicit result.",
     "prompt": "In src/format.js, change the date format from MM/DD/YYYY to YYYY-MM-DD."
   },
   {
-    "id": "mechanical-sequence",
+    "id": "t1-heading-link",
     "tier": 1,
+    "category": "mechanical-edit",
+    "difficulty": "boundary",
+    "labelRationale": "Multiple mechanical replacements with a known target and focused check.",
     "prompt": "Rename the heading, update the matching link, and run the documentation check. The new heading and link text are specified below."
   },
   {
-    "id": "direct-factual-question",
+    "id": "t1-http-status",
     "tier": 1,
+    "category": "explanation",
+    "difficulty": "clear",
+    "labelRationale": "A stable factual question with no investigation.",
     "prompt": "What does HTTP status code 404 mean?"
   },
   {
-    "id": "simple-extraction",
+    "id": "t1-extraction",
     "tier": 1,
+    "category": "transformation",
+    "difficulty": "clear",
+    "labelRationale": "Extracting fields from supplied short text is bounded.",
     "prompt": "Extract the invoice number and due date from this short text and return JSON."
   },
   {
-    "id": "bounded-follow-up",
+    "id": "t1-follow-up",
     "tier": 1,
+    "category": "contextual-follow-up",
+    "difficulty": "clear",
+    "labelRationale": "A direct continuation of a completed local change.",
     "prompt": "Now make that variable name lowercase too.",
     "recentMessages": [
       { "type": "user", "message": "Change the variable name from UserID to userId." },
@@ -49,63 +76,212 @@
     ]
   },
   {
-    "id": "cross-file-bug-investigation",
+    "id": "t1-inspect-config",
+    "tier": 1,
+    "category": "inspection",
+    "difficulty": "boundary",
+    "labelRationale": "The named configuration check is read-only and bounded.",
+    "prompt": "Check whether package.json contains a start:term script and report the result. Do not edit or run anything."
+  },
+  {
+    "id": "t1-explain-error",
+    "tier": 1,
+    "category": "debugging",
+    "difficulty": "clear",
+    "labelRationale": "The supplied error can be explained without repository investigation.",
+    "prompt": "Explain why this JavaScript error occurs: TypeError: value.map is not a function."
+  },
+  {
+    "id": "t1-json-format",
+    "tier": 1,
+    "category": "transformation",
+    "difficulty": "clear",
+    "labelRationale": "Formatting supplied JSON is deterministic.",
+    "prompt": "Pretty-print this JSON with two-space indentation: {\"ok\":true,\"count\":2}"
+  },
+  {
+    "id": "t1-check-test-script",
+    "tier": 1,
+    "category": "inspection",
+    "difficulty": "boundary",
+    "labelRationale": "Checking one known manifest entry is a narrow inspection.",
+    "prompt": "Verify whether the test script exists in package.json; do not run the test or modify files."
+  },
+  {
+    "id": "t1-copy-change",
+    "tier": 1,
+    "category": "mechanical-edit",
+    "difficulty": "clear",
+    "labelRationale": "A specified copy change in one named file.",
+    "prompt": "Change the button label from Save to Apply in src/settings.jsx and make no other changes."
+  },
+  {
+    "id": "t1-review-short-diff",
+    "tier": 1,
+    "category": "inspection",
+    "difficulty": "clear",
+    "labelRationale": "A short supplied diff can be checked directly.",
+    "prompt": "Review this short diff and list any obvious syntax errors. Do not execute it: [diff]"
+  },
+  {
+    "id": "t1-compare-strings",
+    "tier": 1,
+    "category": "transformation",
+    "difficulty": "clear",
+    "labelRationale": "Comparing two supplied strings is fully bounded.",
+    "prompt": "Compare these two configuration strings and list their differing keys: [string A] and [string B]."
+  },
+  {
+    "id": "t1-extract-todos",
+    "tier": 1,
+    "category": "transformation",
+    "difficulty": "clear",
+    "labelRationale": "Extracting marked items from supplied content is mechanical.",
+    "prompt": "Extract every TODO line from this supplied text and return a numbered list."
+  },
+  {
+    "id": "t1-simple-test-fix",
+    "tier": 1,
+    "category": "mechanical-edit",
+    "difficulty": "boundary",
+    "labelRationale": "One assertion has an explicitly specified expected value.",
+    "prompt": "Change the expected value in the named unit test from 3 to 4, then run only that test."
+  },
+  {
+    "id": "t1-explain-config",
+    "tier": 1,
+    "category": "explanation",
+    "difficulty": "clear",
+    "labelRationale": "Explaining a supplied configuration option is bounded.",
+    "prompt": "What does the npm package.json type field do?"
+  },
+  {
+    "id": "t1-inspect-only",
+    "tier": 1,
+    "category": "inspection",
+    "difficulty": "boundary",
+    "labelRationale": "A single-file read-only inspection remains low complexity despite the no-execution constraint.",
+    "prompt": "Inspect src/constants.js and report whether it exports DEFAULT_TIMEOUT. Do not execute commands or change files."
+  },
+
+  {
+    "id": "t2-auth-debug",
     "tier": 2,
+    "category": "debugging",
+    "difficulty": "clear",
+    "labelRationale": "Tracing a bug across related files and fixing it requires bounded investigation.",
     "prompt": "Trace why authentication succeeds in the browser but fails in the CLI, identify the cause across the related files, and fix it."
   },
   {
-    "id": "feature-with-tests",
+    "id": "t2-pagination",
     "tier": 2,
+    "category": "feature",
+    "difficulty": "clear",
+    "labelRationale": "A bounded feature crosses implementation and tests.",
     "prompt": "Add pagination to the API client, preserve the existing response shape, update the tests, and run the relevant suite."
   },
   {
-    "id": "bounded-research-synthesis",
+    "id": "t2-library-compare",
     "tier": 2,
+    "category": "research",
+    "difficulty": "clear",
+    "labelRationale": "Comparison of three specified libraries requires current API verification and synthesis.",
     "prompt": "Compare these three libraries for our stated requirements, verify their current APIs, and recommend one with tradeoffs."
   },
   {
-    "id": "multi-step-analysis",
+    "id": "t2-test-diagnosis",
     "tier": 2,
+    "category": "debugging",
+    "difficulty": "clear",
+    "labelRationale": "Diagnosing a failing test requires inspecting implementation and expectations.",
     "prompt": "Inspect the failing test, determine whether the implementation or the test expectation is wrong, make the appropriate change, and verify it."
   },
   {
-    "id": "ordinary-feature-work",
+    "id": "t2-settings-page",
     "tier": 2,
+    "category": "feature",
+    "difficulty": "clear",
+    "labelRationale": "A normal feature with validation, persistence, and error handling is multi-step but bounded.",
     "prompt": "Implement a settings page that reads the existing config, validates edits, saves them, and displays useful errors."
   },
   {
-    "id": "tool-coordinated-work",
-    "tier": 1,
+    "id": "t2-endpoint-review",
+    "tier": 2,
+    "category": "mechanical-edit",
+    "difficulty": "boundary",
+    "labelRationale": "Several files and focused checks make this more than a single mechanical edit.",
     "prompt": "Review the project structure, find all references to the old endpoint, update them consistently, and run the focused checks."
   },
   {
-    "id": "difficult-ambiguous-debugging",
-    "tier": 3,
-    "prompt": "Intermittent production data corruption has several plausible causes across asynchronous workers and storage. Inspect the broad system architecture, research current recovery and consistency practices, identify the root cause, and propose a safe fix with migration and rollback considerations."
-  },
-  {
-    "id": "system-architecture",
-    "tier": 3,
-    "prompt": "Inspect the current monolith and its data flows, research suitable migration patterns, then design a migration to independently deployable services. Account for data ownership, consistency, staged rollout, failure recovery, and backwards compatibility."
-  },
-  {
-    "id": "high-impact-security",
-    "tier": 3,
-    "prompt": "Review the authentication and authorization design across these services, research current attack patterns, trace realistic attack paths, and recommend high-impact changes that preserve existing clients."
-  },
-  {
-    "id": "novel-research",
-    "tier": 3,
-    "prompt": "Investigate whether this unfamiliar algorithm can meet our latency and correctness constraints. Review the broader system context, research current external literature and implementations, derive edge cases, prototype alternatives, and recommend an implementation."
-  },
-  {
-    "id": "large-refactor",
-    "tier": 3,
-    "prompt": "Inspect the persistence layer across the CLI, background jobs, and web API; research compatible migration patterns; then plan and execute a cross-cutting redesign with compatibility checks and a staged rollout."
-  },
-  {
-    "id": "uncertain-follow-up",
+    "id": "t2-migration-plan",
     "tier": 2,
+    "category": "planning",
+    "difficulty": "clear",
+    "labelRationale": "A bounded module migration needs dependency inspection and a staged implementation plan.",
+    "prompt": "Plan the migration of the three listed modules to the new interface, identify affected tests, and describe the order of changes."
+  },
+  {
+    "id": "t2-config-migration",
+    "tier": 2,
+    "category": "migration",
+    "difficulty": "clear",
+    "labelRationale": "A repository-wide but bounded configuration migration needs coordinated edits and verification.",
+    "prompt": "Migrate the project from the old environment variable names to the new names, update documentation and tests, and verify no old names remain."
+  },
+  {
+    "id": "t2-api-compat",
+    "tier": 2,
+    "category": "research",
+    "difficulty": "boundary",
+    "labelRationale": "The question requires checking a specified external API but has a bounded decision scope.",
+    "prompt": "Check whether the current client library supports the three API methods we use and recommend the smallest compatibility change. Do not implement it yet."
+  },
+  {
+    "id": "t2-cross-file-tests",
+    "tier": 2,
+    "category": "debugging",
+    "difficulty": "clear",
+    "labelRationale": "A failure involving a parser and its fixtures needs several related files.",
+    "prompt": "Investigate why the parser fixtures fail after the schema change, update the implementation or fixtures as appropriate, and run the parser tests."
+  },
+  {
+    "id": "t2-command-review",
+    "tier": 2,
+    "category": "inspection",
+    "difficulty": "boundary",
+    "labelRationale": "Reviewing command behavior across a bounded set of files requires repository investigation.",
+    "prompt": "Inspect the command registration and handlers for the three listed commands and report inconsistencies. Do not modify anything."
+  },
+  {
+    "id": "t2-logging-feature",
+    "tier": 2,
+    "category": "feature",
+    "difficulty": "clear",
+    "labelRationale": "Adding structured logging across a small subsystem involves coordinated implementation and tests.",
+    "prompt": "Add structured error logging to the import subsystem, preserve its public API, update tests, and verify the focused suite."
+  },
+  {
+    "id": "t2-refactor-module",
+    "tier": 2,
+    "category": "refactor",
+    "difficulty": "clear",
+    "labelRationale": "A local module refactor with callers and tests is bounded cross-file work.",
+    "prompt": "Refactor the duplicated validation logic into a shared helper, update its callers and tests, and run the affected checks."
+  },
+  {
+    "id": "t2-review-migration",
+    "tier": 2,
+    "category": "planning",
+    "difficulty": "boundary",
+    "labelRationale": "Reviewing a proposed bounded migration needs careful dependency and compatibility analysis.",
+    "prompt": "Review this proposed database-column migration, identify compatibility risks for the listed consumers, and suggest a safer sequence without applying it."
+  },
+  {
+    "id": "t2-uncertain-follow-up",
+    "tier": 2,
+    "category": "debugging",
+    "difficulty": "boundary",
+    "labelRationale": "The failed approaches require a different bounded solution, but the context is not system-wide.",
     "prompt": "Given the constraints and failed approaches above, find a different solution and explain its risks before changing anything.",
     "recentMessages": [
       { "type": "user", "message": "The migration deadlocks under concurrent writes." },
@@ -114,5 +290,206 @@
         "message": "The first two locking strategies both deadlocked in the integration tests."
       }
     ]
+  },
+  {
+    "id": "t2-ui-bug",
+    "tier": 2,
+    "category": "debugging",
+    "difficulty": "clear",
+    "labelRationale": "A UI behavior spanning component, state, and test files is a bounded investigation.",
+    "prompt": "Find why the dialog closes when its validation fails, fix the state transition, add a regression test, and run that test."
+  },
+  {
+    "id": "t2-dependency-upgrade",
+    "tier": 2,
+    "category": "migration",
+    "difficulty": "boundary",
+    "labelRationale": "One dependency upgrade requires checking changelog compatibility and adapting affected calls.",
+    "prompt": "Upgrade the specified dependency, inspect its breaking changes, update the affected calls, and run the relevant tests."
+  },
+  {
+    "id": "t2-readonly-architecture",
+    "tier": 2,
+    "category": "inspection",
+    "difficulty": "boundary",
+    "labelRationale": "The request is read-only but requires inspecting several related modules.",
+    "prompt": "Inspect the request pipeline across the router, controller, and worker and explain where retries are introduced. Do not run commands or edit files."
+  },
+  {
+    "id": "t2-test-coverage",
+    "tier": 2,
+    "category": "testing",
+    "difficulty": "clear",
+    "labelRationale": "Adding focused coverage requires understanding an existing module and its edge cases.",
+    "prompt": "Add tests for the parser's empty, malformed, and Unicode inputs without changing parser behavior, then run the parser suite."
+  },
+  {
+    "id": "t2-small-cli-feature",
+    "tier": 2,
+    "category": "feature",
+    "difficulty": "clear",
+    "labelRationale": "A command option affects parsing, behavior, help text, and tests.",
+    "prompt": "Add a --format option to this CLI, support json and text output, update help text and tests, and run the CLI checks."
+  },
+
+  {
+    "id": "t3-data-corruption",
+    "tier": 3,
+    "category": "operations",
+    "difficulty": "clear",
+    "labelRationale": "Production corruption across asynchronous workers and storage has high consequences and broad uncertainty.",
+    "prompt": "Intermittent production data corruption has several plausible causes across asynchronous workers and storage. Inspect the broad system architecture, research current recovery and consistency practices, identify the root cause, and propose a safe fix with migration and rollback considerations."
+  },
+  {
+    "id": "t3-service-migration",
+    "tier": 3,
+    "category": "architecture",
+    "difficulty": "clear",
+    "labelRationale": "A monolith-to-services redesign requires broad architecture, consistency, rollout, and recovery decisions.",
+    "prompt": "Inspect the current monolith and its data flows, research suitable migration patterns, then design a migration to independently deployable services. Account for data ownership, consistency, staged rollout, failure recovery, and backwards compatibility."
+  },
+  {
+    "id": "t3-security",
+    "tier": 3,
+    "category": "security",
+    "difficulty": "clear",
+    "labelRationale": "Cross-service security analysis with current threat research and high-impact changes is high consequence.",
+    "prompt": "Review the authentication and authorization design across these services, research current attack patterns, trace realistic attack paths, and recommend high-impact changes that preserve existing clients."
+  },
+  {
+    "id": "t3-novel-algorithm",
+    "tier": 3,
+    "category": "research",
+    "difficulty": "clear",
+    "labelRationale": "An unfamiliar algorithm needs external research, prototyping, and system-level tradeoffs.",
+    "prompt": "Investigate whether this unfamiliar algorithm can meet our latency and correctness constraints. Review the broader system context, research current external literature and implementations, derive edge cases, prototype alternatives, and recommend an implementation."
+  },
+  {
+    "id": "t3-persistence-redesign",
+    "tier": 3,
+    "category": "architecture",
+    "difficulty": "clear",
+    "labelRationale": "A cross-cutting persistence redesign spans applications and requires staged compatibility rollout.",
+    "prompt": "Inspect the persistence layer across the CLI, background jobs, and web API; research compatible migration patterns; then plan and execute a cross-cutting redesign with compatibility checks and a staged rollout."
+  },
+  {
+    "id": "t3-compliance-migration",
+    "tier": 3,
+    "category": "compliance",
+    "difficulty": "clear",
+    "labelRationale": "Compliance-sensitive migration requires external standards, broad compatibility, and consequential decisions.",
+    "prompt": "Design a data-retention migration that meets the stated regulatory requirements, preserves auditability, remains compatible with existing clients, and includes rollback and incident procedures."
+  },
+  {
+    "id": "t3-multi-region",
+    "tier": 3,
+    "category": "operations",
+    "difficulty": "clear",
+    "labelRationale": "Multi-region consistency and failover design requires broad operational reasoning and risk analysis.",
+    "prompt": "Design a multi-region deployment for this stateful service, including consistency guarantees, failover, recovery point objectives, traffic migration, and a tested rollback plan."
+  },
+  {
+    "id": "t3-security-incident",
+    "tier": 3,
+    "category": "security",
+    "difficulty": "boundary",
+    "labelRationale": "A short prompt still describes a high-impact incident requiring broad investigation and containment.",
+    "prompt": "Investigate a suspected credential compromise across the organization, determine the blast radius, contain access, preserve evidence, and recommend recovery steps. Do not make changes until the plan is approved."
+  },
+  {
+    "id": "t3-platform-selection",
+    "tier": 3,
+    "category": "research",
+    "difficulty": "clear",
+    "labelRationale": "Selecting a platform for a broad system requires external research and long-term tradeoffs.",
+    "prompt": "Research and recommend a deployment platform for our organization-wide workloads, comparing cost, compliance, portability, observability, resilience, and migration risk."
+  },
+  {
+    "id": "t3-event-consistency",
+    "tier": 3,
+    "category": "architecture",
+    "difficulty": "clear",
+    "labelRationale": "Replacing synchronous workflows with events affects consistency, operations, data ownership, and recovery.",
+    "prompt": "Design a migration from synchronous order processing to event-driven workflows while preserving business invariants, handling duplicate delivery, and supporting rollback during a staged rollout."
+  },
+  {
+    "id": "t3-legacy-modernization",
+    "tier": 3,
+    "category": "migration",
+    "difficulty": "clear",
+    "labelRationale": "Modernizing a legacy platform requires broad dependency discovery, research, sequencing, and operational planning.",
+    "prompt": "Assess the legacy platform and produce an executable modernization roadmap covering dependencies, data migration, compatibility, staffing risks, observability, and phased rollout."
+  },
+  {
+    "id": "t3-privacy-architecture",
+    "tier": 3,
+    "category": "compliance",
+    "difficulty": "clear",
+    "labelRationale": "Privacy architecture spans systems and policy obligations with high consequences.",
+    "prompt": "Review how personal data flows through all production systems and design a privacy-preserving architecture that supports deletion, access requests, retention limits, auditing, and disaster recovery."
+  },
+  {
+    "id": "t3-capacity-crisis",
+    "tier": 3,
+    "category": "operations",
+    "difficulty": "boundary",
+    "labelRationale": "An urgent capacity issue spanning production systems needs broad diagnosis and a safe remediation plan.",
+    "prompt": "Our production platform is approaching capacity unpredictably. Investigate the likely causes across services and infrastructure, research mitigation options, and propose a safe plan with load testing and rollback."
+  },
+  {
+    "id": "t3-public-api-versioning",
+    "tier": 3,
+    "category": "architecture",
+    "difficulty": "clear",
+    "labelRationale": "Public API versioning across many clients requires compatibility strategy, migration sequencing, and risk management.",
+    "prompt": "Design a versioning and deprecation strategy for a public API used by many independent clients, including compatibility guarantees, telemetry, migration tooling, rollout stages, and emergency rollback."
+  },
+  {
+    "id": "t3-model-governance",
+    "tier": 3,
+    "category": "research",
+    "difficulty": "clear",
+    "labelRationale": "Organization-wide model governance combines policy, security, evaluation, and operational design.",
+    "prompt": "Develop a governance and deployment framework for AI models used across the company, covering data handling, evaluation, access control, auditability, incident response, and model rollback."
+  },
+  {
+    "id": "t3-distributed-recovery",
+    "tier": 3,
+    "category": "operations",
+    "difficulty": "clear",
+    "labelRationale": "Recovery design for distributed state requires broad failure modeling and tested operational procedures.",
+    "prompt": "Create a disaster-recovery architecture for the distributed platform, including dependency ordering, backup integrity, regional failure, recovery testing, data loss limits, and a safe return to service."
+  },
+  {
+    "id": "t3-zero-downtime-db",
+    "tier": 3,
+    "category": "migration",
+    "difficulty": "boundary",
+    "labelRationale": "A no-downtime database redesign has system-wide compatibility and rollback constraints.",
+    "prompt": "Plan and execute a zero-downtime redesign of the production database schema used by multiple services, with dual writes, backfill validation, cutover criteria, and rollback."
+  },
+  {
+    "id": "t3-broad-readonly-review",
+    "tier": 3,
+    "category": "inspection",
+    "difficulty": "boundary",
+    "labelRationale": "The request is explicitly read-only but broad, uncertain, and high consequence.",
+    "prompt": "Perform a read-only review of the entire production architecture to identify the most serious reliability risks, research current mitigation practices, and prioritize a safe remediation roadmap. Do not execute commands or modify anything."
+  },
+  {
+    "id": "t3-supply-chain",
+    "tier": 3,
+    "category": "security",
+    "difficulty": "clear",
+    "labelRationale": "Supply-chain security across dependencies and build infrastructure requires broad research and high-impact decisions.",
+    "prompt": "Assess the software supply-chain risks across repositories, dependencies, CI, artifacts, and deployment, then design a defense-in-depth program with detection, response, and migration steps."
+  },
+  {
+    "id": "t3-global-data-move",
+    "tier": 3,
+    "category": "migration",
+    "difficulty": "clear",
+    "labelRationale": "A global data move combines regulatory, operational, consistency, and rollback complexity.",
+    "prompt": "Plan a multi-country migration of customer data while preserving service availability, meeting regional requirements, maintaining referential integrity, and providing verified rollback and audit procedures."
   }
 ]

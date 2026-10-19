@@ -1,13 +1,15 @@
+const TIERS = [1, 2, 3];
+
 export async function evaluateTierCases({ classifier, cases }) {
   validateCases(cases);
-  const matrix = Object.fromEntries(
-    [1, 2, 3].map((tier) => [tier, { 1: 0, 2: 0, 3: 0, invalid: 0 }]),
-  );
+  const matrix = Object.fromEntries(TIERS.map((tier) => [tier, { 1: 0, 2: 0, 3: 0, invalid: 0 }]));
+  const categoryStats = {};
   const results = [];
   let exact = 0;
   let underRouted = 0;
   let overRouted = 0;
   let absoluteTierError = 0;
+  let weightedTierError = 0;
   let elapsedMs = 0;
 
   for (const item of cases) {
@@ -25,18 +27,46 @@ export async function evaluateTierCases({ classifier, cases }) {
     }
     const durationMs = performance.now() - startedAt;
     elapsedMs += durationMs;
-    const validTier = classification?.valid && [1, 2, 3].includes(classification.tier);
+    const validTier = classification?.valid && TIERS.includes(classification.tier);
     const predicted = validTier ? classification.tier : null;
+    const category = item.category ?? "uncategorized";
+    const categoryReport = (categoryStats[category] ??= {
+      total: 0,
+      exact: 0,
+      valid: 0,
+      underRouted: 0,
+      overRouted: 0,
+      twoTierUnderRoutes: 0,
+      absoluteTierError: 0,
+    });
+    categoryReport.total++;
     matrix[item.tier][predicted ?? "invalid"]++;
     if (!validTier) error ??= classification?.error ?? "Invalid classifier result.";
     else {
-      if (predicted === item.tier) exact++;
-      if (predicted < item.tier) underRouted++;
-      if (predicted > item.tier) overRouted++;
-      absoluteTierError += Math.abs(predicted - item.tier);
+      categoryReport.valid++;
+      if (predicted === item.tier) {
+        exact++;
+        categoryReport.exact++;
+      }
+      if (predicted < item.tier) {
+        underRouted++;
+        categoryReport.underRouted++;
+      }
+      if (predicted > item.tier) {
+        overRouted++;
+        categoryReport.overRouted++;
+      }
+      const tierError = Math.abs(predicted - item.tier);
+      absoluteTierError += tierError;
+      categoryReport.absoluteTierError += tierError;
+      if (item.tier - predicted === 2) categoryReport.twoTierUnderRoutes++;
+      // Under-routing a high-complexity task is more serious than over-routing.
+      weightedTierError += predicted < item.tier ? tierError * 2 : tierError;
     }
     results.push({
       id: item.id,
+      category,
+      difficulty: item.difficulty ?? null,
       expectedTier: item.tier,
       predictedTier: predicted,
       confidence:
@@ -49,6 +79,31 @@ export async function evaluateTierCases({ classifier, cases }) {
   }
 
   const validCount = results.filter((result) => result.predictedTier !== null).length;
+  const perTier = Object.fromEntries(
+    TIERS.map((tier) => {
+      const truePositive = matrix[tier][tier];
+      const actual = TIERS.reduce((sum, predicted) => sum + matrix[tier][predicted], 0);
+      const predictedTotal = TIERS.reduce((sum, expected) => sum + matrix[expected][tier], 0);
+      const precision = predictedTotal ? truePositive / predictedTotal : 0;
+      const recall = actual ? truePositive / actual : 0;
+      return [
+        tier,
+        {
+          precision,
+          recall,
+          f1: precision + recall ? (2 * precision * recall) / (precision + recall) : 0,
+          support: actual,
+        },
+      ];
+    }),
+  );
+  for (const report of Object.values(categoryStats)) {
+    report.accuracy = report.total ? report.exact / report.total : 0;
+    report.validAccuracy = report.valid ? report.exact / report.valid : 0;
+    report.meanAbsoluteTierError = report.valid ? report.absoluteTierError / report.valid : 0;
+    delete report.absoluteTierError;
+  }
+
   return {
     total: cases.length,
     validCount,
@@ -62,8 +117,11 @@ export async function evaluateTierCases({ classifier, cases }) {
       (result) => result.predictedTier !== null && result.expectedTier - result.predictedTier === 2,
     ).length,
     meanAbsoluteTierError: validCount ? absoluteTierError / validCount : 0,
+    weightedTierError,
     meanDurationMs: cases.length ? elapsedMs / cases.length : 0,
     matrix,
+    perTier,
+    categoryStats,
     results,
   };
 }
@@ -76,10 +134,14 @@ export function validateCases(cases) {
     if (typeof item.id !== "string" || !item.id.trim() || ids.has(item.id))
       throw new Error(`Case ${index + 1} must have a unique, non-empty id.`);
     ids.add(item.id);
-    if (![1, 2, 3].includes(item.tier))
+    if (!TIERS.includes(item.tier))
       throw new Error(`Case ${item.id} has an invalid expected tier.`);
     if (typeof item.prompt !== "string" || !item.prompt.trim())
       throw new Error(`Case ${item.id} must have a non-empty prompt.`);
+    for (const field of ["category", "difficulty", "labelRationale"]) {
+      if (item[field] !== undefined && (typeof item[field] !== "string" || !item[field].trim()))
+        throw new Error(`Case ${item.id} has an invalid ${field}.`);
+    }
     if (
       item.recentMessages !== undefined &&
       (!Array.isArray(item.recentMessages) ||
@@ -100,19 +162,32 @@ export function formatEvaluationReport(report) {
   const rows = [
     "Expected\\Predicted | Tier 1 | Tier 2 | Tier 3 | Invalid",
     "------------------ | ------ | ------ | ------ | -------",
-    ...[1, 2, 3].map((tier) => {
+    ...TIERS.map((tier) => {
       const row = report.matrix[tier];
       return `Tier ${tier}             | ${String(row[1]).padStart(6)} | ${String(row[2]).padStart(6)} | ${String(row[3]).padStart(6)} | ${String(row.invalid).padStart(7)}`;
     }),
   ];
   const lines = [
     `Cases: ${report.total} (${report.validCount} valid, ${report.invalidCount} invalid)`,
-    `Exact tier accuracy: ${percent(report.accuracy)}`,
+    `Exact tier accuracy: ${percent(report.accuracy)} (${percent(report.validAccuracy)} of valid)`,
     `Under-routed: ${report.underRouted} · Over-routed: ${report.overRouted} · Two-tier under-routes: ${report.twoTierUnderRoutes}`,
-    `Mean absolute tier error: ${report.meanAbsoluteTierError.toFixed(2)} · Mean classification time: ${report.meanDurationMs.toFixed(0)} ms`,
+    `Mean absolute tier error: ${report.meanAbsoluteTierError.toFixed(2)} · Weighted error: ${report.weightedTierError} · Mean classification time: ${report.meanDurationMs.toFixed(0)} ms`,
     "",
     ...rows,
+    "",
+    "Per-tier precision / recall / F1:",
+    ...TIERS.map((tier) => {
+      const metric = report.perTier[tier];
+      return `- Tier ${tier}: ${percent(metric.precision)} / ${percent(metric.recall)} / ${percent(metric.f1)} (n=${metric.support})`;
+    }),
   ];
+  if (Object.keys(report.categoryStats).length) {
+    lines.push("", "By category:");
+    for (const [category, stats] of Object.entries(report.categoryStats))
+      lines.push(
+        `- ${category}: ${percent(stats.accuracy)} (${stats.exact}/${stats.total}), under-routed ${stats.underRouted}`,
+      );
+  }
   const misses = report.results.filter(
     (result) => result.predictedTier !== result.expectedTier || result.error,
   );

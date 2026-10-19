@@ -33,7 +33,11 @@ test("evaluates tier accuracy, under-routing, over-routing, and invalid outputs"
   assert.equal(report.overRouted, 1);
   assert.equal(report.twoTierUnderRoutes, 1);
   assert.equal(report.matrix[2].invalid, 1);
+  assert.equal(report.perTier[1].support, 2);
+  assert.equal(report.categoryStats.uncategorized.total, 4);
+  assert.equal(report.weightedTierError, 5);
   assert.match(formatEvaluationReport(report), /Two-tier under-routes: 1/);
+  assert.match(formatEvaluationReport(report), /Per-tier precision \/ recall \/ F1/);
   assert.match(formatEvaluationReport(report), /invalid — Bad JSON/);
 });
 
