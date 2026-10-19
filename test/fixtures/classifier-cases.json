@@ -1,0 +1,118 @@
+[
+  {
+    "id": "bounded-explanation",
+    "tier": 1,
+    "prompt": "Explain what this regular expression matches: ^[a-z]+$"
+  },
+  {
+    "id": "bounded-summary",
+    "tier": 1,
+    "prompt": "Summarize this paragraph in three bullet points: [provided text]"
+  },
+  {
+    "id": "simple-formatting",
+    "tier": 1,
+    "prompt": "Convert these names to a comma-separated list: Ada, Grace, Linus"
+  },
+  {
+    "id": "localized-typo",
+    "tier": 1,
+    "prompt": "Fix the spelling mistake in this sentence: The recieve button is blue."
+  },
+  {
+    "id": "routine-small-edit",
+    "tier": 1,
+    "prompt": "In src/format.js, change the date format from MM/DD/YYYY to YYYY-MM-DD."
+  },
+  {
+    "id": "mechanical-sequence",
+    "tier": 1,
+    "prompt": "Rename the heading, update the matching link, and run the documentation check. The new heading and link text are specified below."
+  },
+  {
+    "id": "direct-factual-question",
+    "tier": 1,
+    "prompt": "What does HTTP status code 404 mean?"
+  },
+  {
+    "id": "simple-extraction",
+    "tier": 1,
+    "prompt": "Extract the invoice number and due date from this short text and return JSON."
+  },
+  {
+    "id": "bounded-follow-up",
+    "tier": 1,
+    "prompt": "Now make that variable name lowercase too.",
+    "recentMessages": [
+      { "type": "user", "message": "Change the variable name from UserID to userId." },
+      { "type": "agent", "message": "Updated UserID to userId in the requested function." }
+    ]
+  },
+  {
+    "id": "cross-file-bug-investigation",
+    "tier": 2,
+    "prompt": "Trace why authentication succeeds in the browser but fails in the CLI, identify the cause across the related files, and fix it."
+  },
+  {
+    "id": "feature-with-tests",
+    "tier": 2,
+    "prompt": "Add pagination to the API client, preserve the existing response shape, update the tests, and run the relevant suite."
+  },
+  {
+    "id": "bounded-research-synthesis",
+    "tier": 2,
+    "prompt": "Compare these three libraries for our stated requirements, verify their current APIs, and recommend one with tradeoffs."
+  },
+  {
+    "id": "multi-step-analysis",
+    "tier": 2,
+    "prompt": "Inspect the failing test, determine whether the implementation or the test expectation is wrong, make the appropriate change, and verify it."
+  },
+  {
+    "id": "ordinary-feature-work",
+    "tier": 2,
+    "prompt": "Implement a settings page that reads the existing config, validates edits, saves them, and displays useful errors."
+  },
+  {
+    "id": "tool-coordinated-work",
+    "tier": 1,
+    "prompt": "Review the project structure, find all references to the old endpoint, update them consistently, and run the focused checks."
+  },
+  {
+    "id": "difficult-ambiguous-debugging",
+    "tier": 3,
+    "prompt": "Intermittent production data corruption has several plausible causes across asynchronous workers and storage. Inspect the broad system architecture, research current recovery and consistency practices, identify the root cause, and propose a safe fix with migration and rollback considerations."
+  },
+  {
+    "id": "system-architecture",
+    "tier": 3,
+    "prompt": "Inspect the current monolith and its data flows, research suitable migration patterns, then design a migration to independently deployable services. Account for data ownership, consistency, staged rollout, failure recovery, and backwards compatibility."
+  },
+  {
+    "id": "high-impact-security",
+    "tier": 3,
+    "prompt": "Review the authentication and authorization design across these services, research current attack patterns, trace realistic attack paths, and recommend high-impact changes that preserve existing clients."
+  },
+  {
+    "id": "novel-research",
+    "tier": 3,
+    "prompt": "Investigate whether this unfamiliar algorithm can meet our latency and correctness constraints. Review the broader system context, research current external literature and implementations, derive edge cases, prototype alternatives, and recommend an implementation."
+  },
+  {
+    "id": "large-refactor",
+    "tier": 3,
+    "prompt": "Inspect the persistence layer across the CLI, background jobs, and web API; research compatible migration patterns; then plan and execute a cross-cutting redesign with compatibility checks and a staged rollout."
+  },
+  {
+    "id": "uncertain-follow-up",
+    "tier": 2,
+    "prompt": "Given the constraints and failed approaches above, find a different solution and explain its risks before changing anything.",
+    "recentMessages": [
+      { "type": "user", "message": "The migration deadlocks under concurrent writes." },
+      {
+        "type": "agent",
+        "message": "The first two locking strategies both deadlocked in the integration tests."
+      }
+    ]
+  }
+]

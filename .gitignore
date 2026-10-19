@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+dist/
+*.log
+*.tmp
+*.gguf
+*.gguf.part
+.env
+.env.*
+!.env.example
+.xarab/
+.DS_Store

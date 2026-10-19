@@ -1,0 +1,39 @@
+{
+  "name": "xarab-router",
+  "version": "1.0.0",
+  "description": "A terminal assistant that locally classifies requests and routes them to OpenAI workers",
+  "bin": {
+    "xarab-router": "bin/xarab.js"
+  },
+  "scripts": {
+    "start": "tsx src/cli.jsx",
+    "logo:generate": "node scripts/generate-scarab.js",
+    "format": "prettier --write \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
+    "classifier:evaluate": "node scripts/evaluate-classifier.js",
+    "model:qwen3": "node-llama-cpp pull --dir ${XARAB_MODELS_DIR:-$HOME/.xarab/models} hf:lmstudio-community/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
+    "model:qwen2.5-coder": "node-llama-cpp pull --dir ${XARAB_MODELS_DIR:-$HOME/.xarab/models} hf:bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M",
+    "test": "node --import tsx --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "diff": "^9.0.0",
+    "highlight.js": "^11.12.0",
+    "ink": "^8.0.0",
+    "ink-multiline-input": "^0.1.0",
+    "ink-spinner": "^5.0.0",
+    "marked": "^18.1.0",
+    "node-llama-cpp": "^3.22.1",
+    "react": "^19.3.0",
+    "string-width": "^8.3.0",
+    "tsx": "^4.23.15",
+    "wrap-ansi": "^10.0.2"
+  },
+  "devDependencies": {
+    "pngjs": "^7.0.0",
+    "prettier": "^3.9.10"
+  }
+}
