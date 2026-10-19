@@ -15,8 +15,9 @@ test("package and lockfile expose the executable xarab command", async () => {
   assert.equal(lock.name, metadata.name);
   assert.equal(lock.packages[""].name, metadata.name);
   assert.deepEqual(lock.packages[""].bin, metadata.bin);
-  assert.match(metadata.scripts["model:qwen3"], /XARAB_MODELS_DIR.*\.xarab\/models/);
-  assert.match(metadata.scripts["model:qwen2.5-coder"], /XARAB_MODELS_DIR.*\.xarab\/models/);
+  assert.equal(metadata.scripts.postinstall, "node scripts/install-classifier.js");
+  assert.equal(metadata.scripts["model:qwen3"], undefined);
+  assert.equal(metadata.scripts["model:qwen2.5-coder"], undefined);
   const executable = new URL("../bin/xarab.js", import.meta.url);
   assert.match(await readFile(executable, "utf8"), /^#!\/usr\/bin\/env node/);
   assert.ok((await stat(executable)).mode & 0o111);

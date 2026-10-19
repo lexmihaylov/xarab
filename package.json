@@ -11,8 +11,7 @@
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
     "classifier:evaluate": "node scripts/evaluate-classifier.js",
-    "model:qwen3": "node-llama-cpp pull --dir ${XARAB_MODELS_DIR:-$HOME/.xarab/models} hf:lmstudio-community/Qwen3-4B-Instruct-2507-GGUF:Q4_K_M",
-    "model:qwen2.5-coder": "node-llama-cpp pull --dir ${XARAB_MODELS_DIR:-$HOME/.xarab/models} hf:bartowski/Qwen2.5-Coder-1.5B-Instruct-GGUF:Q4_K_M",
+    "postinstall": "node scripts/install-classifier.js",
     "test": "node --import tsx --test"
   },
   "keywords": [],
