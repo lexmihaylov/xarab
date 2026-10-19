@@ -117,7 +117,7 @@ export function createOpenAICodexAuth({
       state,
       id_token_add_organizations: "true",
       codex_cli_simplified_flow: "true",
-      originator: "xarab-router",
+      originator: "xarab",
     }).toString();
     pendingAuthorization = { verifier, state, expiresAt: now() + 10 * 60 * 1000 };
     return { authorizationUrl: url.toString(), redirectUri: REDIRECT_URI };

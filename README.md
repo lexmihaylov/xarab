@@ -1,8 +1,8 @@
-# Xarab Router
+# Xarab
 
 ![Xarab](assets/xarab.png)
 
-Xarab Router is a terminal coding assistant that uses a small local GGUF model only to classify each request, then routes it with relevant conversation context to an OpenAI worker.
+Xarab is a terminal coding assistant that uses a small local GGUF model only to classify each request, then routes it with relevant conversation context to an OpenAI worker.
 
 The Hugging Face GGUF browser/downloader manages classifier models; local models never generate chat responses. The routing harness classifies task complexity into three task-defined tiers, and users configure an OpenAI worker for each tier. The local classifier runs through `node-llama-cpp`.
 

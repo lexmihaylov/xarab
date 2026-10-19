@@ -67,7 +67,7 @@ test("controller owns command handling and publishes updated UI state", async (t
 });
 
 test("selecting a classifier loads it and persists classifier configuration", async (t) => {
-  const temporary = await mkdtemp("/tmp/opencode/xarab-router-model-test-");
+  const temporary = await mkdtemp("/tmp/opencode/xarab-model-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const loadedModels = [];
   const controller = createAssistantController({

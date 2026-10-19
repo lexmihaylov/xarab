@@ -239,8 +239,8 @@ function responseOutputText(response) {
 
 function codexHeaders(credentials, additional = {}) {
   return {
-    originator: "xarab-router",
-    "user-agent": "xarab-router/1.0.0",
+    originator: "xarab",
+    "user-agent": "xarab/1.0.0",
     authorization: `Bearer ${credentials.access_token}`,
     "chatgpt-account-id": credentials.account_id,
     ...additional,

@@ -19,7 +19,7 @@ function accessToken(accountId) {
 }
 
 async function withCredentialsPath(run) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-router-codex-oauth-"));
+  const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-codex-oauth-"));
   try {
     await run(path.join(directory, "auth", "openai-chatgpt.json"));
   } finally {
@@ -40,7 +40,7 @@ test("builds the Pi-compatible Codex OAuth URL for manual localhost callback pas
     assert.equal(url.searchParams.get("scope"), "openid profile email offline_access");
     assert.equal(url.searchParams.get("codex_cli_simplified_flow"), "true");
     assert.equal(url.searchParams.get("id_token_add_organizations"), "true");
-    assert.equal(url.searchParams.get("originator"), "xarab-router");
+    assert.equal(url.searchParams.get("originator"), "xarab");
     assert.equal(url.searchParams.get("code_challenge_method"), "S256");
     assert.match(url.searchParams.get("code_challenge"), /^[A-Za-z0-9_-]{43}$/);
     assert.ok(url.searchParams.get("state"));

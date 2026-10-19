@@ -76,7 +76,7 @@ test("streams a Responses result with required privacy settings", async () => {
   assert.equal(requests[0].url, "https://chatgpt.com/backend-api/codex/responses");
   assert.equal(requests[0].options.headers.authorization, "Bearer token-secret");
   assert.equal(requests[0].options.headers["chatgpt-account-id"], "account-1");
-  assert.equal(requests[0].options.headers.originator, "xarab-router");
+  assert.equal(requests[0].options.headers.originator, "xarab");
   assert.deepEqual(JSON.parse(requests[0].options.body), {
     model: "model-a",
     instructions: "System instructions",

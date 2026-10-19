@@ -1,9 +1,9 @@
 {
-  "name": "xarab-router",
+  "name": "xarab",
   "version": "1.0.0",
   "description": "A terminal assistant that locally classifies requests and routes them to OpenAI workers",
   "bin": {
-    "xarab-router": "bin/xarab.js"
+    "xarab": "bin/xarab.js"
   },
   "scripts": {
     "start": "tsx src/cli.jsx",

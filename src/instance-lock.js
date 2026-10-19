@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 function lockPathForCurrentUser() {
-  return path.join(os.tmpdir(), "xarab-router.lock");
+  return path.join(os.tmpdir(), "xarab.lock");
 }
 
 function isProcessRunning(pid) {

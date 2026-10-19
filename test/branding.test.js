@@ -7,11 +7,11 @@ import { createAssistantController } from "../src/agent/controller.js";
 import { acquireInstanceLock } from "../src/instance-lock.js";
 import { createWelcomeMessage } from "../src/ui/welcome-message.js";
 
-test("package and lockfile expose the executable xarab-router command", async () => {
+test("package and lockfile expose the executable xarab command", async () => {
   const metadata = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
   const lock = JSON.parse(await readFile(new URL("../package-lock.json", import.meta.url), "utf8"));
-  assert.equal(metadata.name, "xarab-router");
-  assert.deepEqual(metadata.bin, { "xarab-router": "bin/xarab.js" });
+  assert.equal(metadata.name, "xarab");
+  assert.deepEqual(metadata.bin, { xarab: "bin/xarab.js" });
   assert.equal(lock.name, metadata.name);
   assert.equal(lock.packages[""].name, metadata.name);
   assert.deepEqual(lock.packages[""].bin, metadata.bin);
@@ -59,14 +59,14 @@ test("controller defaults are stored under the xarab data directory", async (t) 
   await controller.shutdown();
 });
 
-test("default instance lock uses the xarab-router name", async (t) => {
+test("default instance lock uses the xarab name", async (t) => {
   const root = await mkdtemp("/tmp/opencode/xarab-branding-lock-");
   t.after(() => rm(root, { recursive: true, force: true }));
   t.mock.method(os, "tmpdir", () => root);
   const release = await acquireInstanceLock();
   assert.equal(typeof release, "function");
   try {
-    assert.deepEqual(await readdir(root), ["xarab-router.lock"]);
+    assert.deepEqual(await readdir(root), ["xarab.lock"]);
   } finally {
     await release();
   }
