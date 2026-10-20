@@ -10,7 +10,14 @@ const commandOptions = [
   { command: "/save", description: "Save or name this session" },
   { command: "/clear", description: "Clear the conversation" },
   { command: "/compact", description: "Summarize and compact the conversation" },
-  { command: "/quit", description: "Exit Xarab" },
+  { command: "/openai", description: "Show OpenAI command help" },
+  { command: "/openai login", description: "Sign in to ChatGPT" },
+  { command: "/openai copy", description: "Copy the sign-in URL" },
+  { command: "/openai status", description: "Show OpenAI connection status" },
+  { command: "/openai models", description: "List available OpenAI models" },
+  { command: "/openai use", description: "Select an OpenAI model", acceptsArgument: true },
+  { command: "/openai ask", description: "Ask OpenAI directly", acceptsArgument: true },
+  { command: "/openai logout", description: "Sign out of ChatGPT" },
   { command: "/exit", description: "Exit Xarab" },
 ];
 
@@ -29,7 +36,7 @@ export function Composer({
   const [value, setValue] = useState(draft?.value ?? "");
   const sessionRef = useRef(sessionId);
   const suggestions =
-    !disabled && value.startsWith("/") && !/[\s\n]/.test(value)
+    !disabled && value.startsWith("/") && !value.includes("\n")
       ? commandOptions.filter(({ command }) => command.startsWith(value.toLowerCase()))
       : [];
   const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
@@ -53,9 +60,10 @@ export function Composer({
 
   function completeCommand(suggestion = selectedSuggestion) {
     if (!suggestion) return;
-    const nextValue = ["/download", "/new", "/save"].includes(suggestion.command)
-      ? `${suggestion.command} `
-      : suggestion.command;
+    const nextValue =
+      suggestion.acceptsArgument || ["/download", "/new", "/save"].includes(suggestion.command)
+        ? `${suggestion.command} `
+        : suggestion.command;
     inputRef.current?.setText(nextValue);
     inputRef.current.cursorOffset = nextValue.length;
     setValue(nextValue);

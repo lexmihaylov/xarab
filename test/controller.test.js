@@ -33,6 +33,8 @@ test("controller owns command handling and publishes updated UI state", async (t
   await controller.submit("/help");
   assert.match(controller.getState().messages.at(-1).message, /\/route/);
   assert.match(controller.getState().messages.at(-1).message, /\/openai login/);
+  assert.match(controller.getState().messages.at(-1).message, /\/exit/);
+  assert.doesNotMatch(controller.getState().messages.at(-1).message, /\/quit/);
   assert.ok(states.length > 0);
 
   await controller.submit("/openai status");
@@ -55,13 +57,10 @@ test("controller owns command handling and publishes updated UI state", async (t
   await controller.submit("/route");
   assert.equal(controller.getState().modelModal.mode, "chooser");
   controller.closeModelModal();
-  await controller.submit("/model /path/to/model.gguf");
-  assert.match(controller.getState().messages.at(-1).message, /Use \/route/);
-  assert.equal(controller.getState().model, undefined);
   await controller.submit("/download");
   assert.equal(controller.getState().modelModal.mode, "download");
 
-  await controller.submit("/quit");
+  await controller.submit("/exit");
   assert.equal(quitRequested, true);
   await controller.shutdown();
 });

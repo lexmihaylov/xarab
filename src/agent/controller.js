@@ -1162,7 +1162,7 @@ export function createAssistantController({
     if (isShuttingDown) return;
     const text = raw.trim();
     if (!text) return;
-    if ((generating || isRouting || sessionOperation) && text !== "/quit" && text !== "/exit") {
+    if ((generating || isRouting || sessionOperation) && text !== "/exit") {
       return addMessage({
         type: "system",
         message: "Wait for the current response to finish before sending another prompt.",
@@ -1182,12 +1182,12 @@ export function createAssistantController({
     if (text.startsWith("!")) return runUserCommand(text.slice(1));
     if (text === "/openai" || text.startsWith("/openai ")) return handleOpenAICommand(text);
     if (text === "/compact") return compactConversation();
-    if (text === "/quit" || text === "/exit") return onQuit();
+    if (text === "/exit") return onQuit();
     if (text === "/help") {
       addMessage({
         type: "system",
         message:
-          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /quit.\nUse /route to configure the local classifier and OpenAI tier workers. Local GGUF models are classifier-only.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
+          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /exit.\nUse /route to configure the local classifier and OpenAI tier workers. Local GGUF models are classifier-only.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
       });
       return;
     }
@@ -1213,7 +1213,7 @@ export function createAssistantController({
       });
       return;
     }
-    if (text === "/route" || text === "/models" || text === "/model") {
+    if (text === "/route") {
       const models = await listModels();
       modelModal = {
         models,
@@ -1230,8 +1230,6 @@ export function createAssistantController({
       void loadRouterWorkerModels();
       return;
     }
-    if (text.startsWith("/model "))
-      return addMessage({ type: "system", message: "Use /route to configure routing." });
     if (text === "/download" || text.startsWith("/download ")) {
       const query = text.slice("/download".length).trim();
       modelModal = {
