@@ -27,7 +27,27 @@ test("requires approval for destructive commands and writes", () => {
   assert.equal(assessShellCommand("git reset --hard", workspace).requiresApproval, true);
 });
 
-test("requires approval for outside paths, shell composition, and unknown commands", () => {
+test("allows read-only && chains and pipelines", () => {
+  assert.equal(assessShellCommand("pwd && cat README.md", workspace).requiresApproval, false);
+  assert.equal(
+    assessShellCommand("git status --short && git diff", workspace).requiresApproval,
+    false,
+  );
+  assert.equal(assessShellCommand("rg TODO src | head -n 10", workspace).requiresApproval, false);
+  assert.equal(assessShellCommand("git diff | wc -l", workspace).requiresApproval, false);
+});
+
+test("requires approval when a composed stage is unsafe or unknown", () => {
+  const destructive = assessShellCommand("pwd && rm -rf build", workspace);
+  assert.equal(destructive.requiresApproval, true);
+  assert.ok(
+    destructive.reasons.some((reason) => reason.startsWith("Command stage 2 (rm -rf build):")),
+  );
+  assert.equal(assessShellCommand("git status | tee status.txt", workspace).requiresApproval, true);
+  assert.equal(assessShellCommand("pwd && npm run custom", workspace).requiresApproval, true);
+});
+
+test("requires approval for outside paths, unsupported shell syntax, and unknown commands", () => {
   assert.ok(
     assessShellCommand("cat ../secret.txt", workspace).reasons.some((reason) =>
       reason.includes("outside"),
@@ -38,7 +58,24 @@ test("requires approval for outside paths, shell composition, and unknown comman
       reason.includes("outside"),
     ),
   );
-  assert.equal(assessShellCommand("pwd && cat README.md", workspace).requiresApproval, true);
+  for (const command of [
+    "pwd || git status",
+    "pwd; git status",
+    "cat README.md > output.txt",
+    "cat $(git status)",
+    'cat "$(git status)"',
+    "pwd & git status",
+    "pwd &&",
+    "| git status",
+    "cat 'unterminated",
+  ]) {
+    assert.equal(assessShellCommand(command, workspace).requiresApproval, true, command);
+  }
   assert.equal(assessShellCommand("python script.py", workspace).requiresApproval, true);
   assert.equal(assessShellCommand("npm run custom", workspace).requiresApproval, true);
+});
+
+test("does not split operators inside quoted arguments", () => {
+  const assessment = assessShellCommand("rg 'TODO|FIXME && LATER' src", workspace);
+  assert.equal(assessment.requiresApproval, false);
 });
