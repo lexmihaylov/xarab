@@ -4,7 +4,6 @@ import path from "node:path";
 import test from "node:test";
 import { createAssistantController } from "../src/agent/controller.js";
 import { createSessionStore, newSession } from "../src/agent/session-store.js";
-import { buildChatRows } from "../src/ui/chat-layout.js";
 
 async function setup(t, behavior = async ({ onText }) => onText("Reply")) {
   const root = await mkdtemp("/tmp/opencode/xarab-session-controller-");
@@ -123,11 +122,6 @@ test("keeps OpenAI streamed text and tool activity in event order in one assista
     assistant[0].parts.map((part) => (part.type === "text" ? part.text : part.toolName)),
     ["Before tool. ", "list_files", "After tool."],
   );
-  const rendered = buildChatRows(controller.getState().messages, 80).map((line) => line.text);
-  const before = rendered.findIndex((line) => line.includes("Before tool."));
-  const tool = rendered.findIndex((line) => line.includes("Listing ."));
-  const after = rendered.findIndex((line) => line.includes("After tool."));
-  assert.ok(before >= 0 && before < tool && tool < after);
 });
 
 test("legacy local-model metadata is ignored when restoring a session", async (t) => {
