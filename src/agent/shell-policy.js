@@ -15,6 +15,7 @@ const READ_ONLY_COMMANDS = new Set([
   "ls",
   "pwd",
   "rg",
+  "sed",
   "sort",
   "stat",
   "tail",
@@ -27,23 +28,19 @@ const READ_ONLY_COMMANDS = new Set([
   "whoami",
   "false",
 ]);
-const READ_ONLY_GIT_COMMANDS = new Set([
-  "branch",
-  "diff",
-  "log",
-  "ls-files",
-  "remote",
-  "rev-parse",
-  "show",
-  "status",
-]);
-const WORKSPACE_VALIDATION_SCRIPTS = new Set(["build", "check", "lint", "test", "typecheck"]);
+function isAllowedGitCommand(executable, command) {
+  return executable === "git" && !command.toLowerCase().includes("force");
+}
+
+function isAllowedPackageManagerCommand(executable) {
+  return executable === "npm";
+}
 
 function isWorkspaceValidationCommand(executable, tokens) {
-  if (!["npm", "pnpm", "yarn", "bun"].includes(executable)) return false;
+  if (!["pnpm", "yarn", "bun"].includes(executable)) return false;
   const script =
     tokens[1]?.toLowerCase() === "run" ? tokens[2]?.toLowerCase() : tokens[1]?.toLowerCase();
-  return WORKSPACE_VALIDATION_SCRIPTS.has(script);
+  return ["build", "check", "lint", "test", "typecheck"].includes(script);
 }
 
 function isWithinWorkspace(workspace, candidate) {
@@ -129,15 +126,23 @@ function tokenize(command) {
 }
 
 function assessSimpleShellCommand(command, workspace) {
+  const tokens = tokenize(command);
+  const executable = (tokens[0] ?? "")
+    .replace(/^["']|["']$/g, "")
+    .split(/[\\/]/)
+    .at(-1)
+    ?.toLowerCase();
+  if (isAllowedGitCommand(executable, command)) return [];
+
   const reasons = [];
   if (outsideWorkspaceReference(command, workspace))
     reasons.push("The command may access paths outside the workspace.");
 
   if (
-    /(^|[\s])(?:sudo|doas|su|rm|rmdir|mv|cp|dd|mkfs|wipefs|shred|truncate|chmod|chown|kill|pkill|mkdir|touch|tee|install)(?:\s|$)/i.test(
+    /(^|[\s])(?:sudo|doas|su|rm|rmdir|mv|cp|dd|mkfs|wipefs|shred|truncate|chmod|chown|kill|pkill|mkdir|touch|tee)(?:\s|$)/i.test(
       command,
     ) ||
-    /\b(git\s+(?:reset|clean|checkout|restore|push|commit|merge|rebase|cherry-pick|tag)|npm\s+(?:install|uninstall| ci|publish|link)|pnpm\s+(?:install|add|remove|publish|link)|yarn\s+(?:install|add|remove|publish|link)|pip3?\s+(?:install|uninstall)|docker\s+(?:rm|rmi|system\s+prune|run|exec)|kubectl\s+(?:delete|apply|patch|replace))\b/i.test(
+    /\b(pnpm\s+(?:install|add|remove|publish|link)|yarn\s+(?:install|add|remove|publish|link)|pip3?\s+(?:install|uninstall)|docker\s+(?:rm|rmi|system\s+prune|run|exec)|kubectl\s+(?:delete|apply|patch|replace))\b/i.test(
       command,
     ) ||
     /(?:^|[^<])>{1,2}|\btee\b|\bsed\s+-[^\n]*i/.test(command)
@@ -147,16 +152,9 @@ function assessSimpleShellCommand(command, workspace) {
     );
   }
 
-  const tokens = tokenize(command);
-  const executable = (tokens[0] ?? "")
-    .replace(/^["']|["']$/g, "")
-    .split(/[\\/]/)
-    .at(-1)
-    ?.toLowerCase();
-  const gitSubcommand = executable === "git" ? tokens[1]?.toLowerCase() : null;
   const allowlisted =
     READ_ONLY_COMMANDS.has(executable) ||
-    (executable === "git" && READ_ONLY_GIT_COMMANDS.has(gitSubcommand)) ||
+    isAllowedPackageManagerCommand(executable) ||
     isWorkspaceValidationCommand(executable, tokens) ||
     (executable === "node" && tokens[1]?.toLowerCase() === "--test");
   if (!allowlisted) reasons.push("The command is not a recognized read-only workspace command.");

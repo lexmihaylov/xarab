@@ -649,7 +649,6 @@ export function createAssistantController({
     if (name === "write") return `Writing ${safeToolDetail(params.path)}`;
     if (name === "websearch") return `Searching the web for “${safeToolDetail(params.query)}”`;
     if (name === "webfetch") return `Fetching ${safeToolDetail(params.url)}`;
-    if (name === "run_command") return "Running command";
     return `Running ${name}`;
   }
 
@@ -842,76 +841,6 @@ export function createAssistantController({
         modelModal = { ...modelModal, error: `Could not save tier worker: ${error.message}` };
     }
     notify();
-  }
-
-  async function handleRouterCommand(text) {
-    const [command, ...args] = text.slice("/router".length).trim().split(/\s+/);
-    if (command === "status" || !command) {
-      const classifierPath = configStore.getClassifierModel();
-      const assignments = [1, 2, 3].map((tier) => {
-        const worker = configStore.getTierWorker(tier);
-        const modelId =
-          worker.provider === "openai" ? worker.model || configStore.getOpenAIModel() : null;
-        return `Tier ${tier}: ${worker.provider === "openai" ? `OpenAI${modelId ? ` (${modelId})` : " (no model selected)"}` : "invalid worker"}`;
-      });
-      addMessage({
-        type: "system",
-        message: [
-          `Tier routing: ${classifierPath ? "enabled" : "not configured"}`,
-          `Local classifier: ${classifierPath || "not set"}`,
-          ...assignments,
-          "Set classifier: /router classifier <path-to-local-gguf> (or off)",
-          "Set worker: /router worker <tier> openai [model-id] (local GGUF models are classifier-only)",
-        ].join("\n"),
-      });
-      return;
-    }
-    if (command === "classifier") {
-      const modelText = text.slice("/router classifier".length).trim();
-      if (!modelText) throw new Error("Usage: /router classifier <path-to-local-gguf> (or off)");
-      let classifierPath = null;
-      if (modelText.toLowerCase() !== "off") {
-        const expanded = modelText.replace(/^~(?=$|[\\/])/, os.homedir());
-        classifierPath = path.resolve(workspace, expanded);
-        if (!classifierPath.toLowerCase().endsWith(".gguf"))
-          throw new Error("The classifier must be a local .gguf model.");
-        const file = await stat(classifierPath);
-        if (!file.isFile()) throw new Error("The classifier path must point to a GGUF file.");
-      }
-      await tierClassifier?.dispose?.();
-      tierClassifier = undefined;
-      tierClassifierPath = undefined;
-      await configStore.setClassifierModel(classifierPath);
-      addMessage({
-        type: "system",
-        message: classifierPath
-          ? `Local tier classifier set to ${classifierPath}. Automatic routing is enabled.`
-          : "Local tier classifier disabled. Configure a classifier and OpenAI workers to chat.",
-      });
-      return;
-    }
-    if (command === "worker") {
-      const [, tierText, provider, ...modelParts] =
-        text.match(/^\/router\s+worker\s+(\d+)\s+(openai)(?:\s+(.+))?$/i) ?? [];
-      const tier = Number(tierText);
-      const modelId = modelParts.join(" ").trim();
-      if (![1, 2, 3].includes(tier) || !provider)
-        throw new Error(
-          "Usage: /router worker <1|2|3> openai [model-id]. Local GGUF models are classifier-only.",
-        );
-      await configStore.setTierWorker(tier, {
-        provider: provider.toLowerCase(),
-        ...(modelId ? { model: modelId } : {}),
-      });
-      addMessage({
-        type: "system",
-        message: `Tier ${tier} worker set to ${provider.toLowerCase()}${modelId ? ` (${modelId})` : ""}.`,
-      });
-      return;
-    }
-    throw new Error(
-      "Router commands: /router status, /router classifier <path|off>, /router worker <tier> openai [model-id].",
-    );
   }
 
   async function compactConversation() {
@@ -1239,7 +1168,6 @@ export function createAssistantController({
       return;
     }
     if (text.startsWith("!")) return runUserCommand(text.slice(1));
-    if (text === "/router" || text.startsWith("/router ")) return handleRouterCommand(text);
     if (text === "/openai" || text.startsWith("/openai ")) return handleOpenAICommand(text);
     if (text === "/compact") return compactConversation();
     if (text === "/quit" || text === "/exit") return onQuit();
@@ -1247,7 +1175,7 @@ export function createAssistantController({
       addMessage({
         type: "system",
         message:
-          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /router [status|classifier|worker], /openai [login|status|models|use|ask|logout], /compact, /clear, /quit.\nUse /route to configure the local classifier and OpenAI tier workers. Local GGUF models are classifier-only. Use /router classifier <path> and /router worker <tier> openai [model-id] for command-line setup.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
+          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /quit.\nUse /route to configure the local classifier and OpenAI tier workers. Local GGUF models are classifier-only.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
       });
       return;
     }

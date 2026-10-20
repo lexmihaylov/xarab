@@ -255,11 +255,3 @@ export function modelDetailRows(model, details, width, tab = "Overview") {
       .map((text) => ({ ...row, text }));
   });
 }
-
-export function modelDetailLines(model, details, width) {
-  return ["Overview", "Model card", "Metadata"].flatMap((tab) =>
-    modelDetailRows(model, details, width, tab).map((row) =>
-      row.label ? `${row.label}: ${row.text}` : row.text,
-    ),
-  );
-}

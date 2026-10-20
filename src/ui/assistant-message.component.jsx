@@ -26,7 +26,9 @@ export function OpenTuiAssistantMessage({
           <markdown
             content={responseText}
             syntaxStyle={syntaxStyle}
-            streaming={generating}
+            conceal
+            concealCode
+            streaming={Boolean(generating)}
             selectable
           />
         </OpenTuiMessageCard>

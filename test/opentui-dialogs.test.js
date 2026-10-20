@@ -70,6 +70,41 @@ test("model chooser applies the selected router and worker model", async () => {
   }
 });
 
+test("model chooser deletes a selected router after confirmation", async () => {
+  const deleted = [];
+  const view = await render(
+    React.createElement(OpenTuiModelChooser, {
+      models: ["/models/router.gguf"],
+      modelSettings: {},
+      classifierModel: null,
+      openAIModels: [],
+      tierWorkers: {},
+      onClose() {},
+      onSetClassifier() {},
+      onSetTierWorker() {},
+      onDeleteModel: (model) => deleted.push(model),
+      onRefreshWorkerModels() {},
+    }),
+  );
+  try {
+    await act(async () => view.mockInput.pressArrow("down"));
+    await view.flush();
+    await act(async () => view.mockInput.pressKey("d"));
+    await view.flush();
+    assert.doesNotMatch(view.captureCharFrame(), /Delete router\.gguf\? Enter confirm/);
+    await act(async () => view.mockInput.pressKey("d", { ctrl: true }));
+    await view.flush();
+    const confirmation = view.captureCharFrame();
+    assert.match(confirmation, /DELETE LOCAL MODEL/);
+    assert.match(confirmation, /Delete router\.gguf from local storage\? This cannot be undone\./);
+    assert.match(confirmation, /Enter confirm · Esc cancel/);
+    await act(async () => view.mockInput.pressEnter());
+    assert.deepEqual(deleted, ["/models/router.gguf"]);
+  } finally {
+    await view.dispose();
+  }
+});
+
 test("status bar prioritizes session persistence errors", async () => {
   const view = await render(
     React.createElement(OpenTuiStatusBar, {

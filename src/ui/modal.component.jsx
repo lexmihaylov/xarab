@@ -6,9 +6,11 @@ import { browserColors as colors } from "./model-browser-theme.js";
 export function OpenTuiModal({
   title,
   children,
+  overlay,
   width = "78%",
   height = "70%",
   fullScreen = false,
+  dimmed = false,
 }) {
   return (
     <box
@@ -29,7 +31,7 @@ export function OpenTuiModal({
         paddingX={fullScreen ? 2 : 2}
         paddingY={fullScreen ? 1 : 1}
         overflow="hidden"
-        position="relative"
+        opacity={dimmed ? 0.35 : 1}
       >
         <box justifyContent="center" marginBottom={1}>
           <text fg={colors.accent} bold>
@@ -38,6 +40,7 @@ export function OpenTuiModal({
         </box>
         {children}
       </box>
+      {overlay}
     </box>
   );
 }

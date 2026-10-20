@@ -21,16 +21,8 @@ const pageScrollKeys = new Map([
   ["pagedown", 1],
 ]);
 
-function Message({ message, generating, syntaxStyle }) {
+function Message({ message }) {
   switch (message.type) {
-    case "agent":
-      return (
-        <OpenTuiAssistantMessage
-          message={message}
-          generating={generating}
-          syntaxStyle={syntaxStyle}
-        />
-      );
     case "user":
       return (
         <OpenTuiUserMessage message={message.message} classification={message.classification} />
@@ -48,6 +40,47 @@ function Message({ message, generating, syntaxStyle }) {
   }
 }
 
+export function agentTimelineEntries(message, generating = false) {
+  const entries = [];
+  let text = "";
+  let textIndex = 0;
+  const flushText = (streaming = false) => {
+    if (!text) return;
+    entries.push({
+      type: "text",
+      key: `text-${textIndex++}`,
+      responseText: text,
+      generating: streaming,
+    });
+    text = "";
+  };
+
+  for (const [partIndex, part] of (message.parts ?? []).entries()) {
+    if (part?.type === "text") {
+      text += typeof part.text === "string" ? part.text : String(part.text ?? "");
+    } else if (part?.type === "tool") {
+      flushText();
+      entries.push({ type: "tool", key: `tool-${partIndex}`, part });
+    }
+  }
+  flushText(generating);
+
+  // Support sessions saved before text parts were split out, and show a loading
+  // indicator only when there is no timeline content yet.
+  if (entries.length === 0 && message.message) {
+    entries.push({
+      type: "text",
+      key: "legacy-text",
+      responseText: message.message,
+      generating: false,
+    });
+  } else if (entries.length === 0 && generating) {
+    entries.push({ type: "text", key: "generating", responseText: "", generating: true });
+  }
+
+  return entries;
+}
+
 export function OpenTuiApp({
   state,
   syntaxStyle,
@@ -61,6 +94,7 @@ export function OpenTuiApp({
   onSearchHuggingFace,
   onSetRouterClassifier,
   onSetRouterTierWorker,
+  onDeleteModel,
   onRefreshRouterWorkerModels,
   onApproveToolAction,
   onDenyToolAction,
@@ -147,73 +181,24 @@ export function OpenTuiApp({
               entries = [
                 {
                   key: `${message.type}-${index}`,
-                  element: (
-                    <Message message={message} generating={generating} syntaxStyle={syntaxStyle} />
-                  ),
+                  element: <Message message={message} />,
                 },
               ];
             } else {
-              // Agent messages are a timeline of text and tool parts. Do not render
-              // the empty agent placeholder before the tools: a later streamed text
-              // part must remain after the tool that caused it.
-              const parts = message.parts ?? [];
-              entries = [];
-              let text = "";
-              let textIndex = 0;
-              const flushText = () => {
-                if (!text) return;
-                const value = text;
-                entries.push({
-                  key: `${message.type}-${index}-text-${textIndex++}`,
-                  element: (
+              entries = agentTimelineEntries(message, generating).map((entry) => ({
+                key: `${message.type}-${index}-${entry.key}`,
+                element:
+                  entry.type === "tool" ? (
+                    <OpenTuiToolMessage part={entry.part} syntaxStyle={syntaxStyle} />
+                  ) : (
                     <OpenTuiAssistantMessage
                       message={message}
-                      responseText={value}
+                      responseText={entry.responseText}
+                      generating={entry.generating}
                       syntaxStyle={syntaxStyle}
                     />
                   ),
-                });
-                text = "";
-              };
-
-              for (const [partIndex, part] of parts.entries()) {
-                if (part?.type === "text") {
-                  text += typeof part.text === "string" ? part.text : String(part.text ?? "");
-                } else if (part?.type === "tool") {
-                  flushText();
-                  entries.push({
-                    key: `${message.type}-${index}-tool-${partIndex}`,
-                    element: <OpenTuiToolMessage part={part} syntaxStyle={syntaxStyle} />,
-                  });
-                }
-              }
-              flushText();
-
-              // Support sessions saved before text parts were split out, and show
-              // a loading indicator only when there is no timeline content yet.
-              if (entries.length === 0 && message.message) {
-                entries.push({
-                  key: `${message.type}-${index}-legacy-text`,
-                  element: (
-                    <OpenTuiAssistantMessage
-                      message={message}
-                      responseText={message.message}
-                      syntaxStyle={syntaxStyle}
-                    />
-                  ),
-                });
-              } else if (entries.length === 0 && generating) {
-                entries.push({
-                  key: `${message.type}-${index}-generating`,
-                  element: (
-                    <OpenTuiAssistantMessage
-                      message={message}
-                      generating
-                      syntaxStyle={syntaxStyle}
-                    />
-                  ),
-                });
-              }
+              }));
             }
 
             return entries.map(({ key, element }) => (
@@ -276,6 +261,7 @@ export function OpenTuiApp({
           onClose={onCloseModelModal}
           onSetClassifier={onSetRouterClassifier}
           onSetTierWorker={onSetRouterTierWorker}
+          onDeleteModel={onDeleteModel}
           onRefreshWorkerModels={onRefreshRouterWorkerModels}
         />
       )}

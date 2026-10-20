@@ -70,6 +70,7 @@ function renderApp(state) {
       onSearchHuggingFace={controller.searchHuggingFace}
       onSetRouterClassifier={controller.setRouterClassifier}
       onSetRouterTierWorker={controller.setRouterTierWorker}
+      onDeleteModel={controller.deleteModel}
       onRefreshRouterWorkerModels={controller.refreshRouterWorkerModels}
       onApproveToolAction={controller.approveToolAction}
       onDenyToolAction={controller.denyToolAction}

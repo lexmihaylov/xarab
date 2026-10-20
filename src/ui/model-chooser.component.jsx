@@ -7,6 +7,43 @@ function modelLabel(modelPath, settings = {}) {
   return settings[modelPath]?.name?.trim() || modelPath.split(/[\\/]/).at(-1);
 }
 
+function DeleteModelDialog({ model }) {
+  return (
+    <box
+      position="absolute"
+      top={0}
+      right={0}
+      bottom={0}
+      left={0}
+      zIndex={101}
+      alignItems="center"
+      justifyContent="center"
+    >
+      <box
+        width="58%"
+        maxWidth={72}
+        flexDirection="column"
+        backgroundColor="#202d38"
+        border
+        borderStyle="rounded"
+        borderColor={colors.error}
+        paddingX={2}
+        paddingY={1}
+      >
+        <text fg={colors.error} bold>
+          DELETE LOCAL MODEL
+        </text>
+        <text fg={colors.text} marginTop={1} wrapMode="word">
+          Delete {model} from local storage? This cannot be undone.
+        </text>
+        <text fg={colors.hint} marginTop={1}>
+          Enter confirm · Esc cancel
+        </text>
+      </box>
+    </box>
+  );
+}
+
 export function OpenTuiModelChooser({
   models = [],
   modelSettings = {},
@@ -21,9 +58,11 @@ export function OpenTuiModelChooser({
   onClose,
   onSetClassifier,
   onSetTierWorker,
+  onDeleteModel,
   onRefreshWorkerModels,
 }) {
   const [tier, setTier] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [activeControl, setActiveControl] = useState(0);
   const [classifierIndex, setClassifierIndex] = useState(0);
   const [workerIndex, setWorkerIndex] = useState(0);
@@ -85,6 +124,17 @@ export function OpenTuiModelChooser({
   }, [activeControl, classifierIndex, workerIndex]);
 
   useKeyboard((key) => {
+    if (confirmDelete) {
+      if (key.name === "return") {
+        const model = classifierOptions[classifierIndex]?.value;
+        if (model) onDeleteModel(model);
+        setConfirmDelete(false);
+      } else if (key.name === "escape") {
+        setConfirmDelete(false);
+      }
+      key.preventDefault();
+      return;
+    }
     if (key.name === "escape") {
       key.preventDefault();
       onClose();
@@ -110,6 +160,16 @@ export function OpenTuiModelChooser({
     if (key.name === "r" && activeControl === 2 && !key.ctrl && !key.meta) {
       key.preventDefault();
       onRefreshWorkerModels();
+      return;
+    }
+    if (
+      key.name === "d" &&
+      key.ctrl &&
+      activeControl === 0 &&
+      classifierOptions[classifierIndex]?.value
+    ) {
+      key.preventDefault();
+      setConfirmDelete(true);
       return;
     }
     if (activeControl === 0) {
@@ -170,7 +230,18 @@ export function OpenTuiModelChooser({
   );
 
   return (
-    <OpenTuiModal title="ROUTING & MODEL ASSIGNMENTS" fullScreen>
+    <OpenTuiModal
+      title="ROUTING & MODEL ASSIGNMENTS"
+      fullScreen
+      dimmed={confirmDelete}
+      overlay={
+        confirmDelete ? (
+          <DeleteModelDialog
+            model={modelLabel(classifierOptions[classifierIndex]?.value, modelSettings)}
+          />
+        ) : null
+      }
+    >
       <text fg={colors.muted} height={1} flexShrink={0} truncate>
         Select a router and assign an OpenAI worker to each tier.
       </text>
@@ -324,7 +395,7 @@ export function OpenTuiModelChooser({
         {error || openAIError || " "}
       </text>
       <text height={1} flexShrink={0} fg={colors.hint} truncate>
-        1–3 / Tab choose section · ↑↓ select · Enter apply · R refresh · Esc close
+        1–3 / Tab choose section · ↑↓ select · Enter apply · Ctrl+D delete · R refresh · Esc close
       </text>
     </OpenTuiModal>
   );
