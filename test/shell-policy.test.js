@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { assessShellCommand } from "../src/agent/shell-policy.js";
+import { assessShellCommand } from "../src/agent/tools/shell-policy.js";
 
 const workspace = path.resolve("/workspace/project");
 

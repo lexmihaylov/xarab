@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createShellTool } from "../src/agent/shell-tool.js";
+import { createShellTool } from "../src/agent/tools/shell-tool.js";
 
 test("runs an allowlisted read-only command from the workspace", async () => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "xarab-agent-shell-"));

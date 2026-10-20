@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createWebsearchTool } from "../src/agent/websearch-tool.js";
+import { createWebsearchTool } from "../src/agent/tools/websearch-tool.js";
 
 function response(payload, status = 200) {
   return {
@@ -69,7 +69,10 @@ test("sends a Tavily search without approval and returns source-linked excerpts"
   assert.match(result, /URL: https:\/\/example\.com\/article/);
   assert.match(result, /Useful excerpt/);
   assert.doesNotMatch(result, /javascript:|Must be omitted/);
-  assert.equal(events.some((event) => event.type === "approval_required"), false);
+  assert.equal(
+    events.some((event) => event.type === "approval_required"),
+    false,
+  );
   assert.deepEqual(events.at(-1), {
     type: "searched",
     query: "current local model news",

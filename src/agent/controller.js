@@ -2,18 +2,22 @@ import { readdir, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { buildSystemPrompt } from "./instructions.js";
-import { createReadFileTool } from "./read-file-tool.js";
-import { createListFilesTool } from "./list-files-tool.js";
-import { createSearchFilesTool } from "./search-files-tool.js";
-import { createSearchContentTool } from "./search-content-tool.js";
-import { createEditTool } from "./edit-tool.js";
-import { createInsertTool } from "./insert-tool.js";
-import { createWriteTool } from "./write-tool.js";
-import { createWebsearchTool } from "./websearch-tool.js";
-import { createWebfetchTool } from "./webfetch-tool.js";
-import { runShellCommand } from "./shell-command.js";
-import { createShellTool } from "./shell-tool.js";
-import { appendShellContext, createShellContextEntry, formatShellResult } from "./shell-context.js";
+import { createReadFileTool } from "./tools/read-file-tool.js";
+import { createListFilesTool } from "./tools/list-files-tool.js";
+import { createSearchFilesTool } from "./tools/search-files-tool.js";
+import { createSearchContentTool } from "./tools/search-content-tool.js";
+import { createEditTool } from "./tools/edit-tool.js";
+import { createInsertTool } from "./tools/insert-tool.js";
+import { createWriteTool } from "./tools/write-tool.js";
+import { createWebsearchTool } from "./tools/websearch-tool.js";
+import { createWebfetchTool } from "./tools/webfetch-tool.js";
+import { runShellCommand } from "./tools/shell-command.js";
+import { createShellTool } from "./tools/shell-tool.js";
+import {
+  appendShellContext,
+  createShellContextEntry,
+  formatShellResult,
+} from "./tools/shell-context.js";
 import { createConfigStore } from "./config.js";
 import { searchHuggingFaceModels } from "./model-search.js";
 import { downloadModelFile } from "./download-model.js";

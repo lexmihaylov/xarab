@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createInsertTool } from "../src/agent/insert-tool.js";
+import { createInsertTool } from "../src/agent/tools/insert-tool.js";
 
 async function withWorkspace(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-insert-tool-"));
@@ -56,11 +56,17 @@ test("line-boundary insertions add missing newlines using the file convention", 
     const target = path.join(workspace, "file.txt");
     await writeFile(target, "first\r\nanchor\r\nlast");
     const before = createInsertTool({ workspace, position: "before" });
-    assert.match(await before.handler({ path: "file.txt", anchor: "anchor", content: "added" }), /Inserted before/);
+    assert.match(
+      await before.handler({ path: "file.txt", anchor: "anchor", content: "added" }),
+      /Inserted before/,
+    );
     assert.equal(await readFile(target, "utf8"), "first\r\nadded\r\nanchor\r\nlast");
 
     const after = createInsertTool({ workspace, position: "after" });
-    assert.match(await after.handler({ path: "file.txt", anchor: "last", content: "tail" }), /Inserted after/);
+    assert.match(
+      await after.handler({ path: "file.txt", anchor: "last", content: "tail" }),
+      /Inserted after/,
+    );
     assert.equal(await readFile(target, "utf8"), "first\r\nadded\r\nanchor\r\nlast\r\ntail");
   });
 });

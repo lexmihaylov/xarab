@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createEditTool } from "../src/agent/edit-tool.js";
+import { createEditTool } from "../src/agent/tools/edit-tool.js";
 
 async function withWorkspace(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-edit-tool-"));
@@ -41,7 +41,11 @@ test("matches exact-read LF excerpts against CRLF files and preserves remaining 
     const tool = createEditTool({ workspace });
 
     assert.match(
-      await tool.handler({ path: "crlf.txt", oldString: "old value\nafter", newString: "new value\nafter" }),
+      await tool.handler({
+        path: "crlf.txt",
+        oldString: "old value\nafter",
+        newString: "new value\nafter",
+      }),
       /Edited crlf\.txt/,
     );
     assert.equal(await readFile(target, "utf8"), "before\r\nnew value\nafter\r\n");

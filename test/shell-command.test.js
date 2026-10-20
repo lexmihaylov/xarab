@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runShellCommand } from "../src/agent/shell-command.js";
+import { runShellCommand } from "../src/agent/tools/shell-command.js";
 
 test("runs a user-provided local command and captures stdout/stderr", async () => {
   const result = await runShellCommand("printf 'hello'; printf 'note' >&2; exit 3", {

@@ -61,9 +61,15 @@ export function createInsertTool({ workspace = process.cwd(), onEvent = () => {}
         const insertionPoint = position === "before" ? match.index : match.index + match.length;
         const newline = original.includes("\r\n") ? "\r\n" : "\n";
         let inserted = content;
-        if (position === "before" && (match.index === 0 || /\r?\n$/.test(original.slice(0, match.index)))) {
+        if (
+          position === "before" &&
+          (match.index === 0 || /\r?\n$/.test(original.slice(0, match.index)))
+        ) {
           if (!inserted.endsWith("\n")) inserted += newline;
-        } else if (position === "after" && (insertionPoint === original.length || /^\r?\n/.test(original.slice(insertionPoint)))) {
+        } else if (
+          position === "after" &&
+          (insertionPoint === original.length || /^\r?\n/.test(original.slice(insertionPoint)))
+        ) {
           if (!inserted.startsWith("\n")) inserted = `${newline}${inserted}`;
         }
         const updated = `${original.slice(0, insertionPoint)}${inserted}${original.slice(insertionPoint)}`;

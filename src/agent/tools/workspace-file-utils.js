@@ -82,12 +82,19 @@ export function findText(source, requested) {
   let index = 0;
   let sourceIndex = 0;
   while (index < normalizedIndex) {
-    sourceIndex += normalizedSource[index] === "\n" && source.slice(sourceIndex, sourceIndex + 2) === "\r\n" ? 2 : 1;
+    sourceIndex +=
+      normalizedSource[index] === "\n" && source.slice(sourceIndex, sourceIndex + 2) === "\r\n"
+        ? 2
+        : 1;
     index += 1;
   }
   let sourceLength = 0;
   for (const character of normalizedRequested) {
-    sourceLength += character === "\n" && source.slice(sourceIndex + sourceLength, sourceIndex + sourceLength + 2) === "\r\n" ? 2 : 1;
+    sourceLength +=
+      character === "\n" &&
+      source.slice(sourceIndex + sourceLength, sourceIndex + sourceLength + 2) === "\r\n"
+        ? 2
+        : 1;
   }
   return { index: sourceIndex, length: sourceLength };
 }
