@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 
 const MODEL_URI = "hf:bartowski/SmolLM2-360M-Instruct-GGUF:F16";
-const MODEL_NAME = "SmolLM2-360M-Instruct-f16.gguf";
+const MODEL_NAME = "hf_bartowski_SmolLM2-360M-Instruct.F16.gguf";
 const modelsDir = process.env.XARAB_MODELS_DIR || path.join(os.homedir(), ".xarab", "models");
 const routingConfigPath = path.join(os.homedir(), ".xarab", "routing.conf");
 
@@ -47,9 +47,7 @@ async function classifierFile() {
   } catch {
     const files = await readdir(modelsDir, { withFileTypes: true }).catch(() => []);
     const match = files.find(
-      (entry) =>
-        entry.isFile() &&
-        entry.name.toLowerCase() === MODEL_NAME.toLowerCase(),
+      (entry) => entry.isFile() && entry.name.toLowerCase() === MODEL_NAME.toLowerCase(),
     );
     return match ? path.join(modelsDir, match.name) : null;
   }
