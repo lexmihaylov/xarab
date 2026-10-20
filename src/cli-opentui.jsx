@@ -9,7 +9,7 @@ import { createRoot } from "@opentui/react";
 import { createAssistantController } from "./agent/controller.js";
 import { loadProjectInstructions } from "./agent/instructions.js";
 import { acquireInstanceLock } from "./instance-lock.js";
-import { OpenTuiApp } from "./ui/opentui/app.component.jsx";
+import { OpenTuiApp } from "./ui/app.component.jsx";
 
 const releaseInstanceLock = await acquireInstanceLock();
 if (!releaseInstanceLock) {
