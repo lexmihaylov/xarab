@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { browserColors as colors } from "./model-browser-theme.js";
-import { OpenTuiModal } from "./modal.component.jsx";
+import { Modal } from "./modal.component.jsx";
 
 function modelLabel(modelPath, settings = {}) {
   return settings[modelPath]?.name?.trim() || modelPath.split(/[\\/]/).at(-1);
@@ -44,7 +44,7 @@ function DeleteModelDialog({ model }) {
   );
 }
 
-export function OpenTuiModelChooser({
+export function ModelChooser({
   models = [],
   modelSettings = {},
   classifierModel,
@@ -230,7 +230,7 @@ export function OpenTuiModelChooser({
   );
 
   return (
-    <OpenTuiModal
+    <Modal
       title="ROUTING & MODEL ASSIGNMENTS"
       fullScreen
       dimmed={confirmDelete}
@@ -397,6 +397,6 @@ export function OpenTuiModelChooser({
       <text height={1} flexShrink={0} fg={colors.hint} truncate>
         1–3 / Tab choose section · ↑↓ select · Enter apply · Ctrl+D delete · R refresh · Esc close
       </text>
-    </OpenTuiModal>
+    </Modal>
   );
 }

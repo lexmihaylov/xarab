@@ -9,7 +9,7 @@ function formatBytes(bytes) {
   return `${(bytes / 1_000_000_000).toFixed(2)} GB`;
 }
 
-export function OpenTuiDownloadProgressDialog({
+export function DownloadProgressDialog({
   fileName,
   progress = 0,
   totalSize = 0,

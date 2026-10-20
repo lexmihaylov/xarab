@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { OpenTuiSessionBrowser } from "../src/ui/session-browser.component.jsx";
+import { SessionBrowser } from "../src/ui/session-browser.component.jsx";
 
 const sessions = [
   {
@@ -25,7 +25,7 @@ const sessions = [
 
 async function renderBrowser(props = {}) {
   const view = await testRender(
-    React.createElement(OpenTuiSessionBrowser, {
+    React.createElement(SessionBrowser, {
       sessions,
       onClose() {},
       onSelect() {},

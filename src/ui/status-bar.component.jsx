@@ -8,7 +8,7 @@ function truncate(value, maxLength) {
   return `${value.slice(0, maxLength - 3)}...`;
 }
 
-export function OpenTuiStatusBar({ status, sessionTitle, sessionError, notice }) {
+export function StatusBar({ status, sessionTitle, sessionError, notice }) {
   const renderer = useRenderer();
   const [width, setWidth] = useState(renderer.width);
   useOnResize((nextWidth) => setWidth(nextWidth));

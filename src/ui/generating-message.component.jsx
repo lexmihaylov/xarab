@@ -1,13 +1,13 @@
 import React from "react";
 import { browserColors as colors } from "./model-browser-theme.js";
-import { OpenTuiMessageCard } from "./message-card.component.jsx";
+import { MessageCard } from "./message-card.component.jsx";
 
-export function OpenTuiGeneratingMessage() {
+export function GeneratingMessage() {
   return (
-    <OpenTuiMessageCard label="Assistant" color={colors.green}>
+    <MessageCard label="Assistant" color={colors.green}>
       <text fg={colors.hint} selectable>
         Generating…
       </text>
-    </OpenTuiMessageCard>
+    </MessageCard>
   );
 }

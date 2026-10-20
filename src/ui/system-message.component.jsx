@@ -12,7 +12,7 @@ function toText(value) {
   return typeof value === "string" ? value : String(value);
 }
 
-export function OpenTuiSystemMessage({ text, severity = "info" }) {
+export function SystemMessage({ text, severity = "info" }) {
   const style = severityStyles[severity] ?? severityStyles.info;
 
   return (

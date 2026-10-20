@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { browserColors as colors } from "./model-browser-theme.js";
 import { cleanModelText as clean } from "./model-browser-view.js";
-import { OpenTuiModal } from "./modal.component.jsx";
+import { Modal } from "./modal.component.jsx";
 
 function PreviewMessage({ message }) {
   if (message.type === "user") {
@@ -47,7 +47,7 @@ function PreviewMessage({ message }) {
   );
 }
 
-export function OpenTuiSessionBrowser({
+export function SessionBrowser({
   sessions = [],
   currentId,
   loading,
@@ -186,7 +186,7 @@ export function OpenTuiSessionBrowser({
   };
 
   return (
-    <OpenTuiModal title="SAVED SESSIONS" fullScreen>
+    <Modal title="SAVED SESSIONS" fullScreen>
       <box flexDirection="column" flexGrow={1} minHeight={0} gap={1} overflow="hidden">
         <box
           height={4}
@@ -381,6 +381,6 @@ export function OpenTuiSessionBrowser({
           </text>
         </box>
       )}
-    </OpenTuiModal>
+    </Modal>
   );
 }

@@ -2,11 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act, useState } from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { agentTimelineEntries, OpenTuiApp } from "../src/ui/app.component.jsx";
-import { OpenTuiAssistantMessage } from "../src/ui/assistant-message.component.jsx";
+import { agentTimelineEntries, App } from "../src/ui/app.component.jsx";
+import { AssistantMessage } from "../src/ui/assistant-message.component.jsx";
 
 async function renderMessage(props) {
-  const view = await testRender(React.createElement(OpenTuiAssistantMessage, props), {
+  const view = await testRender(React.createElement(AssistantMessage, props), {
     width: 60,
     height: 12,
   });
@@ -69,7 +69,7 @@ test("renders multiple fenced code blocks without exposing markdown markers", as
     "```",
   ].join("\n");
   const view = await testRender(
-    React.createElement(OpenTuiAssistantMessage, { message: { message: content } }),
+    React.createElement(AssistantMessage, { message: { message: content } }),
     { width: 80, height: 24 },
   );
   await view.flush();
@@ -106,7 +106,7 @@ test("keeps streamed markdown concealed while code fences arrive incrementally",
       status: "",
     });
     updateState = setState;
-    return React.createElement(OpenTuiApp, {
+    return React.createElement(App, {
       state,
       onSubmit() {},
       onStopGeneration() {},

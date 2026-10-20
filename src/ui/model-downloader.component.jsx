@@ -3,8 +3,8 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { getHuggingFaceModelDetails } from "../agent/model-search.js";
 import { cleanModelText as clean, compactCount, modelDetailRows } from "./model-browser-view.js";
 import { browserColors, dimmedColors } from "./model-browser-theme.js";
-import { OpenTuiDownloadProgressDialog } from "./download-progress-dialog.component.jsx";
-import { OpenTuiModal } from "./modal.component.jsx";
+import { DownloadProgressDialog } from "./download-progress-dialog.component.jsx";
+import { Modal } from "./modal.component.jsx";
 
 const tabs = ["Overview", "Model card", "Metadata"];
 
@@ -44,7 +44,7 @@ function MarqueeText({ text, width, active, fg, bold }) {
   );
 }
 
-export function OpenTuiModelDownloader({
+export function ModelDownloader({
   downloads = [],
   searching,
   downloading,
@@ -217,7 +217,7 @@ export function OpenTuiModelDownloader({
         : downloadNotice ||
           `${downloads.length} results${searchQuery ? ` for ${clean(searchQuery)}` : ""}`);
   return (
-    <OpenTuiModal title="DOWNLOAD A MODEL" fullScreen>
+    <Modal title="DOWNLOAD A MODEL" fullScreen>
       <box
         height={4}
         flexShrink={0}
@@ -505,7 +505,7 @@ export function OpenTuiModelDownloader({
         </>
       )}
       {downloading && (
-        <OpenTuiDownloadProgressDialog
+        <DownloadProgressDialog
           fileName={downloadFileName || downloading.split("/").at(-1)}
           progress={progress}
           totalSize={totalSize}
@@ -513,6 +513,6 @@ export function OpenTuiModelDownloader({
           canceling={canceling}
         />
       )}
-    </OpenTuiModal>
+    </Modal>
   );
 }

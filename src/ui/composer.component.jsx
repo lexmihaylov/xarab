@@ -14,7 +14,7 @@ const commandOptions = [
   { command: "/exit", description: "Exit Xarab" },
 ];
 
-export function OpenTuiComposer({
+export function Composer({
   flexShrink = 0,
   sessionId,
   draft,

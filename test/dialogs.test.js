@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { OpenTuiModelChooser } from "../src/ui/model-chooser.component.jsx";
-import { OpenTuiStatusBar } from "../src/ui/status-bar.component.jsx";
-import { OpenTuiToolApprovalDialog } from "../src/ui/tool-approval-dialog.component.jsx";
+import { ModelChooser } from "../src/ui/model-chooser.component.jsx";
+import { StatusBar } from "../src/ui/status-bar.component.jsx";
+import { ToolApprovalDialog } from "../src/ui/tool-approval-dialog.component.jsx";
 
 async function render(element, options = { width: 120, height: 30 }) {
   const view = await testRender(element, options);
@@ -16,9 +16,9 @@ test("tool approval shows the request and lets users approve or deny it", async 
   const approved = [];
   const denied = [];
   const view = await render(
-    React.createElement(OpenTuiToolApprovalDialog, {
+    React.createElement(ToolApprovalDialog, {
       type: "websearch",
-      command: "OpenTUI documentation",
+      command: "Terminal UI documentation",
       reasons: ["External network access is required."],
       onApprove: () => approved.push(true),
       onDeny: () => denied.push(true),
@@ -27,7 +27,7 @@ test("tool approval shows the request and lets users approve or deny it", async 
   try {
     const frame = view.captureCharFrame();
     assert.match(frame, /WEB SEARCH APPROVAL/);
-    assert.match(frame, /OpenTUI documentation/);
+    assert.match(frame, /Terminal UI documentation/);
     assert.match(frame, /External network access is required/);
     await act(async () => view.mockInput.pressKey("y"));
     await act(async () => view.mockInput.pressKey("n"));
@@ -42,7 +42,7 @@ test("model chooser applies the selected router and worker model", async () => {
   const classifiers = [];
   const workers = [];
   const view = await render(
-    React.createElement(OpenTuiModelChooser, {
+    React.createElement(ModelChooser, {
       models: ["/models/router.gguf"],
       modelSettings: {},
       classifierModel: null,
@@ -73,7 +73,7 @@ test("model chooser applies the selected router and worker model", async () => {
 test("model chooser deletes a selected router after confirmation", async () => {
   const deleted = [];
   const view = await render(
-    React.createElement(OpenTuiModelChooser, {
+    React.createElement(ModelChooser, {
       models: ["/models/router.gguf"],
       modelSettings: {},
       classifierModel: null,
@@ -107,7 +107,7 @@ test("model chooser deletes a selected router after confirmation", async () => {
 
 test("status bar prioritizes session persistence errors", async () => {
   const view = await render(
-    React.createElement(OpenTuiStatusBar, {
+    React.createElement(StatusBar, {
       status: "Ready",
       sessionTitle: "A saved conversation",
       sessionError: "Session save failed",

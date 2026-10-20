@@ -427,7 +427,7 @@ export function createAssistantController({
     notify();
   }
 
-  function addMessage({ type, message, severity = "info", classification }) {
+  function addMessage({ type, message, severity = "info", classification, command }) {
     const colors = { user: "#8fbfdc", agent: "#a8d5a2", system: "#aeb8c4", intent: "#657383" };
     const color =
       type === "system" && severity === "warning"
@@ -435,7 +435,14 @@ export function createAssistantController({
         : type === "system" && severity === "error"
           ? "#ef7777"
           : colors[type];
-    const entry = { type, message, severity, color, ...(classification ? { classification } : {}) };
+    const entry = {
+      type,
+      message,
+      severity,
+      color,
+      ...(command !== undefined ? { command } : {}),
+      ...(classification ? { classification } : {}),
+    };
     messages.push(entry);
     if (type === "user" && !activeSession.manualTitle && activeSession.title === "New session")
       activeSession.title =
@@ -681,7 +688,7 @@ export function createAssistantController({
             currentAgentMessage.parts.push(part);
             sessionChanged();
             notify();
-            // Let OpenTUI paint the running tool card before the handler starts.
+            // Let the UI paint the running tool card before the handler starts.
             await new Promise((resolve) => setImmediate(resolve));
           }
           try {
@@ -745,6 +752,7 @@ export function createAssistantController({
     updateStatus("Ready");
     addMessage({
       type: "shell",
+      command,
       message: formatShellResult(command, result, workspace),
       severity: result.timedOut || result.error ? "error" : result.code === 0 ? "info" : "warning",
     });

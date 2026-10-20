@@ -6,7 +6,7 @@
     "xarab": "bin/xarab.js"
   },
   "scripts": {
-    "start": "tsx src/cli-opentui.jsx",
+    "start": "tsx src/cli.jsx",
     "logo:generate": "node scripts/generate-scarab.js",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",

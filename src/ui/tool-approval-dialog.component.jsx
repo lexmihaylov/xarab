@@ -1,7 +1,7 @@
 import React from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { browserColors as colors } from "./model-browser-theme.js";
-import { OpenTuiModal } from "./modal.component.jsx";
+import { Modal } from "./modal.component.jsx";
 
 function approvalTitle(type) {
   if (type === "websearch") return "WEB SEARCH APPROVAL";
@@ -21,13 +21,7 @@ function actionName(type) {
   return "RUN";
 }
 
-export function OpenTuiToolApprovalDialog({
-  type = "shell",
-  command,
-  reasons = [],
-  onApprove,
-  onDeny,
-}) {
+export function ToolApprovalDialog({ type = "shell", command, reasons = [], onApprove, onDeny }) {
   useKeyboard((key) => {
     if (key.name === "return" || (!key.ctrl && !key.meta && key.name === "y")) {
       key.preventDefault();
@@ -105,7 +99,7 @@ export function OpenTuiToolApprovalDialog({
   );
 
   return (
-    <OpenTuiModal title={approvalTitle(type)} fullScreen>
+    <Modal title={approvalTitle(type)} fullScreen>
       <box
         flexDirection="column"
         border
@@ -180,6 +174,6 @@ export function OpenTuiToolApprovalDialog({
           </text>
         </box>
       </box>
-    </OpenTuiModal>
+    </Modal>
   );
 }

@@ -3,7 +3,7 @@ import { browserColors as colors } from "./model-browser-theme.js";
 
 // The scrim owns the complete terminal, while the centered panel has no extra
 // border or background treatment of its own.
-export function OpenTuiModal({
+export function Modal({
   title,
   children,
   overlay,

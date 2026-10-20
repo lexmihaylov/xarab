@@ -1,6 +1,6 @@
 import React from "react";
 
-export function OpenTuiMessageCard({
+export function MessageCard({
   label,
   color,
   children,

@@ -1,22 +1,27 @@
 import React from "react";
+import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
 import { browserColors as colors } from "./model-browser-theme.js";
-import { OpenTuiMessageCard } from "./message-card.component.jsx";
+import { shellSummary } from "./shell-summary.js";
 
-function toText(value) {
-  if (value == null) return " ";
-  return typeof value === "string" ? value : String(value);
-}
+const severityStyle = {
+  info: { color: colors.accent, prefix: "" },
+  warning: { color: colors.warning, prefix: "…" },
+  error: { color: colors.error, prefix: "✕" },
+};
 
-export function OpenTuiShellMessage({ message, severity }) {
-  const isError = severity === "error";
+export function ShellMessage({ message }) {
+  const command = typeof message.command === "string" ? message.command : "";
+  const output = shellSummary(message.message);
+  const status = severityStyle[message.severity] ?? severityStyle.info;
+  const isError = message.severity === "error";
+
   return (
-    <OpenTuiMessageCard
-      label={isError ? "Shell error" : "Shell"}
-      color={isError ? colors.error : colors.accent}
-    >
-      <text fg={colors.text} selectable wrapMode="word">
-        {toText(message)}
-      </text>
-    </OpenTuiMessageCard>
+    <ExecutionMessageCard
+      color={status.color}
+      prefix={status.prefix}
+      title={command ? `Executed ${command}` : "Shell command"}
+      summary={output}
+      error={isError}
+    />
   );
 }

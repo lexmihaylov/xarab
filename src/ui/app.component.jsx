@@ -1,20 +1,20 @@
 import React, { useRef, useState } from "react";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
 import { copyToClipboard } from "../agent/clipboard.js";
-import { OpenTuiComposer } from "./composer.component.jsx";
-import { OpenTuiStatusBar } from "./status-bar.component.jsx";
-import { OpenTuiAssistantMessage } from "./assistant-message.component.jsx";
-import { OpenTuiGeneratingMessage } from "./generating-message.component.jsx";
-import { OpenTuiIntentMessage } from "./intent-message.component.jsx";
-import { OpenTuiShellMessage } from "./shell-message.component.jsx";
-import { OpenTuiUserMessage } from "./user-message.component.jsx";
-import { OpenTuiUnknownMessage } from "./unknown-message.component.jsx";
-import { OpenTuiSystemMessage } from "./system-message.component.jsx";
-import { OpenTuiToolMessage } from "./tool-message.component.jsx";
-import { OpenTuiToolApprovalDialog } from "./tool-approval-dialog.component.jsx";
-import { OpenTuiModelChooser } from "./model-chooser.component.jsx";
-import { OpenTuiModelDownloader } from "./model-downloader.component.jsx";
-import { OpenTuiSessionBrowser } from "./session-browser.component.jsx";
+import { Composer } from "./composer.component.jsx";
+import { StatusBar } from "./status-bar.component.jsx";
+import { AssistantMessage } from "./assistant-message.component.jsx";
+import { GeneratingMessage } from "./generating-message.component.jsx";
+import { IntentMessage } from "./intent-message.component.jsx";
+import { ShellMessage } from "./shell-message.component.jsx";
+import { UserMessage } from "./user-message.component.jsx";
+import { UnknownMessage } from "./unknown-message.component.jsx";
+import { SystemMessage } from "./system-message.component.jsx";
+import { ToolMessage } from "./tool-message.component.jsx";
+import { ToolApprovalDialog } from "./tool-approval-dialog.component.jsx";
+import { ModelChooser } from "./model-chooser.component.jsx";
+import { ModelDownloader } from "./model-downloader.component.jsx";
+import { SessionBrowser } from "./session-browser.component.jsx";
 
 const pageScrollKeys = new Map([
   ["pageup", -1],
@@ -24,19 +24,17 @@ const pageScrollKeys = new Map([
 function Message({ message }) {
   switch (message.type) {
     case "user":
-      return (
-        <OpenTuiUserMessage message={message.message} classification={message.classification} />
-      );
+      return <UserMessage message={message.message} classification={message.classification} />;
     case "system":
-      return <OpenTuiSystemMessage text={message.message} severity={message.severity} />;
+      return <SystemMessage text={message.message} severity={message.severity} />;
     case "intent":
-      return <OpenTuiIntentMessage message={message.message} />;
+      return <IntentMessage message={message.message} />;
     case "shell":
-      return <OpenTuiShellMessage message={message.message} severity={message.severity} />;
+      return <ShellMessage message={message} />;
     case "generating":
-      return <OpenTuiGeneratingMessage />;
+      return <GeneratingMessage />;
     default:
-      return <OpenTuiUnknownMessage type={message.type} message={message.message} />;
+      return <UnknownMessage type={message.type} message={message.message} />;
   }
 }
 
@@ -81,7 +79,7 @@ export function agentTimelineEntries(message, generating = false) {
   return entries;
 }
 
-export function OpenTuiApp({
+export function App({
   state,
   syntaxStyle,
   onSubmit,
@@ -189,9 +187,9 @@ export function OpenTuiApp({
                 key: `${message.type}-${index}-${entry.key}`,
                 element:
                   entry.type === "tool" ? (
-                    <OpenTuiToolMessage part={entry.part} syntaxStyle={syntaxStyle} />
+                    <ToolMessage part={entry.part} syntaxStyle={syntaxStyle} />
                   ) : (
-                    <OpenTuiAssistantMessage
+                    <AssistantMessage
                       message={message}
                       responseText={entry.responseText}
                       generating={entry.generating}
@@ -215,7 +213,7 @@ export function OpenTuiApp({
             ));
           })}
         </scrollbox>
-        <OpenTuiComposer
+        <Composer
           flexShrink={0}
           sessionId={state.currentSession?.id}
           draft={state.sessionDraft}
@@ -229,7 +227,7 @@ export function OpenTuiApp({
           onStopGeneration={onStopGeneration}
           onSessions={onOpenSessions}
         />
-        <OpenTuiStatusBar
+        <StatusBar
           status={state.status}
           sessionTitle={state.currentSession?.title}
           sessionError={state.sessionError}
@@ -237,14 +235,14 @@ export function OpenTuiApp({
         />
       </box>
       {state.toolApproval && (
-        <OpenTuiToolApprovalDialog
+        <ToolApprovalDialog
           {...state.toolApproval}
           onApprove={onApproveToolAction}
           onDeny={onDenyToolAction}
         />
       )}
       {state.sessionModal && (
-        <OpenTuiSessionBrowser
+        <SessionBrowser
           {...state.sessionModal}
           currentId={state.currentSession?.id}
           busy={state.sessionOperation}
@@ -256,7 +254,7 @@ export function OpenTuiApp({
         />
       )}
       {state.modelModal?.mode === "chooser" && (
-        <OpenTuiModelChooser
+        <ModelChooser
           {...state.modelModal}
           onClose={onCloseModelModal}
           onSetClassifier={onSetRouterClassifier}
@@ -266,7 +264,7 @@ export function OpenTuiApp({
         />
       )}
       {state.modelModal?.mode === "download" && (
-        <OpenTuiModelDownloader
+        <ModelDownloader
           {...state.modelModal}
           onClose={onCloseModelModal}
           onDownloadSelected={onDownloadSelectedModel}

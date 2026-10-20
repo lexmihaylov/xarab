@@ -66,6 +66,44 @@ test("controller owns command handling and publishes updated UI state", async (t
   await controller.shutdown();
 });
 
+test("manual shell commands persist command, output, and severity", async (t) => {
+  const temporary = await mkdtemp("/tmp/opencode/xarab-shell-test-");
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const controller = createAssistantController({
+    root: temporary,
+    workspace: temporary,
+    instructionFiles: [],
+    configPath: path.join(temporary, "config.json"),
+  });
+  await controller.initialize();
+
+  await controller.submit("!printf success-output");
+  const success = controller.getState().messages.at(-2);
+  assert.deepEqual(
+    {
+      type: success.type,
+      command: success.command,
+      severity: success.severity,
+    },
+    { type: "shell", command: "printf success-output", severity: "info" },
+  );
+  assert.match(success.message, /success-output/);
+
+  await controller.submit("!false");
+  const warning = controller.getState().messages.at(-2);
+  assert.equal(warning.type, "shell");
+  assert.equal(warning.command, "false");
+  assert.equal(warning.severity, "warning");
+
+  await controller.submit("!command-that-does-not-exist-xarab");
+  const failure = controller.getState().messages.at(-2);
+  assert.equal(failure.type, "shell");
+  assert.equal(failure.command, "command-that-does-not-exist-xarab");
+  assert.equal(failure.severity, "warning");
+
+  await controller.shutdown();
+});
+
 test("selecting a classifier loads it and persists classifier configuration", async (t) => {
   const temporary = await mkdtemp("/tmp/opencode/xarab-model-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));

@@ -8,7 +8,7 @@ function toText(value) {
 
 const loadingFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
-export function OpenTuiUserMessage({ message, classification }) {
+export function UserMessage({ message, classification }) {
   const [frame, setFrame] = useState(0);
   const classifying = classification?.status === "classifying";
 

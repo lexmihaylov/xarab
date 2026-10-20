@@ -2,4 +2,4 @@
 
 import { tsImport } from "tsx/esm/api";
 
-await tsImport("../src/cli-opentui.jsx", import.meta.url);
+await tsImport("../src/cli.jsx", import.meta.url);

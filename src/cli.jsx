@@ -9,7 +9,7 @@ import { createRoot } from "@opentui/react";
 import { createAssistantController } from "./agent/controller.js";
 import { loadProjectInstructions } from "./agent/instructions.js";
 import { acquireInstanceLock } from "./instance-lock.js";
-import { OpenTuiApp } from "./ui/app.component.jsx";
+import { App } from "./ui/app.component.jsx";
 
 const releaseInstanceLock = await acquireInstanceLock();
 if (!releaseInstanceLock) {
@@ -42,7 +42,7 @@ let controller;
 let updateAppState;
 let shuttingDown = false;
 
-function OpenTuiRoot({ initialState }) {
+function Root({ initialState }) {
   const [state, setState] = useState(initialState);
 
   useEffect(() => {
@@ -57,7 +57,7 @@ function OpenTuiRoot({ initialState }) {
 
 function renderApp(state) {
   return (
-    <OpenTuiApp
+    <App
       state={state}
       syntaxStyle={syntaxStyle}
       onSubmit={(value) => void controller.submit(value)}
@@ -111,5 +111,5 @@ controller = createAssistantController({
   },
 });
 
-ui.render(<OpenTuiRoot initialState={controller.getState()} />);
+ui.render(<Root initialState={controller.getState()} />);
 await controller.initialize();
