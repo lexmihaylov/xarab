@@ -8,13 +8,11 @@ import {
 } from "../src/agent/routing.js";
 
 test("classifier instructions distinguish bounded, involved, and exceptional work", () => {
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 = bounded and clear/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 = needs investigation or judgment/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /exceptional and rare/);
-  assert.match(
-    TIER_CLASSIFIER_INSTRUCTIONS,
-    /broad context across a large project.*substantial external web research/s,
-  );
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Bounded execution/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Involved execution/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /3 — Exceptional execution/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /broad context across a large project/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /substantial external research and synthesis/);
   assert.doesNotMatch(TIER_CLASSIFIER_INSTRUCTIONS, /Astra|Sol|Luna/);
 });
 
@@ -90,7 +88,7 @@ test("loads one local model, resets context between cases, and releases resource
       };
     },
     createSession(options) {
-      assert.match(options.systemPrompt, /Route by the work actually required/);
+      assert.match(options.systemPrompt, /Classify the user's request by the work required/);
       return {
         async prompt(prompt, settings) {
           calls.prompts.push({ prompt, settings });
