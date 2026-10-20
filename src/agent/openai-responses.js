@@ -28,6 +28,7 @@ export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch
     tools = {},
     signal,
     onText = () => {},
+    onTextDelta,
     onEvent = () => {},
   }) {
     if (!model) throw new Error("Choose an OpenAI model first.");
@@ -66,10 +67,17 @@ export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch
       });
       if (!response.ok) throw await responseError(response, "OpenAI Responses request");
       const streamedChunks = [];
+      let streamedText = "";
       completedResponse = await readResponseStream(response, {
         onText(chunk) {
           streamedChunks.push(chunk);
         },
+        onTextDelta: onTextDelta
+          ? (chunk) => {
+              streamedText += chunk;
+              onTextDelta(chunk);
+            }
+          : undefined,
         onEvent,
         signal,
       });
@@ -85,7 +93,14 @@ export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch
           throw new Error(
             "OpenAI returned a textual tool call instead of a structured function call.",
           );
-        if (streamedChunks.length) streamedChunks.forEach(onText);
+        // When deltas were supplied, text has already been forwarded during
+        // streaming. Some Responses API completions still include the final
+        // text only in `response.output`, so forward it only if no delta arrived.
+        if (onTextDelta) {
+          if (!streamedText && outputText) onTextDelta(outputText);
+          else if (!streamedText && !outputText && sawToolCall)
+            throw new Error("OpenAI completed the turn after a tool call without a text response.");
+        } else if (streamedChunks.length) streamedChunks.forEach(onText);
         else if (outputText) onText(outputText);
         else if (sawToolCall)
           throw new Error("OpenAI completed the turn after a tool call without a text response.");
@@ -150,7 +165,7 @@ export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch
   return { listModels, run };
 }
 
-async function readResponseStream(response, { onText, onEvent, signal }) {
+async function readResponseStream(response, { onText, onTextDelta, onEvent, signal }) {
   if (!response.body?.getReader) throw new Error("OpenAI response did not provide a stream.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -170,8 +185,11 @@ async function readResponseStream(response, { onText, onEvent, signal }) {
     } catch {
       throw new Error("OpenAI returned a malformed streaming event.");
     }
-    if (event.type === "response.output_text.delta") onText(event.delta ?? "");
-    else if (event.type === "response.completed" || event.type === "response.done")
+    if (event.type === "response.output_text.delta") {
+      const delta = event.delta ?? "";
+      onTextDelta?.(delta);
+      if (!onTextDelta) onText(delta);
+    } else if (event.type === "response.completed" || event.type === "response.done")
       completed = event.response;
     else if (event.type === "response.failed") {
       const error = event.response?.error;

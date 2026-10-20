@@ -187,7 +187,7 @@ export function createLocalTierClassifier({
       queue = operation.catch(() => {});
       return operation;
     },
-    async dispose() {
+    dispose() {
       if (disposal) return disposal;
       disposed = true;
       disposal = (async () => {

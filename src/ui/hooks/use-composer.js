@@ -10,6 +10,7 @@ const commandOptions = [
   { command: "/new", description: "Start a new session" },
   { command: "/save", description: "Save or name this session" },
   { command: "/clear", description: "Clear the conversation" },
+  { command: "/compact", description: "Summarize and compact the conversation" },
   { command: "/quit", description: "Exit Xarab" },
   { command: "/exit", description: "Exit Xarab" },
 ];
