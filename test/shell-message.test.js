@@ -22,7 +22,8 @@ test("renders a successful shell command separately from its output", async () =
   });
   try {
     const frame = view.captureCharFrame();
-    assert.match(frame, /Executed git status/);
+    assert.match(frame, /Command injection/);
+    assert.match(frame, /> git status/);
     assert.match(frame, /On branch main/);
     assert.doesNotMatch(frame, /Tool/);
   } finally {
@@ -41,7 +42,8 @@ test("renders warning and error shell statuses with their output", async (t) => 
       });
       try {
         const frame = view.captureCharFrame();
-        assert.match(frame, /Executed false/);
+        assert.match(frame, /Command injection/);
+        assert.match(frame, /> false/);
         assert.match(frame, /command failed/);
       } finally {
         await view.dispose();

@@ -154,14 +154,7 @@ export function App({
 
   return (
     <box position="relative" width="100%" height="100%" overflow="hidden">
-      <box
-        flexDirection="column"
-        width="100%"
-        height="100%"
-        minHeight={0}
-        overflow="hidden"
-        paddingX={1}
-      >
+      <box flexDirection="column" width="100%" height="100%" minHeight={0} overflow="hidden">
         <scrollbox
           ref={chatRef}
           flexGrow={1}

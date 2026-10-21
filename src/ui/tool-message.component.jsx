@@ -1,4 +1,5 @@
 import React from "react";
+import { CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
 import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
 import { browserColors as colors } from "./model-browser-theme.js";
 import { shellSummary } from "./shell-summary.js";
@@ -26,7 +27,9 @@ export function ToolMessage({ part, syntaxStyle }) {
   return (
     <ExecutionMessageCard
       color={status.color}
-      prefix={status.prefix}
+      prefix={
+        part.status === "running" ? <CompactLoadingIndicator color={status.color} /> : status.prefix
+      }
       title={title}
       summary={summary}
       error={isError}

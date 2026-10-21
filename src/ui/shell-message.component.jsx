@@ -12,6 +12,7 @@ const severityStyle = {
 export function ShellMessage({ message }) {
   const command = typeof message.command === "string" ? message.command : "";
   const output = shellSummary(message.message);
+  const summary = [command && `> ${command}`, output].filter(Boolean).join("\n\n");
   const status = severityStyle[message.severity] ?? severityStyle.info;
   const isError = message.severity === "error";
 
@@ -19,8 +20,8 @@ export function ShellMessage({ message }) {
     <ExecutionMessageCard
       color={status.color}
       prefix={status.prefix}
-      title={command ? `Executed ${command}` : "Shell command"}
-      summary={output}
+      title="Command injection"
+      summary={summary}
       error={isError}
     />
   );

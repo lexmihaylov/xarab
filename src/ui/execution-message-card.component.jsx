@@ -12,8 +12,15 @@ export function ExecutionMessageCard({ color, prefix, title, summary, error, chi
       borderColor={color}
     >
       <box flexDirection="row">
+        {prefix &&
+          (React.isValidElement(prefix) ? (
+            <box marginRight={1}>{prefix}</box>
+          ) : (
+            <text fg={error ? colors.error : color} bold selectable>
+              {`${prefix} `}
+            </text>
+          ))}
         <text fg={error ? colors.error : color} bold selectable>
-          {prefix ? `${prefix} ` : ""}
           {title}
         </text>
       </box>

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useKeyboard } from "@opentui/react";
+import { LoadingIndicator } from "./loading-indicator.component.jsx";
 
 const commandOptions = [
   { command: "/help", description: "Show available commands" },
@@ -123,13 +124,21 @@ export function Composer({
           ))}
         </box>
       )}
-      <text fg="#657383">
-        {disabled
-          ? "Response generating · Esc stop · Ctrl+C interrupt"
-          : suggestions.length
-            ? "↑↓ choose · Tab complete · Enter select/run"
-            : "PgUp/PgDn scroll · Enter send · Shift+Enter/Ctrl+N newline · Esc stop"}
-      </text>
+      {disabled ? (
+        <box flexDirection="row" paddingLeft={1}>
+          <LoadingIndicator color="#a8d5a2" />
+          <text fg="#657383"> · Esc stop · Ctrl+C interrupt</text>
+        </box>
+      ) : (
+        <box flexDirection="row">
+          <text> </text>
+          <text fg="#657383">
+            {suggestions.length
+              ? "↑↓ choose · Tab complete · Enter select/run"
+              : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}
+          </text>
+        </box>
+      )}
       <box border borderStyle="rounded" paddingX={1} minHeight={3} maxHeight={8}>
         <textarea
           ref={inputRef}
@@ -141,8 +150,7 @@ export function Composer({
           keyBindings={[
             { name: "return", action: "submit" },
             { name: "kpenter", action: "submit" },
-            { name: "return", shift: true, action: "newline" },
-            { name: "kpenter", shift: true, action: "newline" },
+            { name: "linefeed", action: "newline" },
           ]}
           onContentChange={updateDraft}
           onSubmit={() => {
