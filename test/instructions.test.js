@@ -10,7 +10,22 @@ import {
 } from "../src/agent/instructions.js";
 
 test("keeps the core system prompt concise", () => {
-  assert.ok(BASE_SYSTEM_PROMPT.length < 3_200);
+  assert.ok(BASE_SYSTEM_PROMPT.length < 4_500);
+});
+
+test("requires research and explicit approval before consequential implementation", () => {
+  const prompt = buildSystemPrompt({ workspace: "/workspace" });
+  assert.match(prompt, /do not begin making changes immediately/);
+  assert.match(prompt, /present concise findings, affected files or systems/);
+  assert.match(prompt, /wait for an explicit actionable user instruction/);
+  assert.match(
+    prompt,
+    /Do not use edit, insert_before, insert_after, write, or consequential shell commands before the user explicitly authorizes implementation/,
+  );
+  assert.match(
+    prompt,
+    /If the user changes the requirements, revise the findings and plan and wait for approval again/,
+  );
 });
 
 test("requires tool-backed research when unsure instead of inventing details", () => {
