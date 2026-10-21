@@ -4,6 +4,8 @@ import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
 import { browserColors as colors } from "./model-browser-theme.js";
 import { shellSummary } from "./shell-summary.js";
 
+const brailleFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
 const statusStyle = {
   running: { color: colors.warning, prefix: "…" },
   complete: { color: colors.accent, prefix: "" },
@@ -28,7 +30,11 @@ export function ToolMessage({ part, syntaxStyle }) {
     <ExecutionMessageCard
       color={status.color}
       prefix={
-        part.status === "running" ? <CompactLoadingIndicator color={status.color} /> : status.prefix
+        part.status === "running" ? (
+          <CompactLoadingIndicator color={status.color} frames={brailleFrames} />
+        ) : (
+          status.prefix
+        )
       }
       title={title}
       summary={summary}
