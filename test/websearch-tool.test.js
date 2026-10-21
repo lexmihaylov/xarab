@@ -27,16 +27,11 @@ test("requires a Tavily key and validates queries before approval or network cal
   assert.equal(fetchCalls, 0);
 });
 
-test("sends a Tavily search without approval and returns source-linked excerpts", async () => {
+test("sends a Tavily search and returns source-linked excerpts", async () => {
   const events = [];
-  let approvalCalled = false;
   let request;
   const tool = createWebsearchTool({
     getApiKey: () => "tvly-test-secret",
-    requestApproval: async () => {
-      approvalCalled = true;
-      return false;
-    },
     fetchImpl: async (url, options) => {
       request = { url, options };
       return response({
@@ -54,7 +49,6 @@ test("sends a Tavily search without approval and returns source-linked excerpts"
   });
 
   const result = await tool.handler({ query: "  current local model news  " });
-  assert.equal(approvalCalled, false);
   assert.equal(request.url, "https://api.tavily.com/search");
   assert.equal(request.options.method, "POST");
   assert.equal(request.options.headers.authorization, "Bearer tvly-test-secret");
@@ -69,10 +63,6 @@ test("sends a Tavily search without approval and returns source-linked excerpts"
   assert.match(result, /URL: https:\/\/example\.com\/article/);
   assert.match(result, /Useful excerpt/);
   assert.doesNotMatch(result, /javascript:|Must be omitted/);
-  assert.equal(
-    events.some((event) => event.type === "approval_required"),
-    false,
-  );
   assert.deepEqual(events.at(-1), {
     type: "searched",
     query: "current local model news",

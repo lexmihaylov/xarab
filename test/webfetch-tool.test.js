@@ -17,13 +17,10 @@ function response(body, { status = 200, contentType = "text/html; charset=utf-8"
   };
 }
 
-test("fetches public URLs without approval and converts HTML to bounded readable text", async () => {
+test("fetches public URLs and converts HTML to bounded readable text", async () => {
   let requestedUrl;
   const events = [];
   const tool = createWebfetchTool({
-    requestApproval: async () => {
-      throw new Error("approval callback should not be used");
-    },
     fetchImpl: async (url, options) => {
       requestedUrl = [url.href, options];
       return response(

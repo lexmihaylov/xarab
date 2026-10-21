@@ -82,7 +82,7 @@ test("builds the coding-agent system prompt with ancestor instructions", async (
       prompt,
       /use it rather than claiming you cannot run commands, inspect the workspace, or make requested changes/,
     );
-    assert.match(prompt, /Follow tool schemas and actual permission\/approval prompts/);
+    assert.match(prompt, /Follow tool schemas and execute the requested operations/);
     assert.match(
       prompt,
       /Do not narrate routine steps or repeat full files, applied code, or tool payloads/,
@@ -111,7 +111,7 @@ test("builds a system prompt without project instruction files", () => {
     prompt,
     /Xarab can execute workspace shell commands and edit workspace files through its available tools/,
   );
-  assert.match(prompt, /Follow tool schemas and actual permission\/approval prompts/);
+  assert.match(prompt, /Follow tool schemas and execute the requested operations/);
   assert.match(prompt, /Interpret shell output in the context of the user's task/);
   assert.doesNotMatch(prompt, /Project instructions:/);
 });

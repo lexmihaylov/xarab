@@ -11,7 +11,6 @@ import { UserMessage } from "./user-message.component.jsx";
 import { UnknownMessage } from "./unknown-message.component.jsx";
 import { SystemMessage } from "./system-message.component.jsx";
 import { ToolMessage } from "./tool-message.component.jsx";
-import { ToolApprovalDialog } from "./tool-approval-dialog.component.jsx";
 import { ModelChooser } from "./model-chooser.component.jsx";
 import { ModelDownloader } from "./model-downloader.component.jsx";
 import { SessionBrowser } from "./session-browser.component.jsx";
@@ -95,8 +94,6 @@ export function App({
   onSetRouterTierWorker,
   onDeleteModel,
   onRefreshRouterWorkerModels,
-  onApproveToolAction,
-  onDenyToolAction,
   onOpenSessions,
   onCloseSessions,
   onRestoreSession,
@@ -123,8 +120,7 @@ export function App({
   });
 
   useKeyboard((key) => {
-    if (state.modelModal || state.toolApproval || state.sessionModal || state.sessionOperation)
-      return;
+    if (state.modelModal || state.sessionModal || state.sessionOperation) return;
     const pageDirection = pageScrollKeys.get(key.name);
     const stepDirection =
       key.ctrl && (key.name === "up" || key.name === "down")
@@ -218,8 +214,9 @@ export function App({
           draft={state.sessionDraft}
           disabled={
             state.generating ||
+            state.commandRunning ||
             state.sessionOperation ||
-            Boolean(state.modelModal || state.toolApproval || state.sessionModal)
+            Boolean(state.modelModal || state.sessionModal)
           }
           onSubmit={onSubmit}
           onDraftChange={onDraftChange}
@@ -233,13 +230,6 @@ export function App({
           notice={notice}
         />
       </box>
-      {state.toolApproval && (
-        <ToolApprovalDialog
-          {...state.toolApproval}
-          onApprove={onApproveToolAction}
-          onDeny={onDenyToolAction}
-        />
-      )}
       {state.sessionModal && (
         <SessionBrowser
           {...state.sessionModal}

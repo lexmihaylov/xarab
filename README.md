@@ -39,7 +39,7 @@ Classifier and tier assignments are stored separately in `~/.xarab/routing.conf`
 
 Use `/openai login` to start Codex OAuth, then run `/openai copy` to copy the sign-in URL to your clipboard (including the Windows clipboard from WSL2). Paste that URL into a browser and sign in to ChatGPT. After the browser redirects to `http://localhost:1455/auth/callback`, copy the full URL from the address bar and paste it into Xarab. Xarab does not start a callback server. Credentials are stored in `~/.xarab/auth/openai-chatgpt.json` with owner-only permissions; `/openai logout` removes the local tokens.
 
-Then use `/openai models`, `/openai use <model-id>`, and `/openai ask <request>`. Codex requests use the ChatGPT Codex Responses endpoint, streaming, and `store: false`. The adapter can call Xarab's existing tools and approvals.
+Then use `/openai models`, `/openai use <model-id>`, and `/openai ask <request>`. Codex requests use the ChatGPT Codex Responses endpoint, streaming, and `store: false`. The adapter can call Xarab's existing tools.
 
 ## Development
 

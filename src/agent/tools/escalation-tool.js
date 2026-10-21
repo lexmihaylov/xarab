@@ -5,7 +5,7 @@ export function createEscalationTool({ activeTier, escalationCount = 0 } = {}) {
 
   return {
     description:
-      "Request a handoff to the next worker tier only after investigation produces concrete evidence that this task exceeds the current tier. Escalate when findings reveal broader codebase or multi-system complexity, significant unknowns requiring deeper investigation, cross-cutting architectural impact, high-risk or consequential changes, or substantial external research beyond the current tier. Do not escalate because the request is long, because tools are needed, or merely to avoid continuing work. Include specific evidence in findings. This ends the current run.",
+      "Request a handoff to the next worker tier only after investigation produces concrete evidence that the overall task or any individual subtask, component, or dependency exceeds the current tier. A single subtask may warrant escalation even when the remainder of the request is manageable. Escalate when findings reveal broader codebase or multi-system complexity, significant unknowns requiring deeper investigation, cross-cutting architectural impact, high-risk or consequential changes, or substantial external research beyond the current tier. Do not escalate because the request is long, because tools are needed, or merely to avoid continuing work. Include specific evidence in findings. This ends the current run.",
     params: {
       type: "object",
       additionalProperties: false,

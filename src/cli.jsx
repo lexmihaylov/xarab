@@ -72,8 +72,6 @@ function renderApp(state) {
       onSetRouterTierWorker={controller.setRouterTierWorker}
       onDeleteModel={controller.deleteModel}
       onRefreshRouterWorkerModels={controller.refreshRouterWorkerModels}
-      onApproveToolAction={controller.approveToolAction}
-      onDenyToolAction={controller.denyToolAction}
       onOpenSessions={controller.openSessionPicker}
       onCloseSessions={controller.closeSessionPicker}
       onRestoreSession={controller.restoreSession}

@@ -77,6 +77,23 @@ test("does not use a local model as a fallback when routing is disabled", async 
   );
 });
 
+test("tells workers that an individual subtask may require escalation", async (t) => {
+  let instructions;
+  const { create, configure } = await setup(t, async (options) => {
+    instructions = options.instructions;
+    options.onText("Reply");
+  });
+  const controller = await create();
+  await configure(controller);
+  await controller.submit("Handle the request");
+
+  assert.match(instructions, /overall task or any individual subtask, component, or dependency/);
+  assert.match(
+    instructions,
+    /escalate for one subtask even when the rest of the request is manageable/,
+  );
+});
+
 test("starts a new session when routing is not configured", async (t) => {
   const { create } = await setup(t);
   const controller = await create();

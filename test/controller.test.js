@@ -103,6 +103,33 @@ test("manual shell commands persist command, output, and severity", async (t) =>
   await controller.shutdown();
 });
 
+test("publishes a running shell message before command completion", async (t) => {
+  const temporary = await mkdtemp("/tmp/opencode/xarab-shell-running-test-");
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  const controller = createAssistantController({
+    root: temporary,
+    workspace: temporary,
+    instructionFiles: [],
+    configPath: path.join(temporary, "config.json"),
+  });
+  await controller.initialize();
+
+  const pending = controller.submit("!sleep 0.1");
+  const running = controller.getState();
+  assert.equal(running.commandRunning, true);
+  assert.equal(running.messages.at(-1).type, "shell");
+  assert.equal(running.messages.at(-1).command, "sleep 0.1");
+  assert.equal(running.messages.at(-1).message, "");
+  assert.equal(running.messages.at(-1).running, true);
+
+  await pending;
+  const completed = controller.getState();
+  assert.equal(completed.commandRunning, false);
+  assert.equal(completed.messages.at(-1).running, undefined);
+  assert.match(completed.messages.at(-1).message, /exit code 0/);
+  await controller.shutdown();
+});
+
 test("selecting a classifier loads it and persists classifier configuration", async (t) => {
   const temporary = await mkdtemp("/tmp/opencode/xarab-model-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));

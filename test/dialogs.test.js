@@ -4,39 +4,12 @@ import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
 import { ModelChooser } from "../src/ui/model-chooser.component.jsx";
 import { StatusBar } from "../src/ui/status-bar.component.jsx";
-import { ToolApprovalDialog } from "../src/ui/tool-approval-dialog.component.jsx";
 
 async function render(element, options = { width: 120, height: 30 }) {
   const view = await testRender(element, options);
   await view.flush();
   return view;
 }
-
-test("tool approval shows the request and lets users approve or deny it", async () => {
-  const approved = [];
-  const denied = [];
-  const view = await render(
-    React.createElement(ToolApprovalDialog, {
-      type: "websearch",
-      command: "Terminal UI documentation",
-      reasons: ["External network access is required."],
-      onApprove: () => approved.push(true),
-      onDeny: () => denied.push(true),
-    }),
-  );
-  try {
-    const frame = view.captureCharFrame();
-    assert.match(frame, /WEB SEARCH APPROVAL/);
-    assert.match(frame, /Terminal UI documentation/);
-    assert.match(frame, /External network access is required/);
-    await act(async () => view.mockInput.pressKey("y"));
-    await act(async () => view.mockInput.pressKey("n"));
-    assert.deepEqual(approved, [true]);
-    assert.deepEqual(denied, [true]);
-  } finally {
-    await view.dispose();
-  }
-});
 
 test("model chooser applies the selected router and worker model", async () => {
   const classifiers = [];

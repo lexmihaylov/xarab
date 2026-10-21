@@ -47,6 +47,7 @@ export function createAssistantController({
   let status = "Ready";
   let generating = false;
   let isRouting = false;
+  let commandRunning = false;
   let abortController;
   let lastInterruptAt = 0;
   let messages = [];
@@ -70,8 +71,6 @@ export function createAssistantController({
   let modelModal = null;
   let activeDownload;
   let nextDownloadId = 0;
-  let toolApproval = null;
-  let pendingToolApproval;
   const configStore = createConfigStore(configPath, routingConfigPath);
   const openAIAuth = createOpenAICodexAuth({
     credentialsPath: path.join(path.dirname(configPath), "auth", "openai-chatgpt.json"),
@@ -95,8 +94,8 @@ export function createAssistantController({
       classifierModel: configStore.getClassifierModel(),
       status,
       generating: generating || isRouting,
+      commandRunning,
       modelModal,
-      toolApproval,
       sessionModal,
       sessionOperation,
       currentSession: {
@@ -196,7 +195,7 @@ export function createAssistantController({
 
   function canSwitchSession() {
     if (isShuttingDown) return false;
-    if (generating || sessionOperation || activeDownload || pendingToolApproval) {
+    if (generating || sessionOperation || activeDownload) {
       const error = "Stop active generation or downloads before switching sessions.";
       if (sessionModal) {
         sessionModal = { ...sessionModal, error };
@@ -414,25 +413,14 @@ export function createAssistantController({
     return deleted;
   }
 
-  function requestToolApproval(command, reasons, type = "shell") {
-    if (isShuttingDown || pendingToolApproval) return Promise.resolve(false);
-    return new Promise((resolve) => {
-      pendingToolApproval = { resolve };
-      toolApproval = { type, command, reasons };
-      notify();
-    });
-  }
-
-  function settleToolApproval(approved) {
-    const pending = pendingToolApproval;
-    if (!pending) return;
-    pendingToolApproval = undefined;
-    toolApproval = null;
-    pending.resolve(approved);
-    notify();
-  }
-
-  function addMessage({ type, message, severity = "info", classification, command }) {
+  function addMessage({
+    type,
+    message,
+    severity = "info",
+    classification,
+    command,
+    running = false,
+  }) {
     const colors = { user: "#8fbfdc", agent: "#a8d5a2", system: "#aeb8c4", intent: "#657383" };
     const color =
       type === "system" && severity === "warning"
@@ -447,6 +435,7 @@ export function createAssistantController({
       color,
       ...(command !== undefined ? { command } : {}),
       ...(classification ? { classification } : {}),
+      ...(running ? { running: true } : {}),
     };
     messages.push(entry);
     if (type === "user" && !activeSession.manualTitle && activeSession.title === "New session")
@@ -539,14 +528,6 @@ export function createAssistantController({
     } else if (event.type === "searched") {
       part.status = "complete";
       part.summary = `Found ${event.results} content matches in ${event.files} files${event.truncated ? " (limited)" : ""}`;
-    } else if (event.type === "approval_required") {
-      part.title =
-        toolName === "websearch"
-          ? "Waiting for web search approval"
-          : toolName === "webfetch"
-            ? "Waiting for web fetch approval"
-            : "Waiting for shell approval";
-      part.summary = event.reasons?.join(" ") ?? "Approval required.";
     } else if (event.type === "denied" && toolName === "websearch") {
       part.status = "complete";
       part.title = "Web search not run";
@@ -612,16 +593,13 @@ export function createAssistantController({
     websearch: createWebsearchTool({
       getApiKey: () => process.env.TAVILY_API_KEY?.trim() || configStore.getApiKey("tavily"),
       onEvent: (event) => onToolEvent("websearch", event),
-      requestApproval: (query, reasons) => requestToolApproval(query, reasons, "websearch"),
     }),
     webfetch: createWebfetchTool({
       onEvent: (event) => onToolEvent("webfetch", event),
-      requestApproval: (url, reasons) => requestToolApproval(url, reasons, "webfetch"),
     }),
     run_command: createShellTool({
       workspace,
       onEvent: (event) => onToolEvent("run_command", event),
-      requestApproval: (command, reasons) => requestToolApproval(command, reasons, "shell"),
     }),
   };
 
@@ -745,26 +723,39 @@ export function createAssistantController({
         message: "Use ! followed by a shell command, for example: !git status",
         severity: "warning",
       });
-    if (generating || isRouting)
+    if (generating || isRouting || commandRunning)
       return addMessage({
         type: "system",
-        message: "Wait for generation to finish before running a shell command.",
+        message: "Wait for the current work to finish before running a shell command.",
         severity: "warning",
       });
 
+    commandRunning = true;
     updateStatus("Running command…");
-    const result = await runShellCommand(command, { cwd: workspace });
-    updateStatus("Ready");
-    addMessage({
+    const shellMessage = addMessage({
       type: "shell",
       command,
-      message: formatShellResult(command, result, workspace),
-      severity: result.timedOut || result.error ? "error" : result.code === 0 ? "info" : "warning",
+      message: "",
+      running: true,
     });
-    pendingShellContext = appendShellContext(
-      pendingShellContext,
-      createShellContextEntry(command, result),
-    );
+    // Let the UI paint the command card before starting the potentially long-running process.
+    await new Promise((resolve) => setImmediate(resolve));
+    try {
+      const result = await runShellCommand(command, { cwd: workspace });
+      shellMessage.message = formatShellResult(command, result, workspace);
+      shellMessage.severity =
+        result.timedOut || result.error ? "error" : result.code === 0 ? "info" : "warning";
+      delete shellMessage.running;
+      pendingShellContext = appendShellContext(
+        pendingShellContext,
+        createShellContextEntry(command, result),
+      );
+      sessionChanged();
+      notify();
+    } finally {
+      commandRunning = false;
+      updateStatus("Ready");
+    }
   }
 
   async function getTierClassifier() {
@@ -1056,7 +1047,7 @@ export function createAssistantController({
 
   function escalationInstructions(tier, canEscalate) {
     if (!canEscalate) return "";
-    return `\n\n## Escalation\nYou are working at Tier ${tier}. If investigation reveals that the task requires the next tier, call request_escalation before making consequential changes. State concrete findings, not speculation. It can only request Tier ${tier + 1}, ends your run immediately, and transfers your findings to that worker. Do not call it merely because tools are needed, and do not write a final answer after calling it.`;
+    return `\n\n## Escalation\nYou are working at Tier ${tier}. If investigation reveals that the overall task or any individual subtask, component, or dependency requires the next tier, call request_escalation before making consequential changes. You may escalate for one subtask even when the rest of the request is manageable. State concrete findings, not speculation. It can only request Tier ${tier + 1}, ends your run immediately, and transfers your findings to that worker. Do not call it merely because tools are needed, and do not write a final answer after calling it.`;
   }
 
   async function runOpenAIChat(
@@ -1364,7 +1355,6 @@ export function createAssistantController({
     isShuttingDown = true;
     clearTimeout(saveTimer);
     saveTimer = undefined;
-    settleToolApproval(false);
     abortController?.abort();
     activeDownload?.controller.abort();
     shutdownPromise = (async () => {
@@ -1604,8 +1594,6 @@ export function createAssistantController({
     renameSession,
     updateDraft,
     closeModelModal,
-    approveToolAction: () => settleToolApproval(true),
-    denyToolAction: () => settleToolApproval(false),
     setRouterClassifier,
     setRouterTierWorker,
     refreshRouterWorkerModels: loadRouterWorkerModels,

@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { createShellTool } from "../src/agent/tools/shell-tool.js";
 
-test("runs an allowlisted read-only command from the workspace", async () => {
+test("runs a command from the workspace", async () => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "xarab-agent-shell-"));
   try {
     const tool = createShellTool({ workspace });
@@ -17,21 +17,8 @@ test("runs an allowlisted read-only command from the workspace", async () => {
   }
 });
 
-test("does not run a risky command when approval is declined", async () => {
-  let askedForApproval = false;
-  const tool = createShellTool({
-    requestApproval: async (command, reasons) => {
-      askedForApproval = command === "rm definitely-not-run" && reasons.length > 0;
-      return false;
-    },
-  });
-  const result = await tool.handler({ command: "rm definitely-not-run" });
-  assert.equal(askedForApproval, true);
-  assert.match(result, /declined approval/);
-});
-
 test("compacts verbose command output while retaining relevant error lines", async () => {
-  const tool = createShellTool({ requestApproval: async () => true });
+  const tool = createShellTool();
   const result = await tool.handler({
     command: `node -e "for(let i=0;i<500;i++) console.log(i===300?'ERROR important failure':'noise '.repeat(20))"`,
   });

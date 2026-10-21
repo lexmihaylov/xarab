@@ -1,20 +1,15 @@
 import { runShellCommand } from "./shell-command.js";
-import { assessShellCommand } from "./shell-policy.js";
 
 const MAX_AGENT_OUTPUT_BYTES = 64 * 1024;
 const MAX_MODEL_OUTPUT_BYTES = 8 * 1024;
 const COMMAND_TIMEOUT_MS = 30_000;
 
-export function createShellTool({
-  workspace = process.cwd(),
-  onEvent = () => {},
-  requestApproval = async () => false,
-} = {}) {
+export function createShellTool({ workspace = process.cwd(), onEvent = () => {} } = {}) {
   const root = workspace;
 
   return {
     description:
-      "Run workspace commands, especially tests, builds, lint, package scripts, and Git inspection. Use this for command-line work rather than guessing results. Destructive, outside-workspace, and ambiguous commands require user approval; execution is time- and output-bounded.",
+      "Run workspace commands, especially tests, builds, lint, package scripts, and Git inspection. Use this for command-line work rather than guessing results. Execution is time- and output-bounded.",
     params: {
       type: "object",
       properties: {
@@ -28,16 +23,6 @@ export function createShellTool({
     async handler({ command } = {}) {
       if (typeof command !== "string" || !command.trim())
         return "Error: provide a non-empty shell command.";
-
-      const assessment = assessShellCommand(command, root);
-      if (assessment.requiresApproval) {
-        onEvent({ type: "approval_required", command, reasons: assessment.reasons });
-        const approved = await requestApproval(command, assessment.reasons);
-        if (!approved) {
-          onEvent({ type: "denied", reason: "The user declined approval." });
-          return "Command not run: the user declined approval.";
-        }
-      }
 
       onEvent({ type: "started", command });
       const result = await runShellCommand(command, {
