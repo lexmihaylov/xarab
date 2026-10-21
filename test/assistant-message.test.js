@@ -4,6 +4,7 @@ import React, { act, useState } from "react";
 import { testRender } from "@opentui/react/test-utils";
 import { agentTimelineEntries, App } from "../src/ui/app.component.jsx";
 import { AssistantMessage } from "../src/ui/assistant-message.component.jsx";
+import { Welcome } from "../src/ui/welcome.component.jsx";
 
 async function renderMessage(props) {
   const view = await testRender(React.createElement(AssistantMessage, props), {
@@ -161,6 +162,15 @@ test("renders the generating state without response text", async () => {
   const view = await renderMessage({ message: { message: "" }, generating: true });
   try {
     assert.match(view.captureCharFrame(), /Generating…/);
+  } finally {
+    await view.dispose();
+  }
+});
+
+test("renders the welcome artwork without passing an array to a text node", async () => {
+  const view = await testRender(React.createElement(Welcome), { width: 80, height: 24 });
+  try {
+    assert.equal(typeof view.captureCharFrame(), "string");
   } finally {
     await view.dispose();
   }

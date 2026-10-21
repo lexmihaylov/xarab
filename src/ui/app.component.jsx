@@ -15,6 +15,7 @@ import { ToolApprovalDialog } from "./tool-approval-dialog.component.jsx";
 import { ModelChooser } from "./model-chooser.component.jsx";
 import { ModelDownloader } from "./model-downloader.component.jsx";
 import { SessionBrowser } from "./session-browser.component.jsx";
+import { Welcome } from "./welcome.component.jsx";
 
 const pageScrollKeys = new Map([
   ["pageup", -1],
@@ -114,6 +115,7 @@ export function App({
     });
     return true;
   };
+  const showWelcome = state.messages.length === 0 && !state.generating;
 
   useSelectionHandler((selection) => {
     selectedText.current = selection.getSelectedText();
@@ -171,47 +173,51 @@ export function App({
           verticalScrollbarOptions={{ showArrows: true }}
           contentOptions={{ flexDirection: "column" }}
         >
-          {state.messages.flatMap((message, index) => {
-            const generating = state.generating && index === state.messages.length - 1;
-            let entries;
+          {showWelcome ? (
+            <Welcome />
+          ) : (
+            state.messages.flatMap((message, index) => {
+              const generating = state.generating && index === state.messages.length - 1;
+              let entries;
 
-            if (message.type !== "agent") {
-              entries = [
-                {
-                  key: `${message.type}-${index}`,
-                  element: <Message message={message} />,
-                },
-              ];
-            } else {
-              entries = agentTimelineEntries(message, generating).map((entry) => ({
-                key: `${message.type}-${index}-${entry.key}`,
-                element:
-                  entry.type === "tool" ? (
-                    <ToolMessage part={entry.part} syntaxStyle={syntaxStyle} />
-                  ) : (
-                    <AssistantMessage
-                      message={message}
-                      responseText={entry.responseText}
-                      generating={entry.generating}
-                      syntaxStyle={syntaxStyle}
-                    />
-                  ),
-              }));
-            }
+              if (message.type !== "agent") {
+                entries = [
+                  {
+                    key: `${message.type}-${index}`,
+                    element: <Message message={message} />,
+                  },
+                ];
+              } else {
+                entries = agentTimelineEntries(message, generating).map((entry) => ({
+                  key: `${message.type}-${index}-${entry.key}`,
+                  element:
+                    entry.type === "tool" ? (
+                      <ToolMessage part={entry.part} syntaxStyle={syntaxStyle} />
+                    ) : (
+                      <AssistantMessage
+                        message={message}
+                        responseText={entry.responseText}
+                        generating={entry.generating}
+                        syntaxStyle={syntaxStyle}
+                      />
+                    ),
+                }));
+              }
 
-            return entries.map(({ key, element }) => (
-              <box
-                key={key}
-                flexDirection="column"
-                width="100%"
-                minWidth={0}
-                flexGrow={0}
-                flexShrink={0}
-              >
-                {element}
-              </box>
-            ));
-          })}
+              return entries.map(({ key, element }) => (
+                <box
+                  key={key}
+                  flexDirection="column"
+                  width="100%"
+                  minWidth={0}
+                  flexGrow={0}
+                  flexShrink={0}
+                >
+                  {element}
+                </box>
+              ));
+            })
+          )}
         </scrollbox>
         <Composer
           flexShrink={0}
