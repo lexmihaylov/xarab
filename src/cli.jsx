@@ -4,11 +4,12 @@ import React, { useEffect, useState } from "react";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createCliRenderer, RGBA, SyntaxStyle } from "@opentui/core";
+import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { createAssistantController } from "./agent/controller.js";
 import { loadProjectInstructions } from "./agent/instructions.js";
 import { acquireInstanceLock } from "./instance-lock.js";
+import { createMarkdownStyle } from "./lib/markdown-style.js";
 import { App } from "./ui/app.component.jsx";
 
 const releaseInstanceLock = await acquireInstanceLock();
@@ -25,18 +26,7 @@ const modelsDir = path.resolve(
 );
 const instructionFiles = await loadProjectInstructions(workspace);
 const renderer = await createCliRenderer({ screenMode: "alternate-screen", useMouse: true });
-const syntaxStyle = SyntaxStyle.fromStyles(
-  {
-    keyword: { fg: RGBA.fromHex("#c792ea") },
-    string: { fg: RGBA.fromHex("#c3e88d") },
-    comment: { fg: RGBA.fromHex("#657383"), italic: true },
-    number: { fg: RGBA.fromHex("#f78c6c") },
-    type: { fg: RGBA.fromHex("#82aaff") },
-    function: { fg: RGBA.fromHex("#82aaff") },
-    default: { fg: RGBA.fromHex("#c5d0dd") },
-  },
-  renderer.nativeScene,
-);
+const syntaxStyle = createMarkdownStyle(renderer.nativeScene);
 const ui = createRoot(renderer);
 let controller;
 let updateAppState;
