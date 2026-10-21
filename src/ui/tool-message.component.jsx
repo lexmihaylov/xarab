@@ -13,7 +13,12 @@ export function ToolMessage({ part, syntaxStyle }) {
   const status = statusStyle[part.status] ?? statusStyle.complete;
   const title = String(part.title ?? part.label ?? "Tool");
   const rawSummary = part.summary == null ? "" : String(part.summary);
-  const summary = part.toolName === "run_command" ? shellSummary(rawSummary) : rawSummary;
+  const hidesOutputBody = part.toolName === "list_files" && part.status !== "error";
+  const summary = hidesOutputBody
+    ? ""
+    : part.toolName === "run_command"
+      ? shellSummary(rawSummary)
+      : rawSummary;
   const diffText = typeof part.diffText === "string" ? part.diffText : "";
 
   const isError = part.status === "error";
@@ -35,9 +40,8 @@ export function ToolMessage({ part, syntaxStyle }) {
             wrapMode="char"
             conceal={false}
             fg={colors.text}
-            // Keep the diff-sign gutter visible while hiding line numbers.
+            // Show both diff signs and source line numbers.
             showLineNumbers
-            lineNumberFg="transparent"
             addedSignColor={colors.green}
             removedSignColor={colors.error}
             selectable

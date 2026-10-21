@@ -4,6 +4,7 @@ import React, { act, useState } from "react";
 import { testRender } from "@opentui/react/test-utils";
 import { agentTimelineEntries, App } from "../src/ui/app.component.jsx";
 import { AssistantMessage } from "../src/ui/assistant-message.component.jsx";
+import { ToolMessage } from "../src/ui/tool-message.component.jsx";
 import { Welcome } from "../src/ui/welcome.component.jsx";
 
 async function renderMessage(props) {
@@ -38,6 +39,28 @@ test("splits agent timeline parts and streams only its final text entry", () => 
     },
     { type: "text", key: "text-1", responseText: "After tool", generating: true },
   ]);
+});
+
+test("does not render a successful file listing output body", async () => {
+  const view = await testRender(
+    React.createElement(ToolMessage, {
+      part: {
+        toolName: "list_files",
+        status: "complete",
+        title: "Listing files",
+        summary: "Files in .:\nsrc/secret-file.js",
+      },
+    }),
+    { width: 60, height: 12 },
+  );
+  await view.flush();
+  try {
+    const frame = view.captureCharFrame();
+    assert.match(frame, /Listing files/);
+    assert.doesNotMatch(frame, /Files in|secret-file/);
+  } finally {
+    await view.dispose();
+  }
 });
 
 test("renders fenced agent response content as markdown", async () => {
