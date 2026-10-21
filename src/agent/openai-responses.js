@@ -59,6 +59,10 @@ export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch
           input: requestInput,
           tools: apiTools,
           parallel_tool_calls: false,
+          reasoning: {
+            effort: "medium",
+            summary: "auto",
+          },
           store: false,
           stream: true,
           include: ["reasoning.encrypted_content"],

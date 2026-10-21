@@ -83,6 +83,10 @@ test("streams a Responses result with required privacy settings", async () => {
     input: [{ role: "user", content: "Say hello" }],
     tools: [],
     parallel_tool_calls: false,
+    reasoning: {
+      effort: "medium",
+      summary: "auto",
+    },
     store: false,
     stream: true,
     include: ["reasoning.encrypted_content"],
@@ -240,6 +244,10 @@ test("runs provider function calls through existing tool handlers and continues 
     call_id: "call-1",
     output: "README contents",
   });
+  assert.deepEqual(requests[0].reasoning, { effort: "medium", summary: "auto" });
+  assert.deepEqual(requests[1].reasoning, { effort: "medium", summary: "auto" });
+  assert.deepEqual(requests[0].include, ["reasoning.encrypted_content"]);
+  assert.deepEqual(requests[1].include, ["reasoning.encrypted_content"]);
 });
 
 test("continues a tool call when input is omitted and serializes unusual tool results", async () => {
