@@ -152,6 +152,10 @@ export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch
           ok: result.ok,
           errorCode: result.errorCode,
         });
+        // A controller-owned handoff must end this model run. Continuing with a
+        // function result would let the current worker produce a final answer
+        // after it has requested a stronger worker.
+        if (result.stop) return { ...completedResponse, handoff: result.handoff };
         functionOutputs.push({
           type: "function_call_output",
           call_id: call.call_id,
@@ -203,7 +207,12 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
         `OpenAI response was incomplete (${event.response?.incomplete_details?.reason ?? "unknown reason"}).`,
       );
     } else if (event.type === "error") {
-      throw new Error(`OpenAI stream failed (${event.code ?? "unknown_error"}).`);
+      // The Responses API places streaming error details in `error`; retain
+      // compatibility with older flat event payloads as well.
+      const error = event.error ?? event;
+      const code = error?.code ?? "unknown_error";
+      const message = typeof error?.message === "string" ? error.message.trim() : "";
+      throw new Error(`OpenAI stream failed (${code})${message ? `: ${message}` : "."}`);
     }
     onEvent(event);
   };

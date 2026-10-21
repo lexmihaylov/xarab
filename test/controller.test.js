@@ -77,7 +77,7 @@ test("manual shell commands persist command, output, and severity", async (t) =>
   await controller.initialize();
 
   await controller.submit("!printf success-output");
-  const success = controller.getState().messages.at(-2);
+  const success = controller.getState().messages.at(-1);
   assert.deepEqual(
     {
       type: success.type,
@@ -89,13 +89,13 @@ test("manual shell commands persist command, output, and severity", async (t) =>
   assert.match(success.message, /success-output/);
 
   await controller.submit("!false");
-  const warning = controller.getState().messages.at(-2);
+  const warning = controller.getState().messages.at(-1);
   assert.equal(warning.type, "shell");
   assert.equal(warning.command, "false");
   assert.equal(warning.severity, "warning");
 
   await controller.submit("!command-that-does-not-exist-xarab");
-  const failure = controller.getState().messages.at(-2);
+  const failure = controller.getState().messages.at(-1);
   assert.equal(failure.type, "shell");
   assert.equal(failure.command, "command-that-does-not-exist-xarab");
   assert.equal(failure.severity, "warning");

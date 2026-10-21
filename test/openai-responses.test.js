@@ -250,6 +250,51 @@ test("runs provider function calls through existing tool handlers and continues 
   assert.deepEqual(requests[1].include, ["reasoning.encrypted_content"]);
 });
 
+test("returns a controller handoff without continuing the current worker turn", async () => {
+  let requests = 0;
+  const adapter = createOpenAIResponsesAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
+    fetchImpl: async () => {
+      requests++;
+      return streamedResponse([
+        {
+          type: "response.completed",
+          response: {
+            id: "response-escalation",
+            output: [
+              {
+                type: "function_call",
+                name: "request_escalation",
+                call_id: "call-escalation",
+                arguments: '{"target_tier":2,"reason":"Scope spans multiple services."}',
+              },
+            ],
+          },
+        },
+      ]);
+    },
+  });
+
+  const result = await adapter.run({
+    model: "model-a",
+    input: [{ role: "user", content: "Investigate the outage" }],
+    tools: {
+      request_escalation: {
+        description: "Request a higher tier",
+        async handler(args) {
+          return { ok: true, output: "Escalating.", stop: true, handoff: args };
+        },
+      },
+    },
+  });
+
+  assert.equal(requests, 1);
+  assert.deepEqual(result.handoff, {
+    target_tier: 2,
+    reason: "Scope spans multiple services.",
+  });
+});
+
 test("continues a tool call when input is omitted and serializes unusual tool results", async () => {
   const requests = [];
   let requestCount = 0;
@@ -456,6 +501,21 @@ test("surfaces response failures and rejects streams without a completed event",
   await assert.rejects(
     failureAdapter.run({ model: "model-a", input: [] }),
     /response failed \(usage_limit\)/,
+  );
+
+  const streamErrorAdapter = createOpenAIResponsesAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
+    fetchImpl: async () =>
+      streamedResponse([
+        {
+          type: "error",
+          error: { code: "invalid_request_error", message: "Unsupported tool schema." },
+        },
+      ]),
+  });
+  await assert.rejects(
+    streamErrorAdapter.run({ model: "model-a", input: [] }),
+    /stream failed \(invalid_request_error\): Unsupported tool schema\./,
   );
 
   const incompleteAdapter = createOpenAIResponsesAdapter({
