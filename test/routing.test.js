@@ -7,12 +7,13 @@ import {
   TIER_CLASSIFIER_INSTRUCTIONS,
 } from "../src/agent/routing.js";
 
-test("classifier instructions distinguish bounded, involved, and exceptional work", () => {
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Bounded execution/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Involved execution/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /3 — Exceptional execution/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /broad context across a large project/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /substantial external research and synthesis/);
+test("classifier instructions distinguish focused, advanced, and specialized work", () => {
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Focused capability/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Advanced capability/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /3 — Specialized or highest-capability execution/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /broad and tightly interdependent context/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /External research is evidence of complexity/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /polished interactive Three\.js 3D model/);
   assert.doesNotMatch(TIER_CLASSIFIER_INSTRUCTIONS, /Astra|Sol|Luna/);
 });
 
@@ -32,7 +33,7 @@ test("classification prompt includes bounded recent user and assistant context",
 
 test("parses a valid tier classification and bounds the rationale", () => {
   const result = parseTierClassification(
-    'Here is the result: {"tier":2,"confidence":0.82,"rationale":"Several dependent steps require investigation."}',
+    '{"tier":2,"confidence":0.82,"rationale":"Several dependent steps require investigation."}',
   );
   assert.deepEqual(result, {
     valid: true,
@@ -40,7 +41,7 @@ test("parses a valid tier classification and bounds the rationale", () => {
     confidence: 0.82,
     rationale: "Several dependent steps require investigation.",
     rawOutput:
-      'Here is the result: {"tier":2,"confidence":0.82,"rationale":"Several dependent steps require investigation."}',
+      '{"tier":2,"confidence":0.82,"rationale":"Several dependent steps require investigation."}',
   });
 });
 
