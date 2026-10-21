@@ -11,6 +11,7 @@
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"test/**/*.js\" \"scripts/**/*.js\"",
     "classifier:evaluate": "node scripts/evaluate-classifier.js",
+    "make:install": "node scripts/make-install.js",
     "postinstall": "node scripts/install-classifier.js",
     "test": "node --import tsx --test"
   },
