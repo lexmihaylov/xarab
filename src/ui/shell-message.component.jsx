@@ -1,5 +1,5 @@
 import React from "react";
-import { CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
+import { brailleFrames, CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
 import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
 import { browserColors as colors } from "./model-browser-theme.js";
 import { shellSummary } from "./shell-summary.js";
@@ -21,7 +21,13 @@ export function ShellMessage({ message }) {
   return (
     <ExecutionMessageCard
       color={isRunning ? colors.accent : status.color}
-      prefix={isRunning ? <CompactLoadingIndicator color={colors.accent} /> : status.prefix}
+      prefix={
+        isRunning ? (
+          <CompactLoadingIndicator color={colors.accent} frames={brailleFrames} />
+        ) : (
+          status.prefix
+        )
+      }
       title="Command injection"
       summary={summary}
       error={isError}

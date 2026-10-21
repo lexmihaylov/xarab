@@ -1,10 +1,8 @@
 import React from "react";
-import { CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
+import { brailleFrames, CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
 import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
 import { browserColors as colors } from "./model-browser-theme.js";
 import { shellSummary } from "./shell-summary.js";
-
-const brailleFrames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
 
 const statusStyle = {
   running: { color: colors.warning, prefix: "…" },
