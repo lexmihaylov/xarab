@@ -1,7 +1,6 @@
 import React from "react";
+import { useTerminalDimensions } from "@opentui/react";
 import { renderScarab } from "./scarab-image.js";
-
-const scarab = renderScarab({ width: 48, maxRows: 27 });
 
 const footer = [
   ["XARAB", "brand"],
@@ -19,7 +18,20 @@ const colors = {
   hint: "#657383",
 };
 
+// The composer uses four rows at its minimum size and the status bar uses one.
+const appChromeRows = 5;
+const maxImageWidth = 40;
+const maxImagePixels = 23;
+
 export function Welcome() {
+  const { width: terminalWidth, height: terminalHeight } = useTerminalDimensions();
+  const imageRows = Math.max(1, terminalHeight - appChromeRows - footer.length);
+  const scarab = renderScarab({
+    width: Math.min(maxImageWidth, Math.max(1, terminalWidth - 2)),
+    // Each terminal row of the image contains two image pixels.
+    maxRows: Math.min(maxImagePixels, imageRows * 2),
+  });
+
   return (
     <box
       flexDirection="column"
