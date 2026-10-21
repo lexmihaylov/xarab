@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
 import { copyToClipboard } from "../agent/clipboard.js";
 import { Composer } from "./composer.component.jsx";
@@ -15,6 +15,7 @@ import { ModelChooser } from "./model-chooser.component.jsx";
 import { ModelDownloader } from "./model-downloader.component.jsx";
 import { SessionBrowser } from "./session-browser.component.jsx";
 import { Welcome } from "./welcome.component.jsx";
+import { ToastNotifications } from "./toast-notifications.component.jsx";
 
 const pageScrollKeys = new Map([
   ["pageup", -1],
@@ -101,14 +102,27 @@ export function App({
   onDeleteSession,
   onRenameSession,
 }) {
-  const [notice, setNotice] = useState("");
+  const [toasts, setToasts] = useState([]);
   const chatRef = useRef(null);
   const selectedText = useRef("");
+  const nextToastId = useRef(1);
+
+  const dismissToast = useCallback((id) => {
+    setToasts((current) => current.filter((toast) => toast.id !== id));
+  }, []);
+
+  const showToast = useCallback((message, severity) => {
+    const toast = { id: nextToastId.current++, message, severity };
+    setToasts((current) => [...current, toast].slice(-3));
+  }, []);
 
   const copySelection = (text) => {
     if (!text.trim()) return false;
     void copyToClipboard(text).then((copied) => {
-      setNotice(copied ? "Copied selection" : "Selection created (clipboard unavailable)");
+      showToast(
+        copied ? "Copied selection" : "Selection created (clipboard unavailable)",
+        copied ? "success" : "warning",
+      );
     });
     return true;
   };
@@ -227,9 +241,9 @@ export function App({
           status={state.status}
           sessionTitle={state.currentSession?.title}
           sessionError={state.sessionError}
-          notice={notice}
         />
       </box>
+      <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
       {state.sessionModal && (
         <SessionBrowser
           {...state.sessionModal}
