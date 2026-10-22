@@ -13,19 +13,28 @@ Capability-based routing:
 3. Consider domain specialization, novelty, depth of reasoning, architectural breadth, research needs, uncertainty, and consequences.
 4. A routine feature with known patterns can be Tier 1 even if it touches a form, styling, and database persistence. The same feature is Tier 2 when it requires new architecture, unfamiliar dependencies, cross-cutting changes, or targeted research.
 5. A task can be Tier 3 even when its scope is bounded if it requires specialized expertise or the strongest model to achieve the requested quality. For example, a Three.js 3D modeling task is Tier 3 when it requires a polished, technically correct scene, interaction, animation, performance, or unfamiliar graphics techniques—not merely because it uses Three.js.
-6. External research is evidence of complexity, not a mandatory requirement. Research-heavy architectural work is generally Tier 2 unless its breadth, uncertainty, specialization, or consequences meet Tier 3 criteria.
-7. Do not route by model identity, implementation convenience, or the fact that a lower tier might produce an incomplete or lower-quality result. Route to the minimum tier likely to deliver the requested quality reliably.
-8. When uncertain, choose the lower tier only if it can reasonably deliver the requested quality; otherwise choose the higher tier and explain the decisive capability in the rationale.
+6. Classify planning, design, and research by the complexity of the work being planned or researched, not by whether implementation is requested. A plan can require Tier 2 or Tier 3 capability even when it is explicitly read-only or no files will be changed.
+7. External research is evidence of complexity, not a mandatory requirement. Research-heavy architectural work is generally Tier 2 unless its breadth, uncertainty, specialization, or consequences meet Tier 3 criteria.
+8. Do not route by model identity, implementation convenience, or the fact that a lower tier might produce an incomplete or lower-quality result. Route to the minimum tier likely to deliver the requested quality reliably.
+9. When uncertain, choose the lower tier only if it can reasonably deliver the requested quality; otherwise choose the higher tier and explain the decisive capability in the rationale.
+
+Planning and research boundaries:
+- Tier 1: Explain a concept or produce a straightforward plan using supplied information and established local patterns, without meaningful investigation or trade-offs.
+- Tier 2: Plan or research a bounded feature, architecture change, migration, or investigation that needs repository or dependency analysis, current API verification, or explicit trade-off reasoning.
+- Tier 3: Plan or research broad, novel, specialized, security-sensitive, operationally consequential, or highly uncertain work with tightly interdependent decisions.
 
 Examples (request -> tier):
 Explain a regex -> 1
 Build a form with styling and database persistence using existing application patterns -> 1
 Rename a symbol, update references, and run a named check -> 1
+Plan a straightforward local refactor using the supplied module boundaries -> 1
 Implement a new feature requiring repository investigation and several coordinated changes -> 2
+Plan a reusable skills system requiring discovery, activation, prompt integration, permissions, and tests -> 2
 Design and implement a feature requiring broader architecture decisions and targeted research -> 2
 Compare three libraries against stated requirements and recommend one -> 2
 Create a polished interactive Three.js 3D model with custom geometry, animation, and performance considerations -> 3
 Design a distributed-system migration with tightly coupled services, substantial uncertainty, and serious operational consequences -> 3
+Research a company-wide security architecture and produce a staged rollout with incident recovery -> 3
 Investigate production data loss across workers and storage and produce a safe recovery plan -> 3
 
 Return exactly one JSON object with this shape: {"tier":1,"confidence":0.9,"rationale":"short reason"}. The tier must be the integer 1, 2, or 3. Confidence is optional, but when present it must be a number from 0 to 1. The rationale must be concise, describe the decisive work characteristic, and contain no more than 10 words.`;

@@ -213,6 +213,22 @@
     "prompt": "Review the project structure, find all references to the old endpoint, update them consistently, and run the focused checks."
   },
   {
+    "id": "t1-straightforward-plan",
+    "tier": 1,
+    "category": "planning",
+    "difficulty": "boundary",
+    "labelRationale": "A supplied local structure supports a straightforward plan without investigation.",
+    "prompt": "Using the supplied module boundaries, outline the steps for a straightforward local refactor. Do not inspect other files or research alternatives."
+  },
+  {
+    "id": "t2-skills-system-plan",
+    "tier": 2,
+    "category": "planning",
+    "difficulty": "clear",
+    "labelRationale": "A bounded skills design needs architecture and integration trade-offs.",
+    "prompt": "Plan a reusable skills system with discovery, activation, prompt integration, permissions, and tests. Inspect the existing instruction and tool-loading architecture, but do not implement it yet."
+  },
+  {
     "id": "t2-migration-plan",
     "tier": 2,
     "category": "planning",
@@ -332,6 +348,14 @@
     "prompt": "Add a --format option to this CLI, support json and text output, update help text and tests, and run the CLI checks."
   },
 
+  {
+    "id": "t3-company-security-plan",
+    "tier": 3,
+    "category": "planning",
+    "difficulty": "clear",
+    "labelRationale": "Company-wide security planning is broad, specialized, and high consequence.",
+    "prompt": "Research and plan a company-wide security architecture spanning identity, services, CI, and incident recovery, including a staged rollout and containment procedures. Do not implement changes yet."
+  },
   {
     "id": "t3-data-corruption",
     "tier": 3,

@@ -12,6 +12,13 @@ test("classifier instructions distinguish focused, advanced, and specialized wor
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Advanced capability/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /3 — Specialized or highest-capability execution/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /broad and tightly interdependent context/);
+  assert.match(
+    TIER_CLASSIFIER_INSTRUCTIONS,
+    /Classify planning, design, and research by the complexity/,
+  );
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /A plan can require Tier 2 or Tier 3 capability/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /Plan or research a bounded feature/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /reusable skills system requiring discovery/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /External research is evidence of complexity/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /polished interactive Three\.js 3D model/);
   assert.doesNotMatch(TIER_CLASSIFIER_INSTRUCTIONS, /Astra|Sol|Luna/);
