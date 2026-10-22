@@ -2,7 +2,7 @@ import React, { act } from "react";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { testRender } from "@opentui/react/test-utils";
-import { ModelDownloader } from "../src/ui/model-downloader.component.jsx";
+import { ModelDownloader } from "../src/components/ModelDownloader.component.jsx";
 
 const downloads = Array.from({ length: 20 }, (_, index) => ({
   name: `publisher/model-${index + 1}`,

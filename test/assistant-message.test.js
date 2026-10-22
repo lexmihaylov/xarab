@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act, useState } from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { agentTimelineEntries, App } from "../src/ui/app.component.jsx";
-import { AssistantMessage } from "../src/ui/assistant-message.component.jsx";
-import { ToolMessage } from "../src/ui/tool-message.component.jsx";
-import { Welcome } from "../src/ui/welcome.component.jsx";
+import { agentTimelineEntries, App } from "../src/App.component.jsx";
+import { AssistantMessage } from "../src/components/AssistantMessage.component.jsx";
+import { ToolMessage } from "../src/components/ToolMessage.component.jsx";
+import { Welcome } from "../src/components/Welcome.component.jsx";
 
 async function renderMessage(props) {
   const view = await testRender(React.createElement(AssistantMessage, props), {

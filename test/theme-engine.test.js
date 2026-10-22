@@ -6,7 +6,7 @@ import {
   getTheme,
   listThemes,
   registerTheme,
-} from "../src/ui/theme-engine.js";
+} from "../src/utils/theme-engine.js";
 
 test("default theme preserves the existing palette", () => {
   assert.equal(getTheme().name, "default");

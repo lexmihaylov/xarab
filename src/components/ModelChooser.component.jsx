@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { getTheme } from "./theme-engine.js";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
-import { Modal } from "./modal.component.jsx";
+import { Modal } from "./Modal.component.jsx";
 
 function modelLabel(modelPath, settings = {}) {
   return settings[modelPath]?.name?.trim() || modelPath.split(/[\\/]/).at(-1);

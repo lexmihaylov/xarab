@@ -9,8 +9,8 @@ import { createRoot } from "@opentui/react";
 import { createAssistantController } from "./agent/controller.js";
 import { loadProjectInstructions } from "./agent/instructions.js";
 import { acquireInstanceLock } from "./instance-lock.js";
-import { createMarkdownStyle } from "./lib/markdown-style.js";
-import { App } from "./ui/app.component.jsx";
+import { createMarkdownStyle } from "./utils/markdown-style.js";
+import { App } from "./App.component.jsx";
 
 const releaseInstanceLock = await acquireInstanceLock();
 if (!releaseInstanceLock) {

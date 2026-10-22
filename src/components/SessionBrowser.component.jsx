@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { getTheme } from "./theme-engine.js";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
-import { cleanModelText as clean } from "./model-browser-view.js";
-import { Modal } from "./modal.component.jsx";
+import { cleanModelText as clean } from "../utils/model-browser-view.js";
+import { Modal } from "./Modal.component.jsx";
 
 function PreviewMessage({ message }) {
   if (message.type === "user") {

@@ -1,6 +1,6 @@
 import React from "react";
-import { cleanModelText } from "./model-browser-view.js";
-import { getTheme } from "./theme-engine.js";
+import { cleanModelText } from "../utils/model-browser-view.js";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
 

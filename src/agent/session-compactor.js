@@ -1,4 +1,4 @@
-import { getTheme } from "../ui/theme-engine.js";
+import { getTheme } from "../utils/theme-engine.js";
 
 export function createSessionCompactor({
   getMessages,

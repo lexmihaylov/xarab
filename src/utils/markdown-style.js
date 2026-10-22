@@ -1,5 +1,5 @@
 import { RGBA, SyntaxStyle } from "@opentui/core";
-import { getTheme } from "../ui/theme-engine.js";
+import { getTheme } from "./theme-engine.js";
 
 const color = (value) => RGBA.fromHex(value);
 

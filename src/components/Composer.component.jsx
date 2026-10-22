@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useKeyboard } from "@opentui/react";
-import { LoadingIndicator } from "./loading-indicator.component.jsx";
-import { getTheme } from "./theme-engine.js";
+import { LoadingIndicator } from "./LoadingIndicator.component.jsx";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
 

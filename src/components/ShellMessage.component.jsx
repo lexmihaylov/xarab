@@ -1,10 +1,10 @@
 import React from "react";
-import { brailleFrames, CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
-import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
-import { getTheme } from "./theme-engine.js";
+import { brailleFrames, CompactLoadingIndicator } from "./CompactLoadingIndicator.component.jsx";
+import { ExecutionMessageCard } from "./ExecutionMessageCard.component.jsx";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
-import { shellSummary } from "./shell-summary.js";
+import { shellSummary } from "../utils/shell-summary.js";
 
 const severityStyle = {
   info: { color: colors.accent, prefix: "" },

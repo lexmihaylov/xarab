@@ -3,7 +3,7 @@ import path from "node:path";
 import { buildSystemPrompt } from "./instructions.js";
 import { createToolRegistry } from "./tool-registry.js";
 import { createEscalationTool } from "./tools/escalation-tool.js";
-import { getTheme } from "../ui/theme-engine.js";
+import { getTheme } from "../utils/theme-engine.js";
 import { createMessageTimeline } from "./message-timeline.js";
 import { createConfigStore } from "./config.js";
 import { downloadModelFile } from "./download-model.js";

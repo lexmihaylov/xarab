@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { getHuggingFaceModelDetails } from "../agent/model-search.js";
-import { cleanModelText as clean, compactCount, modelDetailRows } from "./model-browser-view.js";
-import { getDimmedColors, getTheme } from "./theme-engine.js";
-import { DownloadProgressDialog } from "./download-progress-dialog.component.jsx";
-import { Modal } from "./modal.component.jsx";
+import {
+  cleanModelText as clean,
+  compactCount,
+  modelDetailRows,
+} from "../utils/model-browser-view.js";
+import { getDimmedColors, getTheme } from "../utils/theme-engine.js";
+import { DownloadProgressDialog } from "./DownloadProgressDialog.component.jsx";
+import { Modal } from "./Modal.component.jsx";
 
 const tabs = ["Overview", "Model card", "Metadata"];
 

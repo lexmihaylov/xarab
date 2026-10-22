@@ -1,8 +1,8 @@
 import React from "react";
-import { getTheme } from "./theme-engine.js";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
-import { MessageCard } from "./message-card.component.jsx";
+import { MessageCard } from "./MessageCard.component.jsx";
 
 export function AssistantMessage({ message, responseText: providedText, generating, syntaxStyle }) {
   // A responseText prop is used for live timeline parts so text emitted after a

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { ModelChooser } from "../src/ui/model-chooser.component.jsx";
-import { StatusBar } from "../src/ui/status-bar.component.jsx";
+import { ModelChooser } from "../src/components/ModelChooser.component.jsx";
+import { StatusBar } from "../src/components/StatusBar.component.jsx";
 
 async function render(element, options = { width: 120, height: 30 }) {
   const view = await testRender(element, options);

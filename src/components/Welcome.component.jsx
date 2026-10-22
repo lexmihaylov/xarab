@@ -1,7 +1,7 @@
 import React from "react";
 import { useTerminalDimensions } from "@opentui/react";
-import { renderScarab } from "./scarab-image.js";
-import { getTheme } from "./theme-engine.js";
+import { renderScarab } from "../utils/scarab-image.js";
+import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().welcome;
 

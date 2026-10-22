@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import stringWidth from "string-width";
-import { modelDetailRows, compactCount } from "../src/ui/model-browser-view.js";
+import { modelDetailRows, compactCount } from "../src/utils/model-browser-view.js";
 
 const model = { name: "publisher/Coder", parameters: "7B" };
 const details = {

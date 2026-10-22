@@ -1,21 +1,21 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
-import { copyToClipboard } from "../agent/clipboard.js";
-import { Composer } from "./composer.component.jsx";
-import { StatusBar } from "./status-bar.component.jsx";
-import { AssistantMessage } from "./assistant-message.component.jsx";
-import { GeneratingMessage } from "./generating-message.component.jsx";
-import { IntentMessage } from "./intent-message.component.jsx";
-import { ShellMessage } from "./shell-message.component.jsx";
-import { UserMessage } from "./user-message.component.jsx";
-import { UnknownMessage } from "./unknown-message.component.jsx";
-import { SystemMessage } from "./system-message.component.jsx";
-import { ToolMessage } from "./tool-message.component.jsx";
-import { ModelChooser } from "./model-chooser.component.jsx";
-import { ModelDownloader } from "./model-downloader.component.jsx";
-import { SessionBrowser } from "./session-browser.component.jsx";
-import { Welcome } from "./welcome.component.jsx";
-import { ToastNotifications } from "./toast-notifications.component.jsx";
+import { copyToClipboard } from "./agent/clipboard.js";
+import { Composer } from "./components/Composer.component.jsx";
+import { StatusBar } from "./components/StatusBar.component.jsx";
+import { AssistantMessage } from "./components/AssistantMessage.component.jsx";
+import { GeneratingMessage } from "./components/GeneratingMessage.component.jsx";
+import { IntentMessage } from "./components/IntentMessage.component.jsx";
+import { ShellMessage } from "./components/ShellMessage.component.jsx";
+import { UserMessage } from "./components/UserMessage.component.jsx";
+import { UnknownMessage } from "./components/UnknownMessage.component.jsx";
+import { SystemMessage } from "./components/SystemMessage.component.jsx";
+import { ToolMessage } from "./components/ToolMessage.component.jsx";
+import { ModelChooser } from "./components/ModelChooser.component.jsx";
+import { ModelDownloader } from "./components/ModelDownloader.component.jsx";
+import { SessionBrowser } from "./components/SessionBrowser.component.jsx";
+import { Welcome } from "./components/Welcome.component.jsx";
+import { ToastNotifications } from "./components/ToastNotifications.component.jsx";
 
 const pageScrollKeys = new Map([
   ["pageup", -1],

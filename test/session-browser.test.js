@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { SessionBrowser } from "../src/ui/session-browser.component.jsx";
+import { SessionBrowser } from "../src/components/SessionBrowser.component.jsx";
 
 const sessions = [
   {

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React from "react";
 import { testRender } from "@opentui/react/test-utils";
-import { ShellMessage } from "../src/ui/shell-message.component.jsx";
+import { ShellMessage } from "../src/components/ShellMessage.component.jsx";
 
 async function render(message) {
   const view = await testRender(React.createElement(ShellMessage, { message }), {
