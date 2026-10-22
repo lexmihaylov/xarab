@@ -55,7 +55,7 @@ const defaultModelRuntime = {
     }),
 };
 
-export function buildTierClassificationPrompt({ prompt, recentMessages = [], contextSize = 4096 }) {
+export function buildTierClassificationPrompt({ prompt, recentMessages = [], contextSize = 8192 }) {
   // Keep input well below the model context after reserving room for the system
   // prompt and the classifier's response. Character limits are conservative for
   // code and non-English text, which can use more than four characters per token.
@@ -64,8 +64,8 @@ export function buildTierClassificationPrompt({ prompt, recentMessages = [], con
   const requestBudget = inputBudget - historyBudget;
   const history = recentMessages
     .filter((message) => ["user", "agent"].includes(message.type))
-    .slice(-4)
-    .map((message) => `${message.type}: ${String(message.message ?? "").slice(-1000)}`)
+    .slice(-10)
+    .map((message) => `${message.type}: ${String(message.message ?? "")}`)
     .join("\n")
     .slice(-historyBudget);
   const request = String(prompt ?? "").slice(-requestBudget);
@@ -123,7 +123,7 @@ function invalidClassification(error, rawOutput = "") {
 export function createLocalTierClassifier({
   modelPath,
   modelRuntime = defaultModelRuntime,
-  contextSize = 4096,
+  contextSize = 8192,
   maxTokens = 80,
 }) {
   if (!modelPath) throw new Error("A local classifier model path is required.");

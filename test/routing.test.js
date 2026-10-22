@@ -51,9 +51,24 @@ test("preserves the end when trimming classifier history and request", () => {
   assert.doesNotMatch(prompt, /request-start/);
   assert.match(prompt, /request-end/);
   assert.doesNotMatch(prompt, /history-start/);
-  assert.match(prompt, /history-end/);
+  assert.doesNotMatch(prompt, /history-end/);
   assert.doesNotMatch(prompt, /reply-start/);
   assert.match(prompt, /reply-end/);
+});
+
+test("keeps the last ten conversation messages before truncating the combined history", () => {
+  const prompt = buildTierClassificationPrompt({
+    prompt: "latest request",
+    recentMessages: Array.from({ length: 11 }, (_, index) => ({
+      type: "user",
+      message: `message-${index}`,
+    })),
+    contextSize: 8192,
+  });
+
+  assert.doesNotMatch(prompt, /message-0/);
+  assert.match(prompt, /message-1/);
+  assert.match(prompt, /message-10/);
 });
 
 test("parses a valid tier classification and bounds the rationale", () => {
@@ -94,11 +109,11 @@ test("loads one local model, resets context between cases, and releases resource
         async loadModel(options) {
           calls.loads++;
           assert.equal(options.modelPath, "/models/classifier.gguf");
-          assert.equal(options.gpuLayers.fitContext.contextSize, 4096);
+          assert.equal(options.gpuLayers.fitContext.contextSize, 8192);
           return {
             async createContext(options) {
               calls.contexts++;
-              assert.equal(options.contextSize, 4096);
+              assert.equal(options.contextSize, 8192);
               return {
                 getSequence() {
                   return {
