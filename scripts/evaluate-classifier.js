@@ -3,7 +3,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createLocalTierClassifier } from "../src/agent/tier-classifier.js";
+import { createLocalLlamaClassifierAdapter } from "../src/agent/classifier/index.js";
 import { evaluateTierCases, formatEvaluationReport } from "../src/agent/classifier-evaluation.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,7 +26,7 @@ if (!modelPaths.length) {
       const modelStat = await stat(resolvedModelPath);
       if (!modelStat.isFile() || !resolvedModelPath.toLowerCase().endsWith(".gguf"))
         throw new Error("Classifier path must point to a local .gguf file.");
-      classifier = createLocalTierClassifier({ modelPath: resolvedModelPath });
+      classifier = createLocalLlamaClassifierAdapter({ model: resolvedModelPath });
       const report = await evaluateTierCases({ classifier, cases });
       const name = path.basename(resolvedModelPath);
       summaries.push({ name, report });

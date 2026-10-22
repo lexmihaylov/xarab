@@ -10,6 +10,7 @@ function modelLabel(modelPath, settings = {}) {
 }
 
 function DeleteModelDialog({ model }) {
+  const modelPath = typeof model === "string" ? model : model?.model;
   return (
     <box
       position="absolute"
@@ -36,7 +37,7 @@ function DeleteModelDialog({ model }) {
           DELETE LOCAL MODEL
         </text>
         <text fg={colors.text} marginTop={1} wrapMode="word">
-          Delete {model} from local storage? This cannot be undone.
+          Delete {modelPath} from local storage? This cannot be undone.
         </text>
         <text fg={colors.hint} marginTop={1}>
           Enter confirm · Esc cancel
@@ -49,7 +50,7 @@ function DeleteModelDialog({ model }) {
 export function ModelChooser({
   models = [],
   modelSettings = {},
-  classifierModel,
+  classifier,
   tierWorkers = {},
   openAIModels = [],
   defaultOpenAIModel,
@@ -71,17 +72,32 @@ export function ModelChooser({
   const classifierScroll = useRef(null);
   const workerScroll = useRef(null);
   const { width: terminalWidth } = useTerminalDimensions();
-  const classifierOptions = useMemo(
-    () => [
+  const classifierOptions = useMemo(() => {
+    const options = [
       { name: "Routing disabled", description: "Do not classify requests", value: null },
       ...models.map((model) => ({
-        name: modelLabel(model, modelSettings),
+        name: `Local · ${modelLabel(model, modelSettings)}`,
         description: model,
         value: model,
       })),
-    ],
-    [models, modelSettings],
-  );
+      ...openAIModels.map((model) => ({
+        name: `OpenAI · ${model.name}`,
+        description: model.id,
+        value: { provider: "openai", model: model.id },
+      })),
+    ];
+    if (
+      classifier?.provider === "openai" &&
+      classifier.model &&
+      !openAIModels.some((model) => model.id === classifier.model)
+    )
+      options.push({
+        name: `OpenAI · ${classifier.model}`,
+        description: classifier.model,
+        value: classifier,
+      });
+    return options;
+  }, [classifier, modelSettings, models, openAIModels]);
   const workerOptions = useMemo(() => {
     const options = openAIModels.map((model) => ({
       name: `OpenAI · ${model.name}`,
@@ -115,11 +131,29 @@ export function ModelChooser({
   }, [defaultOpenAIModel, modelSettings, models, openAIModels, tierWorkers]);
   const configuredWorker = tierWorkers[tier];
   const worker = configuredWorker?.model || defaultOpenAIModel || "Worker not selected";
+  const classifierLabel = classifier
+    ? classifier.provider === "local"
+      ? modelLabel(classifier.model, modelSettings)
+      : classifier.model
+    : "Router disabled";
+  const isClassifierOptionConfigured = (option) => {
+    if (option.value === null) return !classifier;
+    const provider = typeof option.value === "string" ? "local" : option.value.provider;
+    const model = typeof option.value === "string" ? option.value : option.value.model;
+    return provider === classifier?.provider && model === classifier?.model;
+  };
 
   useEffect(() => {
-    const index = classifierOptions.findIndex((option) => option.value === classifierModel);
+    const index = classifierOptions.findIndex((option) =>
+      option.value === null
+        ? !classifier
+        : (typeof option.value === "string" ? "local" : option.value.provider) ===
+            classifier?.provider &&
+          (typeof option.value === "string" ? option.value : option.value.model) ===
+            classifier?.model,
+    );
     if (index >= 0) setClassifierIndex(index);
-  }, [classifierModel, classifierOptions]);
+  }, [classifier, classifierOptions]);
 
   useEffect(() => {
     const index = workerOptions.findIndex(
@@ -146,7 +180,8 @@ export function ModelChooser({
     if (confirmDelete) {
       if (key.name === "return") {
         const model = classifierOptions[classifierIndex]?.value;
-        if (model) onDeleteModel(model);
+        if (typeof model === "string" || model?.provider === "local")
+          onDeleteModel(typeof model === "string" ? model : model.model);
         setConfirmDelete(false);
       } else if (key.name === "escape") {
         setConfirmDelete(false);
@@ -256,7 +291,11 @@ export function ModelChooser({
       overlay={
         confirmDelete ? (
           <DeleteModelDialog
-            model={modelLabel(classifierOptions[classifierIndex]?.value, modelSettings)}
+            model={modelLabel(
+              classifierOptions[classifierIndex]?.value?.model ??
+                classifierOptions[classifierIndex]?.value,
+              modelSettings,
+            )}
           />
         ) : null
       }
@@ -277,8 +316,7 @@ export function ModelChooser({
         minWidth={0}
       >
         <text height={1} flexShrink={0} fg={colors.text} truncate>
-          {classifierModel ? modelLabel(classifierModel, modelSettings) : "Router disabled"} → Tier{" "}
-          {tier} → {worker}
+          {classifierLabel} → Tier {tier} → {worker}
         </text>
       </box>
       <box flexGrow={1} minHeight={0} flexDirection="row" gap={1}>
@@ -296,7 +334,7 @@ export function ModelChooser({
             >
               {classifierOptions.map((option, index) => {
                 const selected = activeControl === 0 && index === classifierIndex;
-                const configured = option.value === classifierModel;
+                const configured = isClassifierOptionConfigured(option);
                 return (
                   <box
                     key={option.name}

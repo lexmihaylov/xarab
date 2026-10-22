@@ -1,3 +1,3 @@
 export { createWorker } from "./worker.js";
-export { createLocalLlamaAdapter } from "./local-llama-adapter.js";
-export { createOpenAIResponsesAdapter } from "./openai-responses-adapter.js";
+export { createLocalLlamaWorkerAdapter } from "./local-llama-worker-adapter.js";
+export { createOpenAIResponsesWorkerAdapter } from "./openai-responses-worker-adapter.js";

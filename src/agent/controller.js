@@ -1,6 +1,5 @@
 import os from "node:os";
 import path from "node:path";
-import { buildSystemPrompt } from "./worker-system-prompt.js";
 import { createToolRegistry } from "./tool-registry.js";
 import { createEscalationTool } from "./tools/escalation-tool.js";
 import { getTheme } from "../utils/theme-engine.js";
@@ -11,9 +10,15 @@ import { createSessionStore } from "./session-store.js";
 import { createSessionController } from "./session-controller.js";
 import { createOpenAICodexAuth } from "./openai-codex-auth.js";
 import { copyToClipboard } from "../utils/clipboard.js";
-import { createOpenAIResponsesAdapter } from "./worker/openai-responses-adapter.js";
-import { createLocalLlamaAdapter } from "./worker/local-llama-adapter.js";
-import { createLocalTierClassifier } from "./tier-classifier.js";
+import {
+  createOpenAIResponsesWorkerAdapter,
+  createLocalLlamaWorkerAdapter,
+} from "./worker/index.js";
+import {
+  createClassifier,
+  createLocalLlamaClassifierAdapter,
+  createOpenAIResponsesClassifierAdapter,
+} from "./classifier/index.js";
 import { createModelManager } from "./model-manager.js";
 import { createWorker } from "./worker/worker.js";
 import { createCommandHandler } from "./assistant-command-handler.js";
@@ -30,9 +35,12 @@ export function createAssistantController({
   onQuit = () => {},
   downloadFile = downloadModelFile,
   clipboardWriter = copyToClipboard,
-  tierClassifierFactory = createLocalTierClassifier,
-  openAIAdapterFactory = createOpenAIResponsesAdapter,
-  localWorkerAdapterFactory = createLocalLlamaAdapter,
+  classifierFactory = createClassifier,
+  tierClassifierFactory,
+  localClassifierAdapterFactory = createLocalLlamaClassifierAdapter,
+  openAIClassifierAdapterFactory = createOpenAIResponsesClassifierAdapter,
+  openAIAdapterFactory = createOpenAIResponsesWorkerAdapter,
+  localWorkerAdapterFactory = createLocalLlamaWorkerAdapter,
   sessionsDir = path.join(path.dirname(configPath), "sessions"),
 }) {
   let status = "Ready";
@@ -59,15 +67,9 @@ export function createAssistantController({
   const openAIAdapter = openAIAdapterFactory({
     getCredentials: () => openAIAuth.getCredentials(),
   });
-  const worker = createWorker({
-    configStore,
-    openAIAdapterFactory,
-    localAdapterFactory: localWorkerAdapterFactory,
-    getCredentials: () => openAIAuth.getCredentials(),
-  });
+  let worker;
   let pendingOpenAIAuthUrl;
   let tierClassifier;
-  let tierClassifierPath;
 
   let sessionController;
 
@@ -80,6 +82,7 @@ export function createAssistantController({
           params: part.params ? { ...part.params } : undefined,
         })),
       })),
+      classifier: configStore.getClassifier(),
       classifierModel: configStore.getClassifierModel(),
       status,
       generating: generating || isRouting,
@@ -122,7 +125,7 @@ export function createAssistantController({
     notify,
     updateStatus: (nextStatus) =>
       updateStatus(
-        nextStatus === "Ready" && !configStore.getClassifierModel()
+        nextStatus === "Ready" && !configStore.getClassifier()
           ? "Use /route to configure the classifier and tier workers"
           : nextStatus,
       ),
@@ -160,7 +163,11 @@ export function createAssistantController({
     sessionChanged,
     notify,
   });
-  const systemPrompt = buildSystemPrompt({
+  worker = createWorker({
+    configStore,
+    openAIAdapterFactory,
+    localAdapterFactory: localWorkerAdapterFactory,
+    getCredentials: () => openAIAuth.getCredentials(),
     workspace,
     instructionFiles,
     availableTools: Object.entries(definitions).map(([name, definition]) => ({
@@ -169,13 +176,22 @@ export function createAssistantController({
     })),
   });
 
-  async function getTierClassifier() {
-    const classifierPath = configStore.getClassifierModel();
-    if (!classifierPath) return null;
-    if (tierClassifier && tierClassifierPath === classifierPath) return tierClassifier;
-    await tierClassifier?.dispose?.();
-    tierClassifier = tierClassifierFactory({ modelPath: classifierPath });
-    tierClassifierPath = classifierPath;
+  function getTierClassifier() {
+    if (tierClassifierFactory && !tierClassifier) {
+      tierClassifier = tierClassifierFactory({ modelPath: configStore.getClassifier()?.model });
+      return tierClassifier;
+    }
+    if (!tierClassifier) {
+      tierClassifier = classifierFactory({
+        getAssignment: () => configStore.getClassifier(),
+        localAdapterFactory: localClassifierAdapterFactory,
+        openAIAdapterFactory: ({ model }) =>
+          openAIClassifierAdapterFactory({
+            getCredentials: () => openAIAuth.getCredentials(),
+            model,
+          }),
+      });
+    }
     return tierClassifier;
   }
 
@@ -199,34 +215,23 @@ export function createAssistantController({
     notify();
   }
 
-  async function setRouterClassifier(modelPath) {
-    let nextClassifier;
-    if (modelPath) {
-      if (modelModal) modelModal = { ...modelModal, loadingClassifier: true, error: null };
-      notify();
-    }
+  async function setRouterClassifier(input) {
+    const assignment = typeof input === "string" ? { provider: "local", model: input } : input;
+    if (assignment && modelModal)
+      modelModal = { ...modelModal, loadingClassifier: true, error: null };
+    notify();
     try {
-      if (modelPath) {
-        nextClassifier = tierClassifierFactory({ modelPath });
-        await nextClassifier.load?.();
-      }
-      await configStore.setClassifierModel(modelPath);
-      await tierClassifier?.dispose?.();
-      tierClassifier = nextClassifier;
-      tierClassifierPath = modelPath || undefined;
+      await configStore.setClassifier(assignment);
+      if (assignment?.provider === "local") await getTierClassifier().load();
       if (modelModal)
         modelModal = {
           ...modelModal,
-          classifierModel: modelPath,
+          classifier: assignment,
+          classifierModel: assignment?.provider === "local" ? assignment.model : null,
           loadingClassifier: false,
           error: null,
         };
     } catch (error) {
-      try {
-        await nextClassifier?.dispose?.();
-      } catch {
-        // Preserve the classifier loading/configuration error for the dialog.
-      }
       if (modelModal)
         modelModal = {
           ...modelModal,
@@ -252,11 +257,6 @@ export function createAssistantController({
         modelModal = { ...modelModal, error: `Could not save tier worker: ${error.message}` };
     }
     notify();
-  }
-
-  function escalationInstructions(tier, canEscalate) {
-    if (!canEscalate) return "";
-    return `\n\n## Escalation\nYou are working at Tier ${tier}. If investigation reveals that the overall task or any individual subtask, component, or dependency requires the next tier, call request_escalation before making consequential changes. You may escalate for one subtask even when the rest of the request is manageable. State concrete findings, not speculation. It can only request Tier ${tier + 1}, ends your run immediately, and transfers your findings to that worker. Do not call it merely because tools are needed, and do not write a final answer after calling it.`;
   }
 
   async function runWorker(promptText, { tier, userMessage, handoff, escalationCount = 0 } = {}) {
@@ -295,7 +295,6 @@ export function createAssistantController({
     try {
       const result = await worker.run({
         tier,
-        instructions: `${systemPrompt}${escalationInstructions(tier, Boolean(escalationTool))}`,
         input: [...history, { role: "user", content: requestText }],
         tools: runTools,
         signal: abortController.signal,
@@ -347,7 +346,7 @@ export function createAssistantController({
           ...(userMessage.classification ?? {}),
           status: "done",
           tier: handoffResult.targetTier,
-          model: nextModelId,
+          model: nextWorker.model,
           escalated: true,
         };
         notify();
@@ -362,7 +361,7 @@ export function createAssistantController({
   }
 
   async function classifyForRouting(promptText) {
-    if (!configStore.getClassifierModel()) return null;
+    if (!configStore.getClassifier()) return null;
     const routingController = new AbortController();
     let finishWork;
     const workDone = new Promise((resolve) => {
@@ -372,7 +371,7 @@ export function createAssistantController({
     generating = true;
     abortController = routingController;
     activeWorkDone = workDone;
-    updateStatus("Classifying locally…");
+    updateStatus("Classifying…");
     try {
       const classifier = await getTierClassifier();
       const classification = await classifier.classify({
@@ -382,7 +381,7 @@ export function createAssistantController({
       });
       if (routingController.signal.aborted) return { cancelled: true };
       if (!classification?.valid || ![1, 2, 3].includes(classification.tier))
-        throw new Error(classification?.error || "The local classifier returned an invalid tier.");
+        throw new Error(classification?.error || "The classifier returned an invalid tier.");
       return { classification, worker: worker.getTierInfo(classification.tier) };
     } finally {
       isRouting = false;
@@ -512,7 +511,7 @@ export function createAssistantController({
     getTierClassifier: () => tierClassifier,
     clearTierClassifier: () => {
       tierClassifier = undefined;
-      tierClassifierPath = undefined;
+      tierClassifier = undefined;
     },
   });
 
@@ -580,6 +579,7 @@ export function createAssistantController({
           models,
           modelSettings: modelManager.getModelSettings(models),
           directory: modelsDir,
+          classifier: configStore.getClassifier(),
           classifierModel: configStore.getClassifierModel(),
           tierWorkers: configStore.get().tierWorkers,
           defaultOpenAIModel: configStore.getOpenAIModel(),

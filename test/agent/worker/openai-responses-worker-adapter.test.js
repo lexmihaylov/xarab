@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createOpenAIResponsesAdapter } from "../../../src/agent/worker/openai-responses-adapter.js";
+import { createOpenAIResponsesWorkerAdapter } from "../../../src/agent/worker/openai-responses-worker-adapter.js";
 
 function streamedResponse(events, { split = false } = {}) {
   const text = `${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`;
@@ -20,7 +20,7 @@ function streamedResponse(events, { split = false } = {}) {
 
 test("lists models allowed for display by the signed-in account", async () => {
   const requests = [];
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async (url, options) => {
       requests.push({ url: String(url), options });
@@ -49,7 +49,7 @@ test("streams a Responses result with required privacy settings", async () => {
   const requests = [];
   const chunks = [];
   const finalResponse = { id: "response-1", output: [{ type: "message" }] };
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async (url, options) => {
       requests.push({ url: String(url), options });
@@ -96,7 +96,7 @@ test("streams a Responses result with required privacy settings", async () => {
 test("does not leak streamed text that accompanies a native tool call", async () => {
   const chunks = [];
   let requestCount = 0;
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async () => {
       requestCount++;
@@ -137,7 +137,7 @@ test("rejects textual tool-call syntax without displaying it or executing it", a
   ]) {
     const chunks = [];
     let handlerCalls = 0;
-    const adapter = createOpenAIResponsesAdapter({
+    const adapter = createOpenAIResponsesWorkerAdapter({
       getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
       fetchImpl: async () =>
         streamedResponse([
@@ -161,7 +161,7 @@ test("rejects textual tool-call syntax without displaying it or executing it", a
 
 test("rejects textual tool-call syntax from completed output without streamed deltas", async () => {
   const textualCall = 'to=functions.edit code {"path":"file.js"}';
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async () =>
       streamedResponse([
@@ -186,7 +186,7 @@ test("runs provider function calls through existing tool handlers and continues 
   const requests = [];
   const calls = [];
   let turn = 0;
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async (url, options) => {
       requests.push(JSON.parse(options.body));
@@ -252,7 +252,7 @@ test("runs provider function calls through existing tool handlers and continues 
 
 test("returns a controller handoff without continuing the current worker turn", async () => {
   let requests = 0;
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async () => {
       requests++;
@@ -298,7 +298,7 @@ test("returns a controller handoff without continuing the current worker turn", 
 test("continues a tool call when input is omitted and serializes unusual tool results", async () => {
   const requests = [];
   let requestCount = 0;
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async (_url, options) => {
       requests.push(JSON.parse(options.body));
@@ -343,7 +343,7 @@ test("continues a tool call when input is omitted and serializes unusual tool re
 test("recovers final text from the completed response when the stream has no text deltas", async () => {
   let requestCount = 0;
   const chunks = [];
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async () => {
       requestCount++;
@@ -392,7 +392,7 @@ test("recovers final text from the completed response when the stream has no tex
 
 test("reports an empty final response after a tool call instead of silently ending", async () => {
   let requestCount = 0;
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async () => {
       requestCount++;
@@ -432,7 +432,7 @@ test("continues tool rounds without a fixed cap and keeps tools available", asyn
   let requestCount = 0;
   let handlerCalls = 0;
   const toolRoundCount = 30;
-  const adapter = createOpenAIResponsesAdapter({
+  const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async (_url, options) => {
       const body = JSON.parse(options.body);
@@ -493,7 +493,7 @@ test("continues tool rounds without a fixed cap and keeps tools available", asyn
 });
 
 test("surfaces response failures and rejects streams without a completed event", async () => {
-  const failureAdapter = createOpenAIResponsesAdapter({
+  const failureAdapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async () =>
       streamedResponse([{ type: "response.failed", response: { error: { code: "usage_limit" } } }]),
@@ -503,7 +503,7 @@ test("surfaces response failures and rejects streams without a completed event",
     /response failed \(usage_limit\)/,
   );
 
-  const streamErrorAdapter = createOpenAIResponsesAdapter({
+  const streamErrorAdapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async () =>
       streamedResponse([
@@ -518,7 +518,7 @@ test("surfaces response failures and rejects streams without a completed event",
     /stream failed \(invalid_request_error\): Unsupported tool schema\./,
   );
 
-  const incompleteAdapter = createOpenAIResponsesAdapter({
+  const incompleteAdapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
     fetchImpl: async () => streamedResponse([{ type: "response.created" }]),
   });

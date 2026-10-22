@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildTierClassificationPrompt,
-  createLocalTierClassifier,
+  createLocalLlamaClassifierAdapter,
   parseTierClassification,
   TIER_CLASSIFIER_INSTRUCTIONS,
-} from "../src/agent/tier-classifier.js";
+} from "../src/agent/classifier/index.js";
 
 test("classifier instructions distinguish focused, advanced, and specialized work", () => {
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Focused capability/);
@@ -143,13 +143,23 @@ test("loads one local model, resets context between cases, and releases resource
       };
     },
   };
-  const classifier = createLocalTierClassifier({
-    modelPath: "/models/classifier.gguf",
+  const classifier = createLocalLlamaClassifierAdapter({
+    model: "/models/classifier.gguf",
     modelRuntime,
   });
 
-  const first = await classifier.classify({ prompt: "Summarize this paragraph" });
-  const second = await classifier.classify({ prompt: "Fix this typo" });
+  const first = parseTierClassification(
+    await classifier.run({
+      instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+      input: [{ role: "user", content: "Summarize this paragraph" }],
+    }),
+  );
+  const second = parseTierClassification(
+    await classifier.run({
+      instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+      input: [{ role: "user", content: "Fix this typo" }],
+    }),
+  );
   await classifier.dispose();
 
   assert.equal(first.tier, 1);
@@ -195,14 +205,29 @@ test("serializes classifier calls and rejects use after disposal", async () => {
       };
     },
   };
-  const classifier = createLocalTierClassifier({ modelPath: "model.gguf", modelRuntime: runtime });
-  const first = classifier.classify({ prompt: "first" });
-  const second = classifier.classify({ prompt: "second" });
+  const classifier = createLocalLlamaClassifierAdapter({
+    model: "model.gguf",
+    modelRuntime: runtime,
+  });
+  const first = classifier.run({
+    instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+    input: [{ role: "user", content: "first" }],
+  });
+  const second = classifier.run({
+    instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+    input: [{ role: "user", content: "second" }],
+  });
   await Promise.all([first, second]);
   await classifier.dispose();
 
   assert.deepEqual(order, ["first-start", "first-end", "second-start", "second-end"]);
-  await assert.rejects(classifier.classify({ prompt: "after dispose" }), /disposed/);
+  await assert.rejects(
+    classifier.run({
+      instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+      input: [{ role: "user", content: "after dispose" }],
+    }),
+    /disposed/,
+  );
 });
 
 test("disposes resources after direct loading and shares concurrent disposal", async () => {
@@ -235,7 +260,10 @@ test("disposes resources after direct loading and shares concurrent disposal", a
       };
     },
   };
-  const classifier = createLocalTierClassifier({ modelPath: "model.gguf", modelRuntime: runtime });
+  const classifier = createLocalLlamaClassifierAdapter({
+    model: "model.gguf",
+    modelRuntime: runtime,
+  });
 
   await classifier.load();
   const firstDisposal = classifier.dispose();

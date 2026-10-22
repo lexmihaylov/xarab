@@ -3,7 +3,7 @@ const RESPONSES_URL = `${CODEX_BASE_URL}/responses`;
 const MODELS_URL = new URL(`${CODEX_BASE_URL}/models`);
 MODELS_URL.searchParams.set("client_version", "0.0.0");
 
-export function createOpenAIResponsesAdapter({ getCredentials, fetchImpl = fetch }) {
+export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl = fetch }) {
   async function listModels({ signal } = {}) {
     const credentials = await getCredentials();
     const response = await fetchImpl(MODELS_URL, {

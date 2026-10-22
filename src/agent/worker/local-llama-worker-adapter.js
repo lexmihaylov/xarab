@@ -2,7 +2,7 @@ import { getLlama, LlamaChatSession } from "node-llama-cpp";
 
 const HANDOFF = Symbol("local worker handoff");
 
-export function createLocalLlamaAdapter({
+export function createLocalLlamaWorkerAdapter({
   modelRuntime = { getLlama, createSession: (options) => new LlamaChatSession(options) },
   contextSize = 16384,
   maxTokens = 4096,
