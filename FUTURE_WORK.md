@@ -28,7 +28,7 @@ The OpenAI response path can remain in a generating state if the provider opens 
 
 ### Areas to inspect
 
-- `src/agent/openai-responses.js`: request lifecycle, stream reads, abort handling, and error classification
+- `src/agent/openai-responses-adapter.js`: request lifecycle, stream reads, abort handling, and error classification
 - Controller/session state: transition out of `generating`, preserve partial output, and expose retry behavior
 - Tests: no-response timeout, mid-stream stall, manual cancellation, partial output, retry limits, and tool-call safety
 

@@ -1,6 +1,6 @@
 import { readdir, realpath } from "node:fs/promises";
 import path from "node:path";
-import { fuzzyScore } from "./fuzzy-score.js";
+import { fuzzyScore } from "../../utils/fuzzy-score.js";
 
 const MAX_SCANNED_ENTRIES = 10_000;
 const MAX_DEPTH = 8;

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { getHuggingFaceModelDetails } from "../agent/model-search.js";
+import { getHuggingFaceModelDetails } from "../utils/huggingface-model-search.js";
 import {
   cleanModelText as clean,
   compactCount,

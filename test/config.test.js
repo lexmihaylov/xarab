@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createConfigStore } from "../src/agent/config.js";
+import { createConfigStore } from "../src/utils/config-store.js";
 
 test("loads classifier model labels and ignores obsolete local worker selection", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-config-test-"));

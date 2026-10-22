@@ -7,7 +7,7 @@ import {
   BASE_SYSTEM_PROMPT,
   buildSystemPrompt,
   loadProjectInstructions,
-} from "../src/agent/instructions.js";
+} from "../src/agent/worker-system-prompt.js";
 
 test("keeps the core system prompt concise", () => {
   assert.ok(BASE_SYSTEM_PROMPT.length < 4_500);

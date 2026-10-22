@@ -3,7 +3,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createLocalTierClassifier } from "../src/agent/routing.js";
+import { createLocalTierClassifier } from "../src/agent/tier-classifier.js";
 import { evaluateTierCases, formatEvaluationReport } from "../src/agent/classifier-evaluation.js";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");

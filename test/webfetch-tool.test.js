@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createWebfetchTool } from "../src/agent/tools/webfetch-tool.js";
+import { createWebfetchTool } from "../src/agent/tools/web-fetch-tool.js";
 
 function response(body, { status = 200, contentType = "text/html; charset=utf-8", location } = {}) {
   return {

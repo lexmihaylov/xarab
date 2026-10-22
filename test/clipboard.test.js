@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import test from "node:test";
-import { copyToClipboard } from "../src/agent/clipboard.js";
+import { copyToClipboard } from "../src/utils/clipboard.js";
 
 test("copies to the Windows clipboard from WSL", async () => {
   const child = new EventEmitter();

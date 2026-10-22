@@ -5,8 +5,8 @@ import { createSearchContentTool } from "./tools/search-content-tool.js";
 import { createEditTool } from "./tools/edit-tool.js";
 import { createInsertTool } from "./tools/insert-tool.js";
 import { createWriteTool } from "./tools/write-tool.js";
-import { createWebsearchTool } from "./tools/websearch-tool.js";
-import { createWebfetchTool } from "./tools/webfetch-tool.js";
+import { createWebsearchTool } from "./tools/web-search-tool.js";
+import { createWebfetchTool } from "./tools/web-fetch-tool.js";
 import { createShellTool } from "./tools/shell-tool.js";
 
 export function createToolRegistry({

@@ -3,7 +3,7 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createServer } from "node:http";
 import test from "node:test";
-import { downloadModelFile } from "../src/agent/download-model.js";
+import { downloadModelFile } from "../src/utils/model-downloader.js";
 
 const deferred = () => {
   let resolve, reject;

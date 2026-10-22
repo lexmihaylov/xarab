@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getHuggingFaceModelDetails, searchHuggingFaceModels } from "../src/agent/model-search.js";
+import {
+  getHuggingFaceModelDetails,
+  searchHuggingFaceModels,
+} from "../src/utils/huggingface-model-search.js";
 
 test("search returns lightweight GGUF results without fetching every repository", async (t) => {
   const calls = [];

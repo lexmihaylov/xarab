@@ -2,8 +2,8 @@ import {
   readWorkspaceText,
   replaceWorkspaceText,
   resolveWorkspaceFile,
-} from "./workspace-file-utils.js";
-import { formatChangeDiff } from "./change-diff.js";
+} from "../../utils/workspace-file-utils.js";
+import { formatChangeDiff } from "../../utils/change-diff.js";
 
 export function createWriteTool({ workspace = process.cwd(), onEvent = () => {} } = {}) {
   return {

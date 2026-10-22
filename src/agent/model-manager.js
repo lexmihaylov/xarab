@@ -1,6 +1,6 @@
 import { readdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import { searchHuggingFaceModels } from "./model-search.js";
+import { searchHuggingFaceModels } from "../utils/huggingface-model-search.js";
 
 export function createModelManager({
   modelsDir,

@@ -1,4 +1,4 @@
-import { runShellCommand } from "./shell-command.js";
+import { runShellCommand } from "./shell-command-executor.js";
 
 const MAX_AGENT_OUTPUT_BYTES = 64 * 1024;
 const MAX_MODEL_OUTPUT_BYTES = 8 * 1024;

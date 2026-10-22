@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useState } from "react";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
-import { copyToClipboard } from "./agent/clipboard.js";
+import { copyToClipboard } from "./utils/clipboard.js";
 import { Composer } from "./components/Composer.component.jsx";
 import { StatusBar } from "./components/StatusBar.component.jsx";
 import { AssistantMessage } from "./components/AssistantMessage.component.jsx";

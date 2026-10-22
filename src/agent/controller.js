@@ -1,21 +1,21 @@
 import os from "node:os";
 import path from "node:path";
-import { buildSystemPrompt } from "./instructions.js";
+import { buildSystemPrompt } from "./worker-system-prompt.js";
 import { createToolRegistry } from "./tool-registry.js";
 import { createEscalationTool } from "./tools/escalation-tool.js";
 import { getTheme } from "../utils/theme-engine.js";
 import { createMessageTimeline } from "./message-timeline.js";
-import { createConfigStore } from "./config.js";
-import { downloadModelFile } from "./download-model.js";
+import { createConfigStore } from "../utils/config-store.js";
+import { downloadModelFile } from "../utils/model-downloader.js";
 import { createSessionStore } from "./session-store.js";
 import { createSessionController } from "./session-controller.js";
 import { createOpenAICodexAuth } from "./openai-codex-auth.js";
-import { copyToClipboard } from "./clipboard.js";
-import { createOpenAIResponsesAdapter } from "./openai-responses.js";
-import { createLocalTierClassifier } from "./routing.js";
+import { copyToClipboard } from "../utils/clipboard.js";
+import { createOpenAIResponsesAdapter } from "./openai-responses-adapter.js";
+import { createLocalTierClassifier } from "./tier-classifier.js";
 import { createModelManager } from "./model-manager.js";
 import { createWorker } from "./worker.js";
-import { createCommandHandler } from "./command-handler.js";
+import { createCommandHandler } from "./assistant-command-handler.js";
 import { createSessionCompactor } from "./session-compactor.js";
 
 export function createAssistantController({

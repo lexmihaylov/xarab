@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createOpenAIResponsesAdapter } from "../src/agent/openai-responses.js";
+import { createOpenAIResponsesAdapter } from "../src/agent/openai-responses-adapter.js";
 
 function streamedResponse(events, { split = false } = {}) {
   const text = `${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`;

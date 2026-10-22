@@ -3,8 +3,8 @@ import {
   readWorkspaceText,
   replaceWorkspaceText,
   resolveWorkspaceFile,
-} from "./workspace-file-utils.js";
-import { formatChangeDiff } from "./change-diff.js";
+} from "../../utils/workspace-file-utils.js";
+import { formatChangeDiff } from "../../utils/change-diff.js";
 
 export function createInsertTool({ workspace = process.cwd(), onEvent = () => {}, position }) {
   if (position !== "before" && position !== "after")

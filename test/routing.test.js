@@ -5,7 +5,7 @@ import {
   createLocalTierClassifier,
   parseTierClassification,
   TIER_CLASSIFIER_INSTRUCTIONS,
-} from "../src/agent/routing.js";
+} from "../src/agent/tier-classifier.js";
 
 test("classifier instructions distinguish focused, advanced, and specialized work", () => {
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Focused capability/);

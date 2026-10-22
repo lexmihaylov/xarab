@@ -1,9 +1,9 @@
-import { runShellCommand } from "./tools/shell-command.js";
+import { runShellCommand } from "./tools/shell-command-executor.js";
 import {
   appendShellContext,
   createShellContextEntry,
   formatShellResult,
-} from "./tools/shell-context.js";
+} from "../utils/shell-context.js";
 
 export function createCommandHandler({
   workspace,
