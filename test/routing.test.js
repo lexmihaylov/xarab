@@ -38,6 +38,24 @@ test("classification prompt includes bounded recent user and assistant context",
   assert.doesNotMatch(prompt, /system text is not sent/);
 });
 
+test("preserves the end when trimming classifier history and request", () => {
+  const prompt = buildTierClassificationPrompt({
+    prompt: `request-start ${"request-middle ".repeat(700)}request-end`,
+    recentMessages: [
+      { type: "user", message: `history-start ${"history-middle ".repeat(500)}history-end` },
+      { type: "agent", message: `reply-start ${"reply-middle ".repeat(500)}reply-end` },
+    ],
+    contextSize: 2048,
+  });
+
+  assert.doesNotMatch(prompt, /request-start/);
+  assert.match(prompt, /request-end/);
+  assert.doesNotMatch(prompt, /history-start/);
+  assert.match(prompt, /history-end/);
+  assert.doesNotMatch(prompt, /reply-start/);
+  assert.match(prompt, /reply-end/);
+});
+
 test("parses a valid tier classification and bounds the rationale", () => {
   const result = parseTierClassification(
     '{"tier":2,"confidence":0.82,"rationale":"Several dependent steps require investigation."}',
@@ -76,9 +94,11 @@ test("loads one local model, resets context between cases, and releases resource
         async loadModel(options) {
           calls.loads++;
           assert.equal(options.modelPath, "/models/classifier.gguf");
+          assert.equal(options.gpuLayers.fitContext.contextSize, 4096);
           return {
-            async createContext() {
+            async createContext(options) {
               calls.contexts++;
+              assert.equal(options.contextSize, 4096);
               return {
                 getSequence() {
                   return {
