@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createWorker } from "../../../src/agent/worker/worker.js";
+import { buildWorkerHistory, createWorker } from "../../../src/agent/worker/worker.js";
 
 function createConfig(tierWorker) {
   return {
@@ -21,7 +21,7 @@ test("worker selects an adapter and passes the configured model", async () => {
   });
 
   await worker.run({ tier: 1, input: "hello" });
-  assert.deepEqual(calls, [{ input: "hello", model: "local.gguf" }]);
+  assert.deepEqual(calls, [{ input: [{ role: "user", content: "hello" }], model: "local.gguf" }]);
 });
 
 test("worker uses the OpenAI adapter for the default worker", async () => {
@@ -36,6 +36,43 @@ test("worker uses the OpenAI adapter for the default worker", async () => {
 
   await worker.run({ input: "hello" });
   assert.equal(selected.model, "default-openai");
+});
+
+test("worker history preserves completed tool calls and their results", () => {
+  const history = buildWorkerHistory(
+    [
+      { type: "user", message: "Read the package manifest." },
+      {
+        type: "agent",
+        parts: [
+          { type: "text", text: "I will inspect it." },
+          {
+            type: "tool",
+            callId: "call_1",
+            toolName: "read_file",
+            params: { path: "package.json" },
+            result: { ok: true, output: '{"name":"xarab"}' },
+          },
+          { type: "text", text: "The package is named xarab." },
+        ],
+      },
+    ],
+    "What is its name?",
+  );
+
+  assert.deepEqual(history, [
+    { role: "user", content: "Read the package manifest." },
+    { role: "assistant", content: "I will inspect it." },
+    {
+      type: "tool_call",
+      callId: "call_1",
+      name: "read_file",
+      arguments: { path: "package.json" },
+    },
+    { type: "tool_result", callId: "call_1", output: '{"name":"xarab"}', ok: true },
+    { role: "assistant", content: "The package is named xarab." },
+    { role: "user", content: "What is its name?" },
+  ]);
 });
 
 test("worker rejects an unconfigured tier", async () => {

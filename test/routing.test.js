@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   buildTierClassificationPrompt,
+  createClassifier,
   createLocalLlamaClassifierAdapter,
   parseTierClassification,
   TIER_CLASSIFIER_INSTRUCTIONS,
@@ -272,4 +273,53 @@ test("disposes resources after direct loading and shares concurrent disposal", a
   await Promise.all([firstDisposal, secondDisposal]);
 
   assert.deepEqual(calls, { grammar: 1, context: 1, model: 1 });
+});
+
+test("unloads the previous classifier adapter when its assignment changes", async () => {
+  let assignment = { provider: "local", model: "/models/first.gguf" };
+  const localAdapters = [];
+  const openAIAdapters = [];
+  const classifier = createClassifier({
+    getAssignment: () => assignment,
+    localAdapterFactory({ model }) {
+      const adapter = {
+        model,
+        loads: 0,
+        disposals: 0,
+        async load() {
+          this.loads++;
+        },
+        async dispose() {
+          this.disposals++;
+        },
+      };
+      localAdapters.push(adapter);
+      return adapter;
+    },
+    openAIAdapterFactory({ model }) {
+      const adapter = {
+        model,
+        disposals: 0,
+        async dispose() {
+          this.disposals++;
+        },
+      };
+      openAIAdapters.push(adapter);
+      return adapter;
+    },
+  });
+
+  await classifier.load();
+  await classifier.load();
+  assert.equal(localAdapters[0].loads, 2);
+  assert.equal(localAdapters[0].disposals, 0);
+
+  assignment = { provider: "openai", model: "gpt-router" };
+  await classifier.load();
+  assert.equal(localAdapters[0].disposals, 1);
+  assert.equal(openAIAdapters.length, 1);
+
+  assignment = null;
+  await classifier.load();
+  assert.equal(openAIAdapters[0].disposals, 1);
 });

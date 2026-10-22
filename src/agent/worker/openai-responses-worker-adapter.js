@@ -40,7 +40,7 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
       parameters: tool.params ?? { type: "object", properties: {} },
       strict: false,
     }));
-    let requestInput = Array.isArray(input) ? [...input] : (input ?? []);
+    let requestInput = serializeWorkerInput(input);
     let completedResponse;
     let sawToolCall = false;
 
@@ -134,7 +134,7 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
           });
           continue;
         }
-        onEvent({ type: "tool_call", name: call.name, arguments: args });
+        onEvent({ type: "tool_call", name: call.name, callId: call.call_id, arguments: args });
         let result;
         try {
           result = normalizeToolResult(await tool.handler(args));
@@ -237,6 +237,30 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
   }
   if (!completed) throw new Error("OpenAI stream ended without response.completed.");
   return completed;
+}
+
+function serializeWorkerInput(input) {
+  const items = Array.isArray(input)
+    ? input
+    : input == null
+      ? []
+      : [{ role: "user", content: input }];
+  return items.map((item) => {
+    if (item?.type === "tool_call")
+      return {
+        type: "function_call",
+        call_id: item.callId,
+        name: item.name,
+        arguments: JSON.stringify(item.arguments ?? {}),
+      };
+    if (item?.type === "tool_result")
+      return {
+        type: "function_call_output",
+        call_id: item.callId,
+        output: item.output,
+      };
+    return item;
+  });
 }
 
 function normalizeToolResult(result) {

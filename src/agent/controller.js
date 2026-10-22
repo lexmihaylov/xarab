@@ -8,7 +8,7 @@ import { createConfigStore } from "../utils/config-store.js";
 import { downloadModelFile } from "../utils/model-downloader.js";
 import { createSessionStore } from "./session-store.js";
 import { createSessionController } from "./session-controller.js";
-import { createOpenAICodexAuth } from "./openai-codex-auth.js";
+import { createOpenAICodexAuth } from "../utils/openai-codex-auth.js";
 import { copyToClipboard } from "../utils/clipboard.js";
 import {
   createOpenAIResponsesWorkerAdapter,
@@ -222,7 +222,7 @@ export function createAssistantController({
     notify();
     try {
       await configStore.setClassifier(assignment);
-      if (assignment?.provider === "local") await getTierClassifier().load();
+      await getTierClassifier().load();
       if (modelModal)
         modelModal = {
           ...modelModal,
@@ -260,12 +260,7 @@ export function createAssistantController({
   }
 
   async function runWorker(promptText, { tier, userMessage, handoff, escalationCount = 0 } = {}) {
-    const history = messages
-      .filter((message) => ["user", "agent"].includes(message.type) && message.message?.trim())
-      .map((message) => ({
-        role: message.type === "agent" ? "assistant" : "user",
-        content: message.message,
-      }));
+    const history = messages.filter((message) => message !== userMessage);
     const handoffText = handoff
       ? `\n\nHandoff from Tier ${handoff.fromTier}:\nReason: ${handoff.reason}\nFindings: ${handoff.findings}\nVerify these findings before acting.`
       : "";
@@ -295,7 +290,8 @@ export function createAssistantController({
     try {
       const result = await worker.run({
         tier,
-        input: [...history, { role: "user", content: requestText }],
+        history,
+        input: requestText,
         tools: runTools,
         signal: abortController.signal,
         // Keep onText for adapters that only provide completion callbacks;

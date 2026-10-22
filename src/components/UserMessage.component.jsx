@@ -24,32 +24,40 @@ export function UserMessage({ message, classification }) {
   }, [classifying]);
 
   return (
-    <box
-      flexDirection="column"
-      marginBottom={1}
-      minWidth={0}
-      paddingTop={1}
-      paddingBottom={1}
-      paddingLeft={1}
-      paddingRight={1}
-      borderStyle="single"
-      border={["left"]}
-      borderColor={colors.green}
-      backgroundColor="#263b2f"
-    >
-      <text fg={colors.text} selectable wrapMode="word">
-        {toText(message).trimEnd() || " "}
-      </text>
+    <box flexDirection="column" marginBottom={1} minWidth={0}>
+      <box
+        flexDirection="column"
+        minWidth={0}
+        paddingTop={1}
+        paddingBottom={1}
+        paddingLeft={1}
+        paddingRight={1}
+        borderStyle="single"
+        border={["left"]}
+        borderColor={colors.green}
+        backgroundColor="#263b2f"
+      >
+        <text fg={colors.text} selectable wrapMode="word">
+          {toText(message).trimEnd() || " "}
+        </text>
+      </box>
       {classifying && (
         <box flexDirection="row" justifyContent="flex-end" width="100%" marginTop={1}>
           <text fg={colors.green}>{loadingFrames[frame]} Classifying…</text>
         </box>
       )}
       {classification?.status === "done" && (
-        <box flexDirection="row" justifyContent="flex-end" width="100%" marginTop={1}>
+        <box flexDirection="column" alignItems="flex-end" width="100%" marginTop={1}>
           <text fg={colors.green}>
             Tier {classification.tier} · {toText(classification.model)}
+            {Number.isFinite(classification.confidence) &&
+              ` (${Math.round(classification.confidence * 100)}%)`}
           </text>
+          {classification.rationale && (
+            <text fg={colors.muted} wrapMode="word">
+              {classification.rationale}
+            </text>
+          )}
         </box>
       )}
     </box>

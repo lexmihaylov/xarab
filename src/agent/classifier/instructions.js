@@ -35,7 +35,7 @@ Design a distributed-system migration with tightly coupled services, substantial
 Research a company-wide security architecture and produce a staged rollout with incident recovery -> 3
 Investigate production data loss across workers and storage and produce a safe recovery plan -> 3
 
-Return exactly one JSON object with this shape: {"tier":1,"confidence":0.9,"rationale":"short reason"}. The tier must be the integer 1, 2, or 3. Confidence is optional, but when present it must be a number from 0 to 1. The rationale must be concise and describe the decisive work characteristic.`;
+Return exactly one JSON object with this shape: {"tier":<1|2|3>,"confidence":<0..1>,"rationale":"<why this tier>"}. Do not copy the placeholder values. The tier must be the integer 1, 2, or 3. Confidence is optional, but when present it must be a number from 0 to 1. The rationale must describe this request's decisive work characteristic in no more than 50 characters.`;
 
 export function buildTierClassificationPrompt({ prompt, recentMessages = [], contextSize = 8192 }) {
   const inputBudget = Math.max(1200, Math.floor((contextSize - 700) * 3));

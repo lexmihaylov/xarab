@@ -56,8 +56,16 @@ export function validateSession(value, expectedId = value?.id) {
                 (part.type === "tool" &&
                   (!text(part.title ?? part.label) ||
                     !["running", "complete", "error"].includes(part.status))) ||
+                (part.callId !== undefined && (!text(part.callId) || !part.callId)) ||
                 (part.summary !== undefined && !text(part.summary)) ||
-                (part.diffText !== undefined && !text(part.diffText)),
+                (part.diffText !== undefined && !text(part.diffText)) ||
+                (part.result !== undefined &&
+                  (!object(part.result) ||
+                    typeof part.result.ok !== "boolean" ||
+                    !text(part.result.output) ||
+                    (part.result.truncated !== undefined &&
+                      typeof part.result.truncated !== "boolean") ||
+                    (part.result.errorCode !== undefined && !text(part.result.errorCode)))),
             ))),
     )
   )

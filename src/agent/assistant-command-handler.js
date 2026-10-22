@@ -233,6 +233,8 @@ export function createCommandHandler({
       status: "done",
       tier: classification.tier,
       model: worker.model,
+      confidence: classification.confidence,
+      rationale: classification.rationale,
     };
     notify();
     return runWorker(text, {

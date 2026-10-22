@@ -93,6 +93,7 @@ export function createToolRegistry({
             const rawResult = await definition.handler(params);
             const result = normalizeToolResult(rawResult);
             part.status = result.ok ? "complete" : "error";
+            part.result = storedToolResult(result);
             // These tools emit concise UI summaries separately; keep their full
             // result payload available to the model without rendering it in chat.
             const preservesEventSummary = name === "read_file" || name === "search_content";
@@ -105,6 +106,7 @@ export function createToolRegistry({
               errorCode: error?.code,
             };
             part.status = "error";
+            part.result = storedToolResult(result);
             part.summary = result.output.slice(0, 240);
             return result;
           } finally {
@@ -130,6 +132,21 @@ function normalizeToolResult(result) {
   const output = serialized === undefined ? String(result) : serialized;
   const failed = /^\s*(?:error|failed|failure)\s*:/i.test(output);
   return { ok: !failed, output };
+}
+
+const MAX_STORED_TOOL_OUTPUT = 16 * 1024;
+
+function storedToolResult(result) {
+  const output = result.output.slice(0, MAX_STORED_TOOL_OUTPUT);
+  return {
+    ok: result.ok,
+    output:
+      output.length < result.output.length
+        ? `${output}\n[Tool output truncated for session history.]`
+        : output,
+    ...(output.length < result.output.length ? { truncated: true } : {}),
+    ...(result.errorCode ? { errorCode: result.errorCode } : {}),
+  };
 }
 
 function safeToolDetail(value) {

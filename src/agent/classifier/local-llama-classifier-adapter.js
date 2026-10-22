@@ -9,7 +9,7 @@ const defaultModelRuntime = {
       properties: {
         tier: { type: "integer", enum: [1, 2, 3] },
         confidence: { type: "number", minimum: 0, maximum: 1 },
-        rationale: { type: "string", maxLength: 90 },
+        rationale: { type: "string", maxLength: 50 },
       },
       required: ["tier", "rationale"],
       additionalProperties: false,

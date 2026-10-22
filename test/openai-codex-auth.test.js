@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { CODEX_OAUTH_REDIRECT_URI, createOpenAICodexAuth } from "../src/agent/openai-codex-auth.js";
+import { CODEX_OAUTH_REDIRECT_URI, createOpenAICodexAuth } from "../src/utils/openai-codex-auth.js";
 
 const TOKEN_URL = "https://auth.openai.com/oauth/token";
 const CLIENT_ID = "app_EMoamEEZ73f0CkXaXp7hrann";

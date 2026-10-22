@@ -91,7 +91,9 @@ export function createMessageTimeline({
       return;
     }
 
-    if (event.type === "edited") {
+    if (event.type === "tool_call") {
+      if (typeof event.callId === "string" && event.callId) part.callId = event.callId;
+    } else if (event.type === "edited") {
       part.title = "File edit";
       part.summary = event.action
         ? "1 anchor insertion"

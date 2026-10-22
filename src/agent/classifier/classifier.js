@@ -25,15 +25,25 @@ export function createClassifier({ getAssignment, localAdapterFactory, openAIAda
     return adapter;
   }
 
+  async function reconcileAdapters(assignment) {
+    const activeKey = assignmentKey(assignment);
+    const inactiveAdapters = [...adapters.entries()].filter(([key]) => key !== activeKey);
+    await Promise.allSettled(inactiveAdapters.map(([, adapter]) => adapter.dispose?.()));
+    for (const [key] of inactiveAdapters) adapters.delete(key);
+  }
+
   return {
     async load() {
       if (disposed) throw new Error("Classifier has been disposed.");
-      const adapter = getAdapter(getAssignment());
+      const assignment = getAssignment();
+      await reconcileAdapters(assignment);
+      const adapter = getAdapter(assignment);
       await adapter?.load?.();
     },
     async classify(input) {
       if (disposed) throw new Error("Classifier has been disposed.");
       const assignment = getAssignment();
+      await reconcileAdapters(assignment);
       if (!assignment?.model) return null;
       const adapter = getAdapter(assignment);
       const output = await adapter.run({

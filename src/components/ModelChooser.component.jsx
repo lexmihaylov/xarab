@@ -142,6 +142,9 @@ export function ModelChooser({
     const model = typeof option.value === "string" ? option.value : option.value.model;
     return provider === classifier?.provider && model === classifier?.model;
   };
+  const selectedClassifier = classifierOptions[classifierIndex]?.value;
+  const canDeleteSelectedClassifier =
+    typeof selectedClassifier === "string" || selectedClassifier?.provider === "local";
 
   useEffect(() => {
     const index = classifierOptions.findIndex((option) =>
@@ -216,12 +219,7 @@ export function ModelChooser({
       onRefreshWorkerModels();
       return;
     }
-    if (
-      key.name === "d" &&
-      key.ctrl &&
-      activeControl === 0 &&
-      classifierOptions[classifierIndex]?.value
-    ) {
+    if (key.name === "d" && key.ctrl && activeControl === 0 && canDeleteSelectedClassifier) {
       key.preventDefault();
       setConfirmDelete(true);
       return;
@@ -454,7 +452,9 @@ export function ModelChooser({
         {error || openAIError || " "}
       </text>
       <text height={1} flexShrink={0} fg={colors.hint} truncate>
-        1–3 / Tab choose section · ↑↓ select · Enter apply · Ctrl+D delete · R refresh · Esc close
+        {`1–3 / Tab choose section · ↑↓ select · Enter apply · ${
+          canDeleteSelectedClassifier ? "Ctrl+D delete · " : ""
+        }R refresh · Esc close`}
       </text>
     </Modal>
   );
