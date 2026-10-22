@@ -3,7 +3,7 @@ import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
-import { cleanModelText as clean } from "../utils/model-browser-view.js";
+import { cleanModelText as clean } from "../utils/huggingface-model-formatter.js";
 import { Modal } from "./Modal.component.jsx";
 
 function PreviewMessage({ message }) {

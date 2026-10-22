@@ -5,7 +5,7 @@ import {
   cleanModelText as clean,
   compactCount,
   modelDetailRows,
-} from "../utils/model-browser-view.js";
+} from "../utils/huggingface-model-formatter.js";
 import { getDimmedColors, getTheme } from "../utils/theme-engine.js";
 import { DownloadProgressDialog } from "./DownloadProgressDialog.component.jsx";
 import { Modal } from "./Modal.component.jsx";
