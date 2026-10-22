@@ -33,7 +33,7 @@ export function createCommandHandler({
   openRouteModelModal,
   openDownloadModal,
   classifyForRouting,
-  runOpenAIChat,
+  runWorker,
 }) {
   async function runUserCommand(command) {
     if (!command.trim())
@@ -150,7 +150,7 @@ export function createCommandHandler({
     if (command === "ask") {
       const prompt = text.slice("/openai ask".length).trim();
       if (!prompt) throw new Error("Usage: /openai ask <request>");
-      return runOpenAIChat(prompt);
+      return runWorker(prompt);
     }
     addMessage({
       type: "system",
@@ -168,7 +168,7 @@ export function createCommandHandler({
       addMessage({
         type: "system",
         message:
-          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /exit.\nUse /route to configure the local classifier and OpenAI tier workers. Local GGUF models are classifier-only.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
+          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /exit.\nUse /route to configure the local classifier and tier workers. Tier workers can use OpenAI or local GGUF models.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
       });
       return;
     }
@@ -214,7 +214,7 @@ export function createCommandHandler({
       notify();
       return addMessage({
         type: "system",
-        message: "Configure a local classifier and OpenAI tier worker with /route before chatting.",
+        message: "Configure a local classifier and tier worker with /route before chatting.",
         severity: "warning",
       });
     }
@@ -224,15 +224,21 @@ export function createCommandHandler({
       notify();
       throw new Error(`No worker is configured for Tier ${classification.tier}.`);
     }
-    if (worker.provider !== "openai") {
+    if (!worker.configured) {
       userMessage.classification = { status: "error" };
       notify();
-      throw new Error("Tier routing requires an OpenAI worker; local models are classifier-only.");
+      throw new Error("Tier worker configuration is invalid; choose a model in /route.");
     }
-    const modelId = worker.model || configStore.getOpenAIModel();
-    userMessage.classification = { status: "done", tier: classification.tier, model: modelId };
+    userMessage.classification = {
+      status: "done",
+      tier: classification.tier,
+      model: worker.model,
+    };
     notify();
-    return runOpenAIChat(text, { modelId, tier: classification.tier, userMessage });
+    return runWorker(text, {
+      tier: classification.tier,
+      userMessage,
+    });
   }
 
   return { handle };

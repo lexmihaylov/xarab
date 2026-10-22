@@ -52,7 +52,7 @@ test("starts with empty defaults when the config file does not exist", async () 
   }
 });
 
-test("persists a local classifier path and OpenAI-only tier worker models", async () => {
+test("persists local classifier and local or OpenAI tier worker models", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-config-routing-test-"));
   const configPath = path.join(directory, "config.json");
   try {
@@ -60,19 +60,21 @@ test("persists a local classifier path and OpenAI-only tier worker models", asyn
     await store.load();
     await store.setClassifierModel(path.join(directory, "smollm.gguf"));
     await store.setTierWorker(2, { provider: "openai", model: "gpt-6-astra" });
-    await assert.rejects(
-      store.setTierWorker(3, { provider: "local", model: path.join(directory, "local.gguf") }),
-      /local GGUF models are reserved for classification/,
-    );
-    await store.setTierWorker(3, { provider: "openai", model: "gpt-tier-3" });
+    await store.setTierWorker(3, { provider: "local", model: path.join(directory, "local.gguf") });
 
     assert.equal(store.getClassifierModel(), path.join(directory, "smollm.gguf"));
     assert.deepEqual(store.getTierWorker(2), { provider: "openai", model: "gpt-6-astra" });
-    assert.deepEqual(store.getTierWorker(3), { provider: "openai", model: "gpt-tier-3" });
+    assert.deepEqual(store.getTierWorker(3), {
+      provider: "local",
+      model: path.join(directory, "local.gguf"),
+    });
     const saved = JSON.parse(await readFile(configPath, "utf8"));
     assert.equal(saved.classifierModel, path.join(directory, "smollm.gguf"));
     assert.deepEqual(saved.tierWorkers[2], { provider: "openai", model: "gpt-6-astra" });
-    assert.deepEqual(saved.tierWorkers[3], { provider: "openai", model: "gpt-tier-3" });
+    assert.deepEqual(saved.tierWorkers[3], {
+      provider: "local",
+      model: path.join(directory, "local.gguf"),
+    });
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -122,10 +124,14 @@ test("migrates legacy router settings out of the general config", async () => {
     await store.load();
 
     assert.equal(store.getClassifierModel(), classifierPath);
-    assert.deepEqual(store.getTierWorker(1), { provider: "openai" });
+    assert.deepEqual(store.getTierWorker(1), {
+      provider: "local",
+      model: path.resolve("/models/coder.gguf"),
+    });
     assert.equal(JSON.parse(await readFile(configPath, "utf8")).openaiModel, "gpt-6-astra");
     assert.deepEqual(JSON.parse(await readFile(routingConfigPath, "utf8")).tierWorkers[1], {
-      provider: "openai",
+      provider: "local",
+      model: path.resolve("/models/coder.gguf"),
     });
     const migrated = JSON.parse(await readFile(configPath, "utf8"));
     assert.equal(Object.hasOwn(migrated, "classifierModel"), false);

@@ -13,16 +13,16 @@ function normalizeTierWorkers(value) {
   for (const tier of [1, 2, 3]) {
     const worker = value[tier];
     if (!worker || typeof worker !== "object" || Array.isArray(worker)) continue;
-    // Legacy local worker assignments are retired: local GGUF models classify only.
-    if (worker.provider === "local") {
-      workers[tier] = { provider: "openai" };
+    if (!["openai", "local"].includes(worker.provider)) continue;
+    if (worker.provider === "local" && (typeof worker.model !== "string" || !worker.model.trim()))
       continue;
-    }
-    if (worker.provider !== "openai") continue;
     workers[tier] = {
       provider: worker.provider,
       ...(typeof worker.model === "string" && worker.model.trim()
-        ? { model: worker.model.trim() }
+        ? {
+            model:
+              worker.provider === "local" ? path.resolve(worker.model.trim()) : worker.model.trim(),
+          }
         : {}),
     };
   }
@@ -171,17 +171,20 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
     },
     async setTierWorker(tier, worker) {
       if (![1, 2, 3].includes(tier)) throw new Error("Tier must be 1, 2, or 3.");
-      if (!worker || worker.provider !== "openai")
+      if (!worker || !["openai", "local"].includes(worker.provider))
+        throw new Error("Tier worker provider must be openai or local.");
+      if (typeof worker.model !== "string" || !worker.model.trim())
         throw new Error(
-          "Tier workers must use OpenAI; local GGUF models are reserved for classification.",
+          worker.provider === "local"
+            ? "A local worker requires a model path."
+            : "Worker model must be a non-empty model ID.",
         );
-      if (worker.model !== undefined && (typeof worker.model !== "string" || !worker.model.trim()))
-        throw new Error("Worker model must be a non-empty model ID.");
       const tierWorkers = {
         ...config.tierWorkers,
         [tier]: {
-          provider: "openai",
-          ...(worker.model ? { model: worker.model.trim() } : {}),
+          provider: worker.provider,
+          model:
+            worker.provider === "local" ? path.resolve(worker.model.trim()) : worker.model.trim(),
         },
       };
       config = { ...config, tierWorkers };

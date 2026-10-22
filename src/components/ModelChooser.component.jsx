@@ -83,24 +83,38 @@ export function ModelChooser({
     [models, modelSettings],
   );
   const workerOptions = useMemo(() => {
-    const byId = new Map(openAIModels.map((model) => [model.id, model]));
-    for (const worker of Object.values(tierWorkers)) {
-      if (worker?.provider === "openai" && worker.model && !byId.has(worker.model))
-        byId.set(worker.model, { id: worker.model, name: worker.model });
-    }
-    if (defaultOpenAIModel && !byId.has(defaultOpenAIModel))
-      byId.set(defaultOpenAIModel, { id: defaultOpenAIModel, name: defaultOpenAIModel });
-    return [...byId.values()].map((model) => ({
+    const options = openAIModels.map((model) => ({
       name: `OpenAI · ${model.name}`,
       description: model.id,
-      value: model.id,
+      value: { provider: "openai", model: model.id },
     }));
-  }, [defaultOpenAIModel, openAIModels, tierWorkers]);
+    const known = new Set(openAIModels.map((model) => model.id));
+    for (const worker of Object.values(tierWorkers)) {
+      if (worker?.provider === "openai" && worker.model && !known.has(worker.model)) {
+        options.push({
+          name: `OpenAI · ${worker.model}`,
+          description: worker.model,
+          value: worker,
+        });
+        known.add(worker.model);
+      }
+    }
+    if (defaultOpenAIModel && !known.has(defaultOpenAIModel))
+      options.push({
+        name: `OpenAI · ${defaultOpenAIModel}`,
+        description: defaultOpenAIModel,
+        value: { provider: "openai", model: defaultOpenAIModel },
+      });
+    for (const model of models)
+      options.push({
+        name: `Local · ${modelLabel(model, modelSettings)}`,
+        description: model,
+        value: { provider: "local", model },
+      });
+    return options;
+  }, [defaultOpenAIModel, modelSettings, models, openAIModels, tierWorkers]);
   const configuredWorker = tierWorkers[tier];
-  const worker =
-    configuredWorker?.provider === "openai"
-      ? configuredWorker.model
-      : defaultOpenAIModel || "OpenAI model not selected";
+  const worker = configuredWorker?.model || defaultOpenAIModel || "Worker not selected";
 
   useEffect(() => {
     const index = classifierOptions.findIndex((option) => option.value === classifierModel);
@@ -108,7 +122,10 @@ export function ModelChooser({
   }, [classifierModel, classifierOptions]);
 
   useEffect(() => {
-    const index = workerOptions.findIndex((option) => option.value === worker);
+    const index = workerOptions.findIndex(
+      (option) =>
+        option.value.provider === configuredWorker?.provider && option.value.model === worker,
+    );
     if (index >= 0) setWorkerIndex(index);
   }, [worker, workerOptions]);
   const usableWidth = Math.max(1, terminalWidth - 4);
@@ -197,7 +214,7 @@ export function ModelChooser({
       });
     } else if (key.name === "return") {
       const option = workerOptions[workerIndex];
-      if (option) onSetTierWorker(tier, { provider: "openai", model: option.value });
+      if (option) onSetTierWorker(tier, option.value);
     }
   });
 
@@ -245,7 +262,7 @@ export function ModelChooser({
       }
     >
       <text fg={colors.muted} height={1} flexShrink={0} truncate>
-        Select a router and assign an OpenAI worker to each tier.
+        Select a router and assign a local or OpenAI worker to each tier.
       </text>
       <box
         height={3}
@@ -356,7 +373,9 @@ export function ModelChooser({
               >
                 {workerOptions.map((option, index) => {
                   const selected = activeControl === 2 && index === workerIndex;
-                  const configured = option.value === worker;
+                  const configured =
+                    option.value.provider === configuredWorker?.provider &&
+                    option.value.model === worker;
                   return (
                     <box
                       key={option.value}
@@ -382,7 +401,7 @@ export function ModelChooser({
               </scrollbox>
             ) : (
               <text fg={colors.muted} wrapMode="word">
-                Sign in to OpenAI to choose a worker model.
+                Download a local model or sign in to OpenAI to choose a worker.
               </text>
             ),
             loadingOpenAIModels ? "Loading OpenAI…" : openAIError || "↑↓ choose · R refresh",

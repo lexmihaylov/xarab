@@ -11,10 +11,11 @@ import { createSessionStore } from "./session-store.js";
 import { createSessionController } from "./session-controller.js";
 import { createOpenAICodexAuth } from "./openai-codex-auth.js";
 import { copyToClipboard } from "../utils/clipboard.js";
-import { createOpenAIResponsesAdapter } from "./openai-responses-adapter.js";
+import { createOpenAIResponsesAdapter } from "./worker/openai-responses-adapter.js";
+import { createLocalLlamaAdapter } from "./worker/local-llama-adapter.js";
 import { createLocalTierClassifier } from "./tier-classifier.js";
 import { createModelManager } from "./model-manager.js";
-import { createWorker } from "./worker.js";
+import { createWorker } from "./worker/worker.js";
 import { createCommandHandler } from "./assistant-command-handler.js";
 import { createSessionCompactor } from "./session-compactor.js";
 
@@ -31,6 +32,7 @@ export function createAssistantController({
   clipboardWriter = copyToClipboard,
   tierClassifierFactory = createLocalTierClassifier,
   openAIAdapterFactory = createOpenAIResponsesAdapter,
+  localWorkerAdapterFactory = createLocalLlamaAdapter,
   sessionsDir = path.join(path.dirname(configPath), "sessions"),
 }) {
   let status = "Ready";
@@ -57,7 +59,12 @@ export function createAssistantController({
   const openAIAdapter = openAIAdapterFactory({
     getCredentials: () => openAIAuth.getCredentials(),
   });
-  const worker = createWorker({ adapter: openAIAdapter });
+  const worker = createWorker({
+    configStore,
+    openAIAdapterFactory,
+    localAdapterFactory: localWorkerAdapterFactory,
+    getCredentials: () => openAIAuth.getCredentials(),
+  });
   let pendingOpenAIAuthUrl;
   let tierClassifier;
   let tierClassifierPath;
@@ -116,7 +123,7 @@ export function createAssistantController({
     updateStatus: (nextStatus) =>
       updateStatus(
         nextStatus === "Ready" && !configStore.getClassifierModel()
-          ? "Use /route to configure the classifier and OpenAI workers"
+          ? "Use /route to configure the classifier and tier workers"
           : nextStatus,
       ),
     isGenerating: () => generating,
@@ -252,21 +259,7 @@ export function createAssistantController({
     return `\n\n## Escalation\nYou are working at Tier ${tier}. If investigation reveals that the overall task or any individual subtask, component, or dependency requires the next tier, call request_escalation before making consequential changes. You may escalate for one subtask even when the rest of the request is manageable. State concrete findings, not speculation. It can only request Tier ${tier + 1}, ends your run immediately, and transfers your findings to that worker. Do not call it merely because tools are needed, and do not write a final answer after calling it.`;
   }
 
-  async function runOpenAIChat(
-    promptText,
-    { modelId: modelOverride, tier, userMessage, handoff, escalationCount = 0 } = {},
-  ) {
-    const modelId = modelOverride || configStore.getOpenAIModel();
-    if (!modelId) {
-      addMessage({
-        type: "system",
-        message: tier
-          ? `Tier ${tier} is assigned to OpenAI, but no model is selected. Use /openai use <model-id> or /router worker ${tier} openai <model-id>.`
-          : "Choose a worker first with /openai models, then /openai use <model-id>.",
-      });
-      return;
-    }
-
+  async function runWorker(promptText, { tier, userMessage, handoff, escalationCount = 0 } = {}) {
     const history = messages
       .filter((message) => ["user", "agent"].includes(message.type) && message.message?.trim())
       .map((message) => ({
@@ -293,7 +286,7 @@ export function createAssistantController({
     let handoffResult;
     generating = true;
     abortController = new AbortController();
-    updateStatus(`OpenAI ${modelId} generating…`);
+    updateStatus("Worker generating…");
     let finishWork;
     const workDone = new Promise((resolve) => {
       finishWork = resolve;
@@ -301,7 +294,7 @@ export function createAssistantController({
     activeWorkDone = workDone;
     try {
       const result = await worker.run({
-        model: modelId,
+        tier,
         instructions: `${systemPrompt}${escalationInstructions(tier, Boolean(escalationTool))}`,
         input: [...history, { role: "user", content: requestText }],
         tools: runTools,
@@ -335,9 +328,8 @@ export function createAssistantController({
     }
 
     if (handoffResult) {
-      const nextWorker = configStore.getTierWorker(handoffResult.targetTier);
-      const nextModelId = nextWorker?.model || configStore.getOpenAIModel();
-      if (!nextWorker || nextWorker.provider !== "openai" || !nextModelId) {
+      const nextWorker = worker.getTierInfo(handoffResult.targetTier);
+      if (!nextWorker.configured) {
         addMessage({
           type: "system",
           message: `Tier ${handoffResult.targetTier} is not configured, so the escalation could not continue.`,
@@ -360,8 +352,7 @@ export function createAssistantController({
         };
         notify();
       }
-      return runOpenAIChat(promptText, {
-        modelId: nextModelId,
+      return runWorker(promptText, {
         tier: handoffResult.targetTier,
         userMessage,
         handoff: handoffResult,
@@ -392,7 +383,7 @@ export function createAssistantController({
       if (routingController.signal.aborted) return { cancelled: true };
       if (!classification?.valid || ![1, 2, 3].includes(classification.tier))
         throw new Error(classification?.error || "The local classifier returned an invalid tier.");
-      return { classification, worker: configStore.getTierWorker(classification.tier) };
+      return { classification, worker: worker.getTierInfo(classification.tier) };
     } finally {
       isRouting = false;
       generating = false;
@@ -484,13 +475,14 @@ export function createAssistantController({
       }
       await activeDownload?.promise;
       await tierClassifier?.dispose?.();
+      await worker.dispose();
     })();
     return shutdownPromise;
   }
 
   async function initialize() {
     await configStore.load();
-    updateStatus("Use /route to configure the classifier and OpenAI workers");
+    updateStatus("Use /route to configure the classifier and tier workers");
   }
 
   function closeModelModal() {
@@ -610,7 +602,7 @@ export function createAssistantController({
       notify();
     },
     classifyForRouting,
-    runOpenAIChat,
+    runWorker,
   });
 
   function downloadSelectedModel(uri, fileName) {
