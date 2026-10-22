@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { getHuggingFaceModelDetails } from "../agent/model-search.js";
 import { cleanModelText as clean, compactCount, modelDetailRows } from "./model-browser-view.js";
-import { browserColors, dimmedColors } from "./model-browser-theme.js";
+import { getDimmedColors, getTheme } from "./theme-engine.js";
 import { DownloadProgressDialog } from "./download-progress-dialog.component.jsx";
 import { Modal } from "./modal.component.jsx";
 
@@ -63,7 +63,8 @@ export function ModelDownloader({
   onCancelDownload,
 }) {
   // Keep the browser visible but subdued while the progress dialog owns input.
-  const colors = downloading ? dimmedColors : browserColors;
+  const theme = getTheme();
+  const colors = downloading ? getDimmedColors(theme) : theme.colors;
   const [search, setSearch] = useState(query);
   const [modelIndex, setModelIndex] = useState(0);
   const [fileIndex, setFileIndex] = useState(0);

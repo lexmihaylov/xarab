@@ -14,6 +14,7 @@ import { createWebfetchTool } from "./tools/webfetch-tool.js";
 import { runShellCommand } from "./tools/shell-command.js";
 import { createShellTool } from "./tools/shell-tool.js";
 import { createEscalationTool } from "./tools/escalation-tool.js";
+import { getTheme } from "../ui/theme-engine.js";
 import {
   appendShellContext,
   createShellContextEntry,
@@ -421,13 +422,13 @@ export function createAssistantController({
     command,
     running = false,
   }) {
-    const colors = { user: "#8fbfdc", agent: "#a8d5a2", system: "#aeb8c4", intent: "#657383" };
+    const theme = getTheme();
     const color =
       type === "system" && severity === "warning"
-        ? "#e6b17e"
+        ? theme.colors.warning
         : type === "system" && severity === "error"
-          ? "#ef7777"
-          : colors[type];
+          ? theme.colors.error
+          : theme.messages[type];
     const entry = {
       type,
       message,
@@ -938,7 +939,7 @@ export function createAssistantController({
           message: "Conversation compacted. Earlier messages were replaced with this summary.",
           severity: "info",
         },
-        { type: "agent", message: summary, parts: [], color: "#a8d5a2" },
+        { type: "agent", message: summary, parts: [], color: getTheme().messages.agent },
       ];
       currentAgentMessage = undefined;
       sessionChanged();
@@ -1079,7 +1080,12 @@ export function createAssistantController({
       : `${promptText}${handoffText}`;
     pendingShellContext = [];
     if (!userMessage) addMessage({ type: "user", message: promptText });
-    const assistantMessage = { type: "agent", message: "", parts: [], color: "#a8d5a2" };
+    const assistantMessage = {
+      type: "agent",
+      message: "",
+      parts: [],
+      color: getTheme().messages.agent,
+    };
     currentAgentMessage = assistantMessage;
     const escalationTool = createEscalationTool({ activeTier: tier, escalationCount });
     const runTools = escalationTool ? { ...tools, request_escalation: escalationTool } : tools;

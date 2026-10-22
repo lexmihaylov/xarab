@@ -1,5 +1,7 @@
 import React from "react";
-import { browserColors as colors } from "./model-browser-theme.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 
 const severityStyles = {
   info: { label: "System", color: colors.accent },

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { browserColors as colors } from "./model-browser-theme.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 import { Modal } from "./modal.component.jsx";
 
 function modelLabel(modelPath, settings = {}) {
@@ -23,7 +25,7 @@ function DeleteModelDialog({ model }) {
         width="58%"
         maxWidth={72}
         flexDirection="column"
-        backgroundColor="#202d38"
+        backgroundColor={colors.overlay}
         border
         borderStyle="rounded"
         borderColor={colors.error}

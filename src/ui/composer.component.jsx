@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useKeyboard } from "@opentui/react";
 import { LoadingIndicator } from "./loading-indicator.component.jsx";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 
 const commandOptions = [
   { command: "/help", description: "Show available commands" },
@@ -41,6 +44,8 @@ export function Composer({
       ? commandOptions.filter(({ command }) => command.startsWith(value.toLowerCase()))
       : [];
   const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
+  const commandColumnWidth =
+    suggestions.reduce((width, suggestion) => Math.max(width, suggestion.command.length), 0) + 3;
 
   useEffect(() => {
     if (sessionRef.current === sessionId) return;
@@ -117,22 +122,31 @@ export function Composer({
       {suggestions.length > 0 && (
         <box flexDirection="column" marginBottom={1}>
           {suggestions.map((suggestion, index) => (
-            <text key={suggestion.command} fg={index === suggestionIndex ? "#a8d5a2" : "#657383"}>
-              {index === suggestionIndex ? "› " : "  "}
-              {suggestion.command.padEnd(10)} {suggestion.description}
-            </text>
+            <box key={suggestion.command} flexDirection="row" width="100%" overflow="hidden">
+              <box width={commandColumnWidth} flexShrink={0}>
+                <text fg={index === suggestionIndex ? colors.green : colors.hint}>
+                  {index === suggestionIndex ? "› " : "  "}
+                  {suggestion.command}{" "}
+                </text>
+              </box>
+              <box flexGrow={1} flexShrink={1} minWidth={0} overflow="hidden">
+                <text fg={index === suggestionIndex ? colors.green : colors.hint}>
+                  {suggestion.description}
+                </text>
+              </box>
+            </box>
           ))}
         </box>
       )}
       {disabled ? (
         <box flexDirection="row" paddingLeft={1}>
-          <LoadingIndicator color="#a8d5a2" />
-          <text fg="#657383"> · Esc stop · Ctrl+C interrupt</text>
+          <LoadingIndicator color={colors.green} />
+          <text fg={colors.hint}> · Esc stop · Ctrl+C interrupt</text>
         </box>
       ) : (
         <box flexDirection="row">
           <text> </text>
-          <text fg="#657383">
+          <text fg={colors.hint}>
             {suggestions.length
               ? "↑↓ choose · Tab complete · Enter select/run"
               : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}

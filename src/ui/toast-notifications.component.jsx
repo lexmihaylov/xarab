@@ -1,4 +1,7 @@
 import React, { useEffect } from "react";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 
 const severityStyles = {
   info: { marker: "·", color: "#7dd3fc" },
@@ -47,7 +50,7 @@ export function ToastNotifications({ toasts, onDismiss }) {
             key={toast.id}
             flexDirection="row"
             padding={1}
-            backgroundColor="#202d38"
+            backgroundColor={colors.overlay}
             border={["left"]}
             borderStyle="single"
             borderColor={style.color}

@@ -1,7 +1,9 @@
 import React from "react";
 import { brailleFrames, CompactLoadingIndicator } from "./compact-loading-indicator.component.jsx";
 import { ExecutionMessageCard } from "./execution-message-card.component.jsx";
-import { browserColors as colors } from "./model-browser-theme.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 import { shellSummary } from "./shell-summary.js";
 
 const severityStyle = {

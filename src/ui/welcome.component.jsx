@@ -1,6 +1,9 @@
 import React from "react";
 import { useTerminalDimensions } from "@opentui/react";
 import { renderScarab } from "./scarab-image.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().welcome;
 
 const footer = [
   ["XARAB", "brand"],
@@ -10,13 +13,6 @@ const footer = [
   ["Ask a question or describe a change.", "copy"],
   ["Type !command to run a local command. · Ctrl+O saved sessions", "hint"],
 ];
-
-const colors = {
-  brand: "#8fbfdc",
-  heading: "#a8d5a2",
-  copy: "#c5d0dd",
-  hint: "#657383",
-};
 
 // The composer uses four rows at its minimum size and the status bar uses one.
 const appChromeRows = 5;

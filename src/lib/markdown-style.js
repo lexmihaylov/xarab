@@ -1,19 +1,9 @@
 import { RGBA, SyntaxStyle } from "@opentui/core";
-
-const colors = {
-  default: "#c5d0dd",
-  keyword: "#c792ea",
-  string: "#c3e88d",
-  comment: "#657383",
-  number: "#f78c6c",
-  type: "#82aaff",
-  heading: "#89ddff",
-  list: "#f78c6c",
-  quote: "#a6accd",
-  link: "#80cbc4",
-};
+import { getTheme } from "../ui/theme-engine.js";
 
 const color = (value) => RGBA.fromHex(value);
+
+const colors = getTheme().markdown;
 
 /**
  * Creates the syntax styles shared by code blocks and Markdown messages.

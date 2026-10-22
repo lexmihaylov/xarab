@@ -1,5 +1,7 @@
 import React from "react";
-import { browserColors as colors } from "./model-browser-theme.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 
 // The scrim owns the complete terminal, while the centered panel has no extra
 // border or background treatment of its own.
@@ -20,7 +22,7 @@ export function Modal({
       bottom={0}
       left={0}
       zIndex={100}
-      backgroundColor="#202d38"
+      backgroundColor={colors.overlay}
       alignItems={fullScreen ? "stretch" : "center"}
       justifyContent={fullScreen ? "flex-start" : "center"}
     >

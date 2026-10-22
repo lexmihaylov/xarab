@@ -1,6 +1,8 @@
 import React from "react";
 import { cleanModelText } from "./model-browser-view.js";
-import { browserColors as colors } from "./model-browser-theme.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return "Unknown";

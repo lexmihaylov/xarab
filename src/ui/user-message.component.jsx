@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { browserColors as colors } from "./model-browser-theme.js";
+import { getTheme } from "./theme-engine.js";
+
+const colors = getTheme().colors;
 
 function toText(value) {
   if (value == null) return " ";
