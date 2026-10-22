@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-const MODEL_URI = "hf:bartowski/SmolLM2-360M-Instruct-GGUF:F16";
-const MODEL_NAME = "hf_bartowski_SmolLM2-360M-Instruct.F16.gguf";
+const MODEL_URI = "hf:google/gemma-4-E2B-it-qat-q4_0-gguf:gemma-4-E2B_q4_0-it.gguf";
+const MODEL_NAME = "hf_google_gemma-4-E2B-it-qat-q4_0.GEMMA-4-E2B_Q4_0-IT.GGUF.gguf";
 const modelsDir = process.env.XARAB_MODELS_DIR || path.join(os.homedir(), ".xarab", "models");
 const routingConfigPath = path.join(os.homedir(), ".xarab", "routing.conf");
 
@@ -79,13 +79,13 @@ async function main() {
 
   const existing = await classifierFile();
   if (!existing) {
-    console.log("Downloading Xarab's default SmolLM classifier…");
+    console.log("Downloading Xarab's default Gemma 4 E2B Q4_0 classifier…");
     await mkdir(modelsDir, { recursive: true });
     await runPull();
   }
   const installed = await classifierFile();
   if (!installed)
-    throw new Error("Classifier download completed, but no SmolLM GGUF file was found.");
+    throw new Error("Classifier download completed, but no Gemma 4 E2B Q4_0 GGUF file was found.");
   if (await configureClassifier(path.resolve(installed))) {
     console.log(`Xarab classifier configured: ${path.resolve(installed)}`);
   }

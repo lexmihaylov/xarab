@@ -10,7 +10,7 @@ The Hugging Face GGUF browser/downloader manages classifier models; local models
 
 - Node.js 20 or newer
 - A supported machine for [`node-llama-cpp`](https://github.com/withcatai/node-llama-cpp)
-- The default SmolLM2 GGUF classifier (downloaded automatically by `npm install`)
+- The default Google Gemma 4 E2B Q4_0 GGUF classifier (downloaded automatically by `npm install`; approximately 3.35 GB)
 
 ## Start
 
@@ -19,7 +19,7 @@ npm install
 npm start
 ```
 
-Installation downloads and configures the default SmolLM2 classifier in `~/.xarab/models`. Set `XARAB_SKIP_POSTINSTALL=1` to skip that download. The CLI uses the local classifier for routing and OpenAI Codex workers for all chat responses, using the same ChatGPT OAuth flow as Pi. Use `/route` to configure routing, or `/download` to search Hugging Face for additional classifier models. Models are shared with `xarab-local` and stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to change that location. Router configuration, OAuth credentials, general settings, and sessions are stored under `~/.xarab/`.
+Installation downloads and configures the default [Google Gemma 4 E2B Q4_0 GGUF classifier](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf) in `~/.xarab/models` (approximately 3.35 GB). Set `XARAB_SKIP_POSTINSTALL=1` to skip that download. The CLI uses the local classifier for routing and OpenAI Codex workers for all chat responses, using the same ChatGPT OAuth flow as Pi. Use `/route` to configure routing, or `/download` to search Hugging Face for additional classifier models. Models are shared with `xarab-local` and stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to change that location. Router configuration, OAuth credentials, general settings, and sessions are stored under `~/.xarab/`.
 
 ### Tier routing
 
