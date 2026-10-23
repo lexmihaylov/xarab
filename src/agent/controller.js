@@ -276,13 +276,21 @@ export function createAssistantController({
       finishWork = resolve;
     });
     activeWorkDone = workDone;
+    let approvedHandoff;
     try {
       const result = await worker.run({
         tier,
         history,
         input: requestText,
-        tools: runTools,
         signal: abortController.signal,
+        onTierAdjustment: (request) => {
+          if (adjustmentCount >= 1)
+            return {
+              status: "unchanged",
+              reason: "A tier adjustment was already attempted for this request.",
+            };
+          return decideTierAdjustment({ ...request, promptText, signal: abortController.signal });
+        },
         // Keep onText for adapters that only provide completion callbacks;
         // the Responses adapter uses onTextDelta for live tokens and suppresses
         // its completion replay when both callbacks are present.

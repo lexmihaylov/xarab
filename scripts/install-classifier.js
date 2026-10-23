@@ -55,11 +55,20 @@ async function classifierFile() {
 
 async function configureClassifier(modelPath) {
   const routing = await readRoutingConfig();
-  if (typeof routing.classifierModel === "string" && routing.classifierModel.trim()) return false;
+  if (
+    routing.classifier ||
+    (typeof routing.classifierModel === "string" && routing.classifierModel.trim())
+  )
+    return false;
   await mkdir(path.dirname(routingConfigPath), { recursive: true });
+  const { classifierModel: _legacyClassifierModel, ...currentRouting } = routing;
   await writeFile(
     routingConfigPath,
-    `${JSON.stringify({ ...routing, classifierModel: modelPath }, null, 2)}\n`,
+    `${JSON.stringify(
+      { ...currentRouting, classifier: { provider: "local", model: modelPath } },
+      null,
+      2,
+    )}\n`,
     { encoding: "utf8", mode: 0o600 },
   );
   return true;

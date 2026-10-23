@@ -1,4 +1,4 @@
-import { runShellCommand } from "./tools/shell-command-executor.js";
+import { runShellCommand } from "./worker/tools/shell-command-executor.js";
 import {
   appendShellContext,
   createShellContextEntry,
@@ -168,7 +168,7 @@ export function createCommandHandler({
       addMessage({
         type: "system",
         message:
-          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /exit.\nUse /route to configure the local classifier and tier workers. Tier workers can use OpenAI or local GGUF models.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
+          "Commands: /help, /new [name], /sessions, /save [name], /route, /download [query], /openai [login|status|models|use|ask|logout], /compact, /clear, /exit.\nUse /route to configure the router and tier workers. Routers and workers can use OpenAI or local GGUF models.\nUse /openai login, /openai models, and /openai use <id> to configure OpenAI workers. /openai ask <request> runs it directly.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
       });
       return;
     }
@@ -214,7 +214,7 @@ export function createCommandHandler({
       notify();
       return addMessage({
         type: "system",
-        message: "Configure a local classifier and tier worker with /route before chatting.",
+        message: "Configure a router and tier worker with /route before chatting.",
         severity: "warning",
       });
     }

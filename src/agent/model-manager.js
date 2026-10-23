@@ -47,11 +47,9 @@ export function createModelManager({
     }
     try {
       await unlink(resolvedPath);
-      if (
-        configStore.getClassifierModel() &&
-        path.resolve(configStore.getClassifierModel()) === resolvedPath
-      ) {
-        await configStore.setClassifierModel(null);
+      const classifier = configStore.getClassifier();
+      if (classifier?.provider === "local" && path.resolve(classifier.model) === resolvedPath) {
+        await configStore.setClassifier(null);
         await getTierClassifier()?.dispose?.();
         clearTierClassifier();
       }

@@ -27,7 +27,7 @@ test("controller owns command handling and publishes updated UI state", async (t
 
   await controller.initialize();
   assert.equal(controller.getState().model, undefined);
-  assert.equal(controller.getState().classifierModel, null);
+  assert.equal(controller.getState().classifier, null);
   assert.equal(controller.getState().messages.length, 0);
 
   await controller.submit("/help");
@@ -139,10 +139,10 @@ test("selecting a classifier loads it and persists classifier configuration", as
     workspace: temporary,
     instructionFiles: [],
     configPath: path.join(temporary, "config.json"),
-    tierClassifierFactory({ modelPath }) {
+    classifierFactory({ getAssignment }) {
       return {
         async load() {
-          loadedModels.push(modelPath);
+          loadedModels.push(getAssignment().model);
         },
         async dispose() {},
       };
@@ -152,9 +152,15 @@ test("selecting a classifier loads it and persists classifier configuration", as
   await controller.setRouterClassifier(path.join(temporary, "router.gguf"));
 
   assert.deepEqual(loadedModels, [path.join(temporary, "router.gguf")]);
-  assert.equal(controller.getState().classifierModel, path.join(temporary, "router.gguf"));
+  assert.deepEqual(controller.getState().classifier, {
+    provider: "local",
+    model: path.join(temporary, "router.gguf"),
+  });
   assert.equal(controller.getState().modelModal, null);
   const routingConfig = JSON.parse(await readFile(path.join(temporary, "routing.conf"), "utf8"));
-  assert.equal(routingConfig.classifierModel, path.join(temporary, "router.gguf"));
+  assert.deepEqual(routingConfig.classifier, {
+    provider: "local",
+    model: path.join(temporary, "router.gguf"),
+  });
   await controller.shutdown();
 });

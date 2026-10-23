@@ -40,7 +40,7 @@ test("starts with empty defaults when the config file does not exist", async () 
       models: {},
       apiKeys: {},
       openaiModel: null,
-      classifierModel: null,
+      classifier: null,
       tierWorkers: {
         1: { provider: "openai" },
         2: { provider: "openai" },
@@ -58,18 +58,24 @@ test("persists local classifier and local or OpenAI tier worker models", async (
   try {
     const store = createConfigStore(configPath);
     await store.load();
-    await store.setClassifierModel(path.join(directory, "smollm.gguf"));
+    await store.setClassifier({ provider: "local", model: path.join(directory, "smollm.gguf") });
     await store.setTierWorker(2, { provider: "openai", model: "gpt-6-astra" });
     await store.setTierWorker(3, { provider: "local", model: path.join(directory, "local.gguf") });
 
-    assert.equal(store.getClassifierModel(), path.join(directory, "smollm.gguf"));
+    assert.deepEqual(store.getClassifier(), {
+      provider: "local",
+      model: path.join(directory, "smollm.gguf"),
+    });
     assert.deepEqual(store.getTierWorker(2), { provider: "openai", model: "gpt-6-astra" });
     assert.deepEqual(store.getTierWorker(3), {
       provider: "local",
       model: path.join(directory, "local.gguf"),
     });
     const saved = JSON.parse(await readFile(configPath, "utf8"));
-    assert.equal(saved.classifierModel, path.join(directory, "smollm.gguf"));
+    assert.deepEqual(saved.classifier, {
+      provider: "local",
+      model: path.join(directory, "smollm.gguf"),
+    });
     assert.deepEqual(saved.tierWorkers[2], { provider: "openai", model: "gpt-6-astra" });
     assert.deepEqual(saved.tierWorkers[3], {
       provider: "local",
@@ -87,11 +93,14 @@ test("stores router assignments in a separate routing.conf", async () => {
   try {
     const store = createConfigStore(configPath, routingConfigPath);
     await store.load();
-    await store.setClassifierModel(path.join(directory, "smollm.gguf"));
+    await store.setClassifier({ provider: "local", model: path.join(directory, "smollm.gguf") });
     await store.setTierWorker(1, { provider: "openai", model: "gpt-tier-1" });
 
     const routingConfig = JSON.parse(await readFile(routingConfigPath, "utf8"));
-    assert.equal(routingConfig.classifierModel, path.join(directory, "smollm.gguf"));
+    assert.deepEqual(routingConfig.classifier, {
+      provider: "local",
+      model: path.join(directory, "smollm.gguf"),
+    });
     assert.deepEqual(routingConfig.tierWorkers[1], {
       provider: "openai",
       model: "gpt-tier-1",
@@ -123,7 +132,10 @@ test("migrates legacy router settings out of the general config", async () => {
     const store = createConfigStore(configPath, routingConfigPath);
     await store.load();
 
-    assert.equal(store.getClassifierModel(), classifierPath);
+    assert.deepEqual(store.getClassifier(), {
+      provider: "local",
+      model: classifierPath,
+    });
     assert.deepEqual(store.getTierWorker(1), {
       provider: "local",
       model: path.resolve("/models/coder.gguf"),

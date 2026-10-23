@@ -19,11 +19,11 @@ npm install
 npm start
 ```
 
-Installation downloads and configures the default [Google Gemma 4 E2B Q4_0 GGUF classifier](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf) in `~/.xarab/models` (approximately 3.35 GB). Set `XARAB_SKIP_POSTINSTALL=1` to skip that download. The CLI uses the local classifier for routing and OpenAI Codex workers for all chat responses, using the same ChatGPT OAuth flow as Pi. Use `/route` to configure routing, or `/download` to search Hugging Face for additional classifier models. Models are shared with `xarab-local` and stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to change that location. Router configuration, OAuth credentials, general settings, and sessions are stored under `~/.xarab/`.
+Installation downloads and configures the default [Google Gemma 4 E2B Q4_0 GGUF router](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf) in `~/.xarab/models` (approximately 3.35 GB). Set `XARAB_SKIP_POSTINSTALL=1` to skip that download. Routers and tier workers can each use a local GGUF model or an OpenAI Codex model through the ChatGPT OAuth flow. Use `/route` to configure routing, or `/download` to search Hugging Face for additional local models. Models are shared with `xarab-local` and stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to change that location. Router configuration, OAuth credentials, general settings, and sessions are stored under `~/.xarab/`.
 
 ### Tier routing
 
-Open `/route` for a three-column setup dialog: choose the local classifier, select Tier 1/2/3, and assign that tier an OpenAI model. Use Tab or Left/Right to switch sections, Up/Down to select, and Enter to apply/assign. OpenAI models are fetched for your signed-in account. `/download` remains a separate Hugging Face browser for classifier models.
+Open `/route` for a three-column setup dialog: choose a router model, select Tier 1/2/3, and assign that tier a worker model. Routers and workers may use local GGUF or OpenAI models. Use Tab or Left/Right to switch sections, Up/Down to select, and Enter to apply/assign. OpenAI models are fetched for your signed-in account. `/download` remains a separate Hugging Face browser for local models.
 
 You can also configure routing from commands. For example:
 

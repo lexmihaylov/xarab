@@ -19,7 +19,7 @@ async function setup(t, behavior = async ({ onText }) => onText("Reply")) {
       modelsDir: path.join(root, "models"),
       configPath: path.join(root, "config.json"),
       instructionFiles: [],
-      tierClassifierFactory: () => ({
+      classifierFactory: () => ({
         async classify() {
           return { valid: true, tier: 1, rationale: "test" };
         },
@@ -63,34 +63,20 @@ test("routes chat through the local classifier to an OpenAI worker and autosaves
   assert.equal(record.contextSize, undefined);
   assert.deepEqual(record.history, []);
   assert.equal((await store.list(root)).sessions.length, 1);
-  assert.equal(controller.getState().classifierModel, path.join(root, "classifier.gguf"));
+  assert.deepEqual(controller.getState().classifier, {
+    provider: "local",
+    model: path.join(root, "classifier.gguf"),
+  });
 });
 
 test("does not use a local model as a fallback when routing is disabled", async (t) => {
   const { create } = await setup(t);
   const controller = await create();
   await controller.submit("Answer this");
-  assert.match(controller.getState().messages.at(-1).message, /Configure a local classifier/);
+  assert.match(controller.getState().messages.at(-1).message, /Configure a router/);
   assert.equal(
     controller.getState().messages.some((message) => message.type === "agent"),
     false,
-  );
-});
-
-test("tells workers that an individual subtask may require escalation", async (t) => {
-  let instructions;
-  const { create, configure } = await setup(t, async (options) => {
-    instructions = options.instructions;
-    options.onText("Reply");
-  });
-  const controller = await create();
-  await configure(controller);
-  await controller.submit("Handle the request");
-
-  assert.match(instructions, /overall task or any individual subtask, component, or dependency/);
-  assert.match(
-    instructions,
-    /escalate for one subtask even when the rest of the request is manageable/,
   );
 });
 

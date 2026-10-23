@@ -59,18 +59,14 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
     models: {},
     apiKeys: {},
     openaiModel: null,
-    classifierModel: null,
+    classifier: null,
     tierWorkers: structuredClone(DEFAULT_TIER_WORKERS),
   };
   let writeQueue = Promise.resolve();
   let routingWriteQueue = Promise.resolve();
 
   async function save() {
-    const persistedConfig = {
-      ...config,
-      classifierModel:
-        config.classifier?.provider === "local" ? config.classifier.model : config.classifierModel,
-    };
+    const persistedConfig = { ...config };
     if (hasSeparateRoutingConfig) {
       delete persistedConfig.classifier;
       delete persistedConfig.classifierModel;
@@ -93,8 +89,6 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
     const contents = `${JSON.stringify(
       {
         classifier: config.classifier,
-        // Keep the legacy local path for older routing files and clients.
-        classifierModel: config.classifier?.provider === "local" ? config.classifier.model : null,
         tierWorkers: config.tierWorkers,
       },
       null,
@@ -117,8 +111,9 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
       try {
         const parsed = JSON.parse(await readFile(configPath, "utf8"));
         parsedConfig = parsed;
+        const { classifierModel: _legacyClassifierModel, ...currentConfig } = parsed;
         config = {
-          ...parsed,
+          ...currentConfig,
           lastModel: undefined,
           models: normalizeModelMetadata(parsed.models),
           apiKeys:
@@ -130,13 +125,7 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
                 )
               : {},
           openaiModel: typeof parsed.openaiModel === "string" ? parsed.openaiModel : null,
-          ...(normalizeClassifier(parsed.classifier ?? parsed.classifierModel)
-            ? { classifier: normalizeClassifier(parsed.classifier ?? parsed.classifierModel) }
-            : {}),
-          classifierModel:
-            typeof parsed.classifierModel === "string" && parsed.classifierModel.trim()
-              ? path.resolve(parsed.classifierModel)
-              : null,
+          classifier: normalizeClassifier(parsed.classifier ?? parsed.classifierModel),
           tierWorkers: normalizeTierWorkers(parsed.tierWorkers),
         };
       } catch (error) {
@@ -147,18 +136,9 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
           const routingConfig = JSON.parse(await readFile(routingConfigPath, "utf8"));
           config = {
             ...config,
-            ...(normalizeClassifier(routingConfig.classifier ?? routingConfig.classifierModel)
-              ? {
-                  classifier: normalizeClassifier(
-                    routingConfig.classifier ?? routingConfig.classifierModel,
-                  ),
-                }
-              : {}),
-            classifierModel:
-              typeof routingConfig.classifierModel === "string" &&
-              routingConfig.classifierModel.trim()
-                ? path.resolve(routingConfig.classifierModel)
-                : null,
+            classifier:
+              normalizeClassifier(routingConfig.classifier ?? routingConfig.classifierModel) ??
+              config.classifier,
             tierWorkers: normalizeTierWorkers(routingConfig.tierWorkers),
           };
         } catch (error) {
@@ -188,11 +168,7 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
       return config.openaiModel;
     },
     getClassifier() {
-      return config.classifier ?? normalizeClassifier(config.classifierModel);
-    },
-    getClassifierModel() {
-      const classifier = config.classifier ?? normalizeClassifier(config.classifierModel);
-      return classifier?.provider === "local" ? classifier.model : null;
+      return config.classifier;
     },
     async setClassifier(assignment) {
       if (assignment !== null) {
@@ -203,25 +179,18 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
       }
       config = {
         ...config,
-        ...(assignment === null
-          ? { classifier: undefined, classifierModel: null }
-          : {
-              classifier: {
+        classifier:
+          assignment === null
+            ? null
+            : {
                 provider: assignment.provider,
                 model:
                   assignment.provider === "local"
                     ? path.resolve(assignment.model.trim())
                     : assignment.model.trim(),
               },
-              classifierModel: null,
-            }),
       };
       await saveRouting();
-    },
-    async setClassifierModel(modelPath) {
-      return this.setClassifier(
-        modelPath === null ? null : { provider: "local", model: modelPath },
-      );
     },
     getTierWorker(tier) {
       return config.tierWorkers[tier];
