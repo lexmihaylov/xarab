@@ -8,9 +8,11 @@ import { createWriteTool } from "./tools/write-tool.js";
 import { createWebsearchTool } from "./tools/web-search-tool.js";
 import { createWebfetchTool } from "./tools/web-fetch-tool.js";
 import { createShellTool } from "./tools/shell-tool.js";
+import { createSkillTool } from "./tools/skill-tool.js";
 
 export function createToolRegistry({
   workspace,
+  skills = new Map(),
   configStore,
   onToolEvent,
   getMessages,
@@ -58,6 +60,7 @@ export function createToolRegistry({
       workspace,
       onEvent: (event) => onToolEvent("run_command", event),
     }),
+    ...(skills.size ? { skill: createSkillTool(skills) } : {}),
   };
 
   const tools = Object.fromEntries(
@@ -73,7 +76,7 @@ export function createToolRegistry({
             toolName: name,
             params: { ...(params ?? {}) },
             label: toolProgressLabel(name, params),
-            title: toolProgressLabel(name, params),
+            title: name === "skill" ? `Loading skill: ${safeToolDetail(params?.name)}` : toolProgressLabel(name, params),
             summary: toolProgressSummary(name, params),
             status: "running",
           };
@@ -98,7 +101,12 @@ export function createToolRegistry({
             // These tools emit concise UI summaries separately; keep their full
             // result payload available to the model without rendering it in chat.
             const preservesEventSummary = name === "read_file" || name === "search_content";
-            if (!result.ok || !preservesEventSummary || !part.summary) part.summary = result.output;
+            if (name === "skill" && result.ok) {
+              part.title = `Loaded skill: ${safeToolDetail(params?.name)}`;
+              part.summary = "";
+            } else if (!result.ok || !preservesEventSummary || !part.summary) {
+              part.summary = result.output;
+            }
             return result;
           } catch (error) {
             const result = {

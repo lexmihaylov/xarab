@@ -1,6 +1,7 @@
 import { buildSystemPrompt } from "./instructions.js";
 import { createTierAdjustmentTool } from "./tools/tier-adjustment-tool.js";
 import { createToolRegistry } from "./tool-registry.js";
+import { discoverSkills } from "./skills.js";
 
 export function createWorker({
   configStore,
@@ -51,7 +52,7 @@ export function createWorker({
     return adapter;
   }
 
-  const { definitions, tools } = createToolRegistry({
+  const registryOptions = {
     workspace,
     configStore,
     onToolEvent: toolRuntime?.onToolEvent ?? (() => {}),
@@ -59,13 +60,13 @@ export function createWorker({
     getCurrentAgentMessage: toolRuntime?.getCurrentAgentMessage ?? (() => undefined),
     sessionChanged: toolRuntime?.sessionChanged ?? (() => {}),
     notify: toolRuntime?.notify ?? (() => {}),
-  });
-  const toolDescriptions = Object.entries(definitions).map(([name, definition]) => ({
-    name,
-    description: definition.description,
-  }));
+  };
 
-  function systemPromptFor(tier, tierAdjustmentTool) {
+  function systemPromptFor(tier, tierAdjustmentTool, definitions) {
+    const toolDescriptions = Object.entries(definitions).map(([name, definition]) => ({
+      name,
+      description: definition.description,
+    }));
     const prompt = buildSystemPrompt({
       workspace,
       instructionFiles,
@@ -99,6 +100,8 @@ export function createWorker({
   }
 
   async function run({ tier, history, input, onTierAdjustment, ...request }) {
+    const skills = await discoverSkills(workspace);
+    const { definitions, tools } = createToolRegistry({ ...registryOptions, skills });
     const tierAdjustmentTool = createTierAdjustmentTool({
       activeTier: tier,
       requestAdjustment: onTierAdjustment,
@@ -107,7 +110,7 @@ export function createWorker({
       ...request,
       tier,
       input: buildWorkerHistory(history, input),
-      instructions: systemPromptFor(tier, tierAdjustmentTool),
+      instructions: systemPromptFor(tier, tierAdjustmentTool, definitions),
       tools: { ...tools, tier_adjustment: tierAdjustmentTool },
     });
   }
