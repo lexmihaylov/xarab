@@ -1,5 +1,8 @@
+import WebSocket from "ws";
+
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const RESPONSES_URL = `${CODEX_BASE_URL}/responses`;
+const WEBSOCKET_RESPONSES_URL = RESPONSES_URL.replace(/^https:/, "wss:");
 const MODELS_URL = new URL(`${CODEX_BASE_URL}/models`);
 MODELS_URL.searchParams.set("client_version", "0.0.0");
 const KNOWN_CODEX_MODELS = [
@@ -13,7 +16,11 @@ const KNOWN_CODEX_MODELS = [
   { id: "gpt-6.1-sol-fast", name: "GPT-6.1 Sol Fast" },
 ];
 
-export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl = fetch }) {
+export function createOpenAIResponsesWorkerAdapter({
+  getCredentials,
+  fetchImpl = fetch,
+  webSocketFactory = (url, options) => new WebSocket(url, options),
+}) {
   async function listModels({ signal } = {}) {
     const credentials = await getCredentials();
     const response = await fetchImpl(MODELS_URL, {
@@ -42,6 +49,7 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
     instructions,
     input,
     tools = {},
+    sessionID,
     signal,
     onText = () => {},
     onTextDelta,
@@ -59,17 +67,29 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
     let requestInput = serializeWorkerInput(input);
     let completedResponse;
     let sawToolCall = false;
+    let socket;
+    let previousResponseId;
+    let pendingToolOutputs = [];
+    let useWebSocket = Boolean(sessionID);
 
-    while (true) {
-      if (signal?.aborted) throw abortError();
-      const response = await fetchImpl(RESPONSES_URL, {
-        method: "POST",
-        headers: codexHeaders(credentials, {
-          "content-type": "application/json",
-          accept: "text/event-stream",
-          "openai-beta": "responses=experimental",
-        }),
-        body: JSON.stringify({
+    if (useWebSocket) {
+      try {
+        socket = await openResponsesWebSocket({
+          webSocketFactory,
+          credentials,
+          sessionID,
+          signal,
+        });
+      } catch (error) {
+        if (signal?.aborted) throw abortError();
+        useWebSocket = false;
+      }
+    }
+
+    try {
+      while (true) {
+        if (signal?.aborted) throw abortError();
+        const requestBody = {
           model,
           instructions,
           input: requestInput,
@@ -80,106 +100,163 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
             summary: "auto",
           },
           store: false,
-          stream: true,
           include: ["reasoning.encrypted_content"],
-        }),
-        signal,
-      });
-      if (!response.ok) throw await responseError(response, "OpenAI Responses request");
-      const streamedChunks = [];
-      let streamedText = "";
-      completedResponse = await readResponseStream(response, {
-        onText(chunk) {
-          streamedChunks.push(chunk);
-        },
-        onTextDelta: onTextDelta
-          ? (chunk) => {
-              streamedText += chunk;
-              onTextDelta(chunk);
-            }
-          : undefined,
-        onEvent,
-        signal,
-      });
-      if (!completedResponse?.output || !Array.isArray(completedResponse.output))
-        throw new Error("OpenAI stream completed without a response output.");
+        };
+        let streamedChunks;
+        let streamedText;
+        if (useWebSocket) {
+          try {
+            const body = previousResponseId
+              ? {
+                  ...requestBody,
+                  input: pendingToolOutputs,
+                  previous_response_id: previousResponseId,
+                }
+              : requestBody;
+            ({
+              response: completedResponse,
+              streamedChunks,
+              streamedText,
+            } = await requestOverWebSocket(socket, body, {
+              onText,
+              onTextDelta,
+              onEvent,
+              signal,
+            }));
+          } catch (error) {
+            if (signal?.aborted) throw abortError();
+            if (!error.webSocketFallback || error.outputStarted) throw error;
+            useWebSocket = false;
+            socket?.terminate();
+            socket = undefined;
+            continue;
+          }
+        } else {
+          const response = await fetchImpl(RESPONSES_URL, {
+            method: "POST",
+            headers: codexHeaders(credentials, {
+              "content-type": "application/json",
+              accept: "text/event-stream",
+              "openai-beta": "responses=experimental",
+            }),
+            body: JSON.stringify({ ...requestBody, stream: true }),
+            signal,
+          });
+          if (!response.ok) throw await responseError(response, "OpenAI Responses request");
+          streamedChunks = [];
+          streamedText = "";
+          completedResponse = await readResponseStream(response, {
+            onText(chunk) {
+              streamedChunks.push(chunk);
+            },
+            onTextDelta: onTextDelta
+              ? (chunk) => {
+                  streamedText += chunk;
+                  onTextDelta(chunk);
+                }
+              : undefined,
+            onEvent,
+            signal,
+          });
+        }
+        if (!completedResponse?.output || !Array.isArray(completedResponse.output))
+          throw new Error("OpenAI stream completed without a response output.");
 
-      const functionCalls = completedResponse.output.filter(
-        (item) => item.type === "function_call",
-      );
-      if (functionCalls.length === 0) {
-        const outputText = responseOutputText(completedResponse);
-        if (isTextualToolCall(`${streamedChunks.join("")}\n${outputText}`))
-          throw new Error(
-            "OpenAI returned a textual tool call instead of a structured function call.",
-          );
-        // When deltas were supplied, text has already been forwarded during
-        // streaming. Some Responses API completions still include the final
-        // text only in `response.output`, so forward it only if no delta arrived.
-        if (onTextDelta) {
-          if (!streamedText && outputText) onTextDelta(outputText);
-          else if (!streamedText && !outputText && sawToolCall)
+        const functionCalls = completedResponse.output.filter(
+          (item) => item.type === "function_call",
+        );
+        if (functionCalls.length === 0) {
+          const outputText = responseOutputText(completedResponse);
+          if (isTextualToolCall(`${streamedChunks.join("")}\n${outputText}`))
+            throw new Error(
+              "OpenAI returned a textual tool call instead of a structured function call.",
+            );
+          // When deltas were supplied, text has already been forwarded during
+          // streaming. Some Responses API completions still include the final
+          // text only in `response.output`, so forward it only if no delta arrived.
+          if (onTextDelta) {
+            if (!streamedText && outputText) onTextDelta(outputText);
+            else if (!streamedText && !outputText && sawToolCall)
+              throw new Error(
+                "OpenAI completed the turn after a tool call without a text response.",
+              );
+          } else if (streamedChunks.length) streamedChunks.forEach(onText);
+          else if (outputText) onText(outputText);
+          else if (sawToolCall)
             throw new Error("OpenAI completed the turn after a tool call without a text response.");
-        } else if (streamedChunks.length) streamedChunks.forEach(onText);
-        else if (outputText) onText(outputText);
-        else if (sawToolCall)
-          throw new Error("OpenAI completed the turn after a tool call without a text response.");
-        return completedResponse;
-      }
-      const functionOutputs = [];
-      sawToolCall = true;
-      for (const call of functionCalls) {
-        if (signal?.aborted) throw abortError();
-        const tool = tools[call.name];
-        if (!tool || typeof tool.handler !== "function") {
+          return completedResponse;
+        }
+        const functionOutputs = [];
+        sawToolCall = true;
+        for (const call of functionCalls) {
+          if (signal?.aborted) throw abortError();
+          const tool = tools[call.name];
+          if (!tool || typeof tool.handler !== "function") {
+            functionOutputs.push({
+              type: "function_call_output",
+              call_id: call.call_id,
+              output: `Error: tool ${String(call.name)} is unavailable.`,
+            });
+            continue;
+          }
+          let args;
+          try {
+            args = JSON.parse(call.arguments || "{}");
+          } catch {
+            functionOutputs.push({
+              type: "function_call_output",
+              call_id: call.call_id,
+              output: "Error: tool arguments were invalid JSON.",
+            });
+            continue;
+          }
+          onEvent({ type: "tool_call", name: call.name, callId: call.call_id, arguments: args });
+          let result;
+          try {
+            result = normalizeToolResult(
+              await tool.handler(args, { callId: call.call_id, signal }),
+            );
+          } catch (error) {
+            result = {
+              ok: false,
+              output: `Error: ${error?.message ?? String(error)}`,
+              errorCode: error?.code,
+            };
+          }
+          onEvent({
+            type: "tool_result",
+            name: call.name,
+            callId: call.call_id,
+            ok: result.ok,
+            errorCode: result.errorCode,
+          });
+          if (result.handoff) return { handoff: result.handoff };
           functionOutputs.push({
             type: "function_call_output",
             call_id: call.call_id,
-            output: `Error: tool ${String(call.name)} is unavailable.`,
+            output: result.output,
           });
-          continue;
         }
-        let args;
-        try {
-          args = JSON.parse(call.arguments || "{}");
-        } catch {
-          functionOutputs.push({
-            type: "function_call_output",
-            call_id: call.call_id,
-            output: "Error: tool arguments were invalid JSON.",
-          });
-          continue;
+        requestInput = [
+          ...(Array.isArray(requestInput)
+            ? requestInput
+            : [{ role: "user", content: requestInput }]),
+          ...completedResponse.output,
+          ...functionOutputs,
+        ];
+        if (useWebSocket) {
+          if (!completedResponse.id) {
+            useWebSocket = false;
+            socket?.terminate();
+            socket = undefined;
+          } else {
+            previousResponseId = completedResponse.id;
+            pendingToolOutputs = functionOutputs;
+          }
         }
-        onEvent({ type: "tool_call", name: call.name, callId: call.call_id, arguments: args });
-        let result;
-        try {
-          result = normalizeToolResult(await tool.handler(args, { callId: call.call_id, signal }));
-        } catch (error) {
-          result = {
-            ok: false,
-            output: `Error: ${error?.message ?? String(error)}`,
-            errorCode: error?.code,
-          };
-        }
-        onEvent({
-          type: "tool_result",
-          name: call.name,
-          callId: call.call_id,
-          ok: result.ok,
-          errorCode: result.errorCode,
-        });
-        if (result.handoff) return { handoff: result.handoff };
-        functionOutputs.push({
-          type: "function_call_output",
-          call_id: call.call_id,
-          output: result.output,
-        });
       }
-      requestInput = [
-        ...(Array.isArray(requestInput) ? requestInput : [{ role: "user", content: requestInput }]),
-        ...completedResponse.output,
-        ...functionOutputs,
-      ];
+    } finally {
+      socket?.close();
     }
   }
 
@@ -250,6 +327,115 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
   }
   if (!completed) throw new Error("OpenAI stream ended without response.completed.");
   return completed;
+}
+
+async function openResponsesWebSocket({ webSocketFactory, credentials, sessionID, signal }) {
+  if (signal?.aborted) throw abortError();
+  const socket = webSocketFactory(WEBSOCKET_RESPONSES_URL, {
+    handshakeTimeout: 15_000,
+    headers: codexHeaders(credentials, {
+      "openai-beta": "responses_websockets=2026-02-06",
+      "x-session-affinity": sessionID,
+    }),
+  });
+  await new Promise((resolve, reject) => {
+    const cleanup = () => {
+      socket.removeListener("open", onOpen);
+      socket.removeListener("error", onError);
+      socket.removeListener("close", onClose);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onOpen = () => {
+      cleanup();
+      resolve();
+    };
+    const onError = (error) => {
+      cleanup();
+      reject(webSocketError(error));
+    };
+    const onClose = () => {
+      cleanup();
+      reject(webSocketError());
+    };
+    const onAbort = () => {
+      cleanup();
+      socket.terminate();
+      reject(abortError());
+    };
+    socket.once("open", onOpen);
+    socket.once("error", onError);
+    socket.once("close", onClose);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+  return socket;
+}
+
+function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, signal }) {
+  return new Promise((resolve, reject) => {
+    let completed;
+    let streamedText = "";
+    let outputStarted = false;
+    const streamedChunks = [];
+    const cleanup = () => {
+      socket.removeListener("message", onMessage);
+      socket.removeListener("error", onError);
+      socket.removeListener("close", onClose);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const fail = (error) => {
+      cleanup();
+      if (error && typeof error === "object") error.outputStarted = outputStarted;
+      reject(error);
+    };
+    const onError = (error) => fail(webSocketError(error));
+    const onClose = () => fail(webSocketError());
+    const onAbort = () => fail(abortError());
+    const onMessage = (data) => {
+      try {
+        const event = JSON.parse(data.toString());
+        if (event.type === "response.output_text.delta") {
+          outputStarted = true;
+          const text = event.delta ?? "";
+          streamedText += text;
+          streamedChunks.push(text);
+          if (onTextDelta) onTextDelta(text);
+        }
+        if (event.type === "response.failed" || event.type === "error") {
+          const detail = event.response?.error ?? event.error ?? {};
+          throw new Error(`OpenAI WebSocket response failed (${detail.code ?? "unknown_error"}).`);
+        }
+        if (event.type === "response.incomplete")
+          throw new Error(
+            `OpenAI WebSocket response was incomplete (${event.response?.incomplete_details?.reason ?? "unknown reason"}).`,
+          );
+        onEvent(event);
+        if (event.type === "response.completed" || event.type === "response.done") {
+          completed = event.response;
+          cleanup();
+          resolve({ response: completed, streamedChunks, streamedText });
+        }
+      } catch (error) {
+        fail(error);
+      }
+    };
+    socket.on("message", onMessage);
+    socket.once("error", onError);
+    socket.once("close", onClose);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+      socket.send(JSON.stringify({ ...body, type: "response.create" }), (error) => {
+        if (error) fail(webSocketError(error));
+      });
+    } catch (error) {
+      fail(webSocketError(error));
+    }
+  });
+}
+
+function webSocketError(cause) {
+  const error = new Error("OpenAI Responses WebSocket is unavailable.", { cause });
+  error.webSocketFallback = true;
+  return error;
 }
 
 function serializeWorkerInput(input) {

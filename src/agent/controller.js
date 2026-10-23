@@ -334,6 +334,7 @@ export function createAssistantController({
     try {
       const result = await worker.run({
         tier,
+        sessionID: sessionController.getState().currentSession.id,
         history,
         input: requestText,
         signal: abortController.signal,

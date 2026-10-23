@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import test from "node:test";
 import { createOpenAIResponsesWorkerAdapter } from "../../../src/agent/worker/openai-responses-worker-adapter.js";
 
@@ -16,6 +17,26 @@ function streamedResponse(events, { split = false } = {}) {
     }),
     { headers: { "content-type": "text/event-stream" } },
   );
+}
+
+class TestWebSocket extends EventEmitter {
+  constructor(responses) {
+    super();
+    this.responses = responses;
+    queueMicrotask(() => this.emit("open"));
+  }
+
+  send(message, callback) {
+    callback?.();
+    const request = JSON.parse(message);
+    const events = this.responses(request);
+    queueMicrotask(() =>
+      events.forEach((event) => this.emit("message", Buffer.from(JSON.stringify(event)))),
+    );
+  }
+
+  close() {}
+  terminate() {}
 }
 
 test("lists account models plus known Codex models", async () => {
@@ -263,6 +284,101 @@ test("runs provider function calls through existing tool handlers and continues 
   assert.deepEqual(requests[1].reasoning, { effort: "low", summary: "auto" });
   assert.deepEqual(requests[0].include, ["reasoning.encrypted_content"]);
   assert.deepEqual(requests[1].include, ["reasoning.encrypted_content"]);
+});
+
+test("continues WebSocket tool rounds with only new outputs and stable session affinity", async () => {
+  const requests = [];
+  let socketOptions;
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
+    webSocketFactory: (_url, options) => {
+      socketOptions = options;
+      return new TestWebSocket((request) => {
+        requests.push(request);
+        if (requests.length === 1)
+          return [
+            {
+              type: "response.completed",
+              response: {
+                id: "response-1",
+                output: [
+                  { type: "function_call", name: "inspect", call_id: "call-1", arguments: "{}" },
+                ],
+              },
+            },
+          ];
+        assert.equal(request.previous_response_id, "response-1");
+        return [
+          {
+            type: "response.completed",
+            response: {
+              id: "response-2",
+              output: [{ type: "message", content: [{ type: "output_text", text: "Done" }] }],
+            },
+          },
+        ];
+      });
+    },
+    fetchImpl: async () => assert.fail("HTTP fallback was not expected"),
+  });
+
+  const result = await adapter.run({
+    model: "model-a",
+    instructions: "System prompt",
+    input: [{ role: "user", content: "Inspect" }],
+    sessionID: "session-123",
+    tools: { inspect: { description: "Inspect", handler: async () => "tool result" } },
+  });
+
+  assert.equal(result.id, "response-2");
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].type, "response.create");
+  assert.deepEqual(requests[0].input, [{ role: "user", content: "Inspect" }]);
+  assert.equal(requests[1].instructions, "System prompt");
+  assert.deepEqual(requests[1].input, [
+    { type: "function_call_output", call_id: "call-1", output: "tool result" },
+  ]);
+  assert.equal(requests[1].store, false);
+  assert.equal(socketOptions.headers["x-session-affinity"], "session-123");
+  assert.equal(socketOptions.headers["openai-beta"], "responses_websockets=2026-02-06");
+});
+
+test("falls back to full-history HTTP when the WebSocket closes before a response", async () => {
+  const httpRequests = [];
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
+    webSocketFactory: () => {
+      const socket = new TestWebSocket(() => []);
+      socket.send = (_message, callback) => {
+        callback?.();
+        queueMicrotask(() => socket.emit("close"));
+      };
+      return socket;
+    },
+    fetchImpl: async (_url, options) => {
+      httpRequests.push(JSON.parse(options.body));
+      return streamedResponse([
+        {
+          type: "response.completed",
+          response: {
+            output: [{ type: "message", content: [{ type: "output_text", text: "HTTP result" }] }],
+          },
+        },
+      ]);
+    },
+  });
+  const chunks = [];
+
+  await adapter.run({
+    model: "model-a",
+    sessionID: "session-123",
+    input: [{ role: "user", content: "Full request" }],
+    onText: (chunk) => chunks.push(chunk),
+  });
+
+  assert.equal(httpRequests.length, 1);
+  assert.deepEqual(httpRequests[0].input, [{ role: "user", content: "Full request" }]);
+  assert.deepEqual(chunks, ["HTTP result"]);
 });
 
 test("continues a tool call when input is omitted and serializes unusual tool results", async () => {
