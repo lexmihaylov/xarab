@@ -1,4 +1,6 @@
 import { buildSystemPrompt } from "./instructions.js";
+import { createTierAdjustmentTool } from "./tools/tier-adjustment-tool.js";
+import { createToolRegistry } from "./tool-registry.js";
 
 export function createWorker({
   configStore,
@@ -7,7 +9,7 @@ export function createWorker({
   getCredentials,
   workspace,
   instructionFiles,
-  availableTools,
+  toolRuntime,
 }) {
   if (!configStore || typeof configStore.getTierWorker !== "function")
     throw new TypeError("A worker config store is required.");
@@ -31,8 +33,13 @@ export function createWorker({
     return Boolean(assignment.model);
   }
 
-  function getAdapter(assignment) {
+  async function getAdapter(assignment) {
     const key = `${assignment.provider}:${assignment.model}`;
+    for (const [cachedKey, adapter] of adapters) {
+      if (cachedKey === key) continue;
+      adapters.delete(cachedKey);
+      await adapter.dispose?.();
+    }
     if (adapters.has(key)) return adapters.get(key);
     const adapter =
       assignment.provider === "openai"
@@ -44,17 +51,36 @@ export function createWorker({
     return adapter;
   }
 
-  const systemPrompt =
-    workspace || instructionFiles || availableTools
-      ? buildSystemPrompt({ workspace, instructionFiles, availableTools })
-      : "";
+  const { definitions, tools } = createToolRegistry({
+    workspace,
+    configStore,
+    onToolEvent: toolRuntime?.onToolEvent ?? (() => {}),
+    getMessages: toolRuntime?.getMessages ?? (() => []),
+    getCurrentAgentMessage: toolRuntime?.getCurrentAgentMessage ?? (() => undefined),
+    sessionChanged: toolRuntime?.sessionChanged ?? (() => {}),
+    notify: toolRuntime?.notify ?? (() => {}),
+  });
+  const toolDescriptions = Object.entries(definitions).map(([name, definition]) => ({
+    name,
+    description: definition.description,
+  }));
 
-  function escalationInstructions(tier, canEscalate) {
-    if (!canEscalate) return "";
-    return `\n\n## Escalation\nYou are working at Tier ${tier}. If investigation reveals that the overall task or any individual subtask, component, or dependency requires the next tier, call request_escalation before making consequential changes. You may escalate for one subtask even when the rest of the request is manageable. State concrete findings, not speculation. It can only request Tier ${tier + 1}, ends your run immediately, and transfers your findings to that worker. Do not call it merely because tools are needed, and do not write a final answer after calling it.`;
+  function systemPromptFor(tier, tierAdjustmentTool) {
+    const prompt = buildSystemPrompt({
+      workspace,
+      instructionFiles,
+      availableTools: [
+        ...toolDescriptions,
+        ...(tierAdjustmentTool
+          ? [{ name: "tier_adjustment", description: tierAdjustmentTool.description }]
+          : []),
+      ],
+    });
+    if (!tierAdjustmentTool) return prompt;
+    return `${prompt}\n\n## Tier adjustment\nRequest tier adjustment only after investigation gives concrete evidence that the remaining work needs materially more capability or is routine enough for a lower tier. Do not use it merely because work is long or tools are needed. Request a capability, never a model or tier. If the request is not applied, continue at the current tier and do not repeat it for the same reason.`;
   }
 
-  async function run({ tier, tools, history, input, ...request }) {
+  async function execute({ tier, instructions, input, tools, ...request }) {
     const assignment = getAssignment(tier);
     if (!validateAssignment(assignment)) {
       throw new Error(
@@ -63,14 +89,31 @@ export function createWorker({
           : `Tier ${tier} is not configured; choose a worker model in /route.`,
       );
     }
-    const instructions = `${systemPrompt}${escalationInstructions(tier, Boolean(tools?.request_escalation))}`;
-    return getAdapter(assignment).run({
+    return (await getAdapter(assignment)).run({
       ...request,
-      input: buildWorkerHistory(history, input),
+      input,
       model: assignment.model,
       ...(instructions ? { instructions } : {}),
       ...(tools ? { tools } : {}),
     });
+  }
+
+  async function run({ tier, history, input, onTierAdjustment, ...request }) {
+    const tierAdjustmentTool = createTierAdjustmentTool({
+      activeTier: tier,
+      requestAdjustment: onTierAdjustment,
+    });
+    return execute({
+      ...request,
+      tier,
+      input: buildWorkerHistory(history, input),
+      instructions: systemPromptFor(tier, tierAdjustmentTool),
+      tools: { ...tools, tier_adjustment: tierAdjustmentTool },
+    });
+  }
+
+  function complete({ tier, instructions, input, ...request }) {
+    return execute({ ...request, tier, instructions, input, tools: {} });
   }
 
   function getTierInfo(tier) {
@@ -86,14 +129,14 @@ export function createWorker({
     adapters.clear();
   }
 
-  return { run, getTierInfo, dispose };
+  return { run, complete, getTierInfo, dispose };
 }
 
 const MAX_REPLAY_TOOL_OUTPUT = 64 * 1024;
 
 export function buildWorkerHistory(messages = [], currentInput) {
   const history = [];
-  let replayedOutput = 0;
+  const replayableToolParts = selectReplayableToolParts(messages);
   for (const message of messages ?? []) {
     if (message?.type === "user" && message.message?.trim()) {
       history.push({ role: "user", content: message.message });
@@ -111,24 +154,20 @@ export function buildWorkerHistory(messages = [], currentInput) {
         continue;
       }
       if (part.type !== "tool" || !part.callId || !part.toolName) continue;
+      // Keep call/result records paired. In particular, interrupted calls have no
+      // result and must not be replayed as dangling function calls.
+      if (!replayableToolParts.has(part)) continue;
       history.push({
         type: "tool_call",
         callId: part.callId,
         name: part.toolName,
         arguments: part.params ?? {},
       });
-      if (!part.result) continue;
-      const remaining = MAX_REPLAY_TOOL_OUTPUT - replayedOutput;
-      if (remaining <= 0) continue;
-      const output = part.result.output.slice(0, remaining);
-      replayedOutput += output.length;
+      const output = String(part.result.output ?? "");
       history.push({
         type: "tool_result",
         callId: part.callId,
-        output:
-          output.length < part.result.output.length
-            ? `${output}\n[Tool output omitted because the conversation replay limit was reached.]`
-            : output,
+        output,
         ok: part.result.ok,
       });
     }
@@ -136,4 +175,29 @@ export function buildWorkerHistory(messages = [], currentInput) {
   if (currentInput !== undefined && currentInput !== null)
     history.push({ role: "user", content: String(currentInput) });
   return history;
+}
+
+function selectReplayableToolParts(messages) {
+  const candidates = [];
+  for (const message of messages ?? []) {
+    if (message?.type !== "agent" || !Array.isArray(message.parts)) continue;
+    for (const part of message.parts) {
+      if (part?.type !== "tool" || !part.callId || !part.toolName || !part.result) continue;
+      candidates.push(part);
+    }
+  }
+
+  // Spend the aggregate replay budget on the newest complete exchanges first,
+  // then restore chronological order when building the transcript.
+  const selected = new Set();
+  let remaining = MAX_REPLAY_TOOL_OUTPUT;
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const part = candidates[index];
+    const output = String(part.result.output ?? "");
+    const outputBytes = Buffer.byteLength(output);
+    if (outputBytes > remaining) continue;
+    selected.add(part);
+    remaining -= outputBytes;
+  }
+  return selected;
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createInsertTool } from "../src/agent/tools/insert-tool.js";
+import { createInsertTool } from "../../../../src/agent/worker/tools/insert-tool.js";
 
 async function withWorkspace(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-insert-tool-"));

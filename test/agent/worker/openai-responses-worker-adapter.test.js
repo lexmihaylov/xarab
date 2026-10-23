@@ -18,7 +18,7 @@ function streamedResponse(events, { split = false } = {}) {
   );
 }
 
-test("lists models allowed for display by the signed-in account", async () => {
+test("lists account models plus known Codex models", async () => {
   const requests = [];
   const adapter = createOpenAIResponsesWorkerAdapter({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
@@ -28,15 +28,30 @@ test("lists models allowed for display by the signed-in account", async () => {
         models: [
           { slug: "model-a", display_name: "Model A" },
           { slug: "model-b", display_name: "Model B" },
+          { slug: "gpt-6-sol", display_name: "Account GPT-6 Sol" },
         ],
       });
     },
   });
 
-  assert.deepEqual(await adapter.listModels(), [
+  const models = await adapter.listModels();
+  assert.deepEqual(models.slice(0, 3), [
     { id: "model-a", name: "Model A" },
     { id: "model-b", name: "Model B" },
+    { id: "gpt-6-sol", name: "Account GPT-6 Sol" },
   ]);
+  assert.deepEqual(
+    models.slice(3).map((model) => model.id),
+    [
+      "gpt-6-astra",
+      "gpt-6-astra-fast",
+      "gpt-6-luna",
+      "gpt-6-luna-fast",
+      "gpt-6-sol-fast",
+      "gpt-6.1-sol",
+      "gpt-6.1-sol-fast",
+    ],
+  );
   assert.equal(requests[0].options.headers.authorization, "Bearer token-secret");
   assert.equal(
     requests[0].url,
@@ -82,9 +97,9 @@ test("streams a Responses result with required privacy settings", async () => {
     instructions: "System instructions",
     input: [{ role: "user", content: "Say hello" }],
     tools: [],
-    parallel_tool_calls: false,
+    parallel_tool_calls: true,
     reasoning: {
-      effort: "medium",
+      effort: "low",
       summary: "auto",
     },
     store: false,
@@ -244,58 +259,53 @@ test("runs provider function calls through existing tool handlers and continues 
     call_id: "call-1",
     output: "README contents",
   });
-  assert.deepEqual(requests[0].reasoning, { effort: "medium", summary: "auto" });
-  assert.deepEqual(requests[1].reasoning, { effort: "medium", summary: "auto" });
+  assert.deepEqual(requests[0].reasoning, { effort: "low", summary: "auto" });
+  assert.deepEqual(requests[1].reasoning, { effort: "low", summary: "auto" });
   assert.deepEqual(requests[0].include, ["reasoning.encrypted_content"]);
   assert.deepEqual(requests[1].include, ["reasoning.encrypted_content"]);
 });
 
-test("returns a controller handoff without continuing the current worker turn", async () => {
-  let requests = 0;
-  const adapter = createOpenAIResponsesWorkerAdapter({
-    getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
-    fetchImpl: async () => {
-      requests++;
-      return streamedResponse([
-        {
-          type: "response.completed",
-          response: {
-            id: "response-escalation",
-            output: [
-              {
-                type: "function_call",
-                name: "request_escalation",
-                call_id: "call-escalation",
-                arguments: '{"target_tier":2,"reason":"Scope spans multiple services."}',
-              },
-            ],
+test("continues a tool call when input is omitted and serializes unusual tool results", async () => {
+  test("returns immediately when a tool approves a tier handoff", async () => {
+    let requests = 0;
+    const adapter = createOpenAIResponsesWorkerAdapter({
+      getCredentials: async () => ({ access_token: "token", account_id: "account-1" }),
+      fetchImpl: async () => {
+        requests += 1;
+        return streamedResponse([
+          {
+            type: "response.completed",
+            response: {
+              output: [
+                {
+                  type: "function_call",
+                  name: "tier_adjustment",
+                  call_id: "call-adjustment",
+                  arguments: '{"direction":"up"}',
+                },
+              ],
+            },
+          },
+        ]);
+      },
+    });
+
+    const result = await adapter.run({
+      model: "model-a",
+      input: [{ role: "user", content: "Do the work" }],
+      tools: {
+        tier_adjustment: {
+          description: "Request reassignment",
+          async handler() {
+            return { ok: true, output: "Approved", handoff: { selectedTier: 2 } };
           },
         },
-      ]);
-    },
-  });
-
-  const result = await adapter.run({
-    model: "model-a",
-    input: [{ role: "user", content: "Investigate the outage" }],
-    tools: {
-      request_escalation: {
-        description: "Request a higher tier",
-        async handler(args) {
-          return { ok: true, output: "Escalating.", stop: true, handoff: args };
-        },
       },
-    },
-  });
+    });
 
-  assert.equal(requests, 1);
-  assert.deepEqual(result.handoff, {
-    target_tier: 2,
-    reason: "Scope spans multiple services.",
+    assert.deepEqual(result, { handoff: { selectedTier: 2 } });
+    assert.equal(requests, 1);
   });
-});
-
-test("continues a tool call when input is omitted and serializes unusual tool results", async () => {
   const requests = [];
   let requestCount = 0;
   const adapter = createOpenAIResponsesWorkerAdapter({

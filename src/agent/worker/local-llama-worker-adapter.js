@@ -1,8 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getLlama, LlamaChatSession } from "node-llama-cpp";
 
-const HANDOFF = Symbol("local worker handoff");
-
 export function createLocalLlamaWorkerAdapter({
   modelRuntime = { getLlama, createSession: (options) => new LlamaChatSession(options) },
   contextSize = 16384,
@@ -58,19 +56,15 @@ export function createLocalLlamaWorkerAdapter({
           params: tool.params ?? { type: "object", properties: {} },
           async handler(params) {
             if (signal?.aborted) throw abortError();
-            onEvent({
-              type: "tool_call",
-              name,
-              callId: `local_${randomUUID()}`,
-              arguments: params,
-            });
+            const callId = `local_${randomUUID()}`;
+            onEvent({ type: "tool_call", name, callId, arguments: params });
             let result;
             try {
-              result = normalizeToolResult(await tool.handler(params));
+              result = normalizeToolResult(await tool.handler(params, { callId, signal }));
             } catch (error) {
               result = { ok: false, output: `Error: ${error?.message ?? String(error)}` };
             }
-            if (result.stop) throw { [HANDOFF]: result.handoff };
+            if (result.handoff) throw new TierAdjustmentHandoff(result.handoff);
             return result.output;
           },
         },
@@ -84,18 +78,20 @@ export function createLocalLlamaWorkerAdapter({
     });
     try {
       const prompt = formatInput(input);
-      const result = await session.prompt(prompt, {
-        functions,
-        maxParallelFunctionCalls: 1,
-        maxTokens,
-        signal,
-        onTextChunk: onText,
-      });
-      if (typeof result === "string") return {};
-      return result ?? {};
-    } catch (error) {
-      if (error?.[HANDOFF]) return { handoff: error[HANDOFF] };
-      throw error;
+      try {
+        const result = await session.prompt(prompt, {
+          functions,
+          maxParallelFunctionCalls: 1,
+          maxTokens,
+          signal,
+          onTextChunk: onText,
+        });
+        if (typeof result === "string") return {};
+        return result ?? {};
+      } catch (error) {
+        if (error instanceof TierAdjustmentHandoff) return { handoff: error.handoff };
+        throw error;
+      }
     } finally {
       await session.dispose?.();
       await contextSequence.clearHistory();
@@ -114,6 +110,13 @@ export function createLocalLlamaWorkerAdapter({
       return disposal;
     },
   };
+}
+
+class TierAdjustmentHandoff extends Error {
+  constructor(handoff) {
+    super("Tier adjustment approved.");
+    this.handoff = handoff;
+  }
 }
 
 function formatInput(input) {

@@ -1,7 +1,7 @@
 import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { TextDecoder } from "node:util";
-import { fuzzyScore } from "../../utils/fuzzy-score.js";
+import { fuzzyScore } from "../../../utils/fuzzy-score.js";
 
 const MAX_FILES = 500;
 const MAX_DIRECTORY_ENTRIES = 10_000;

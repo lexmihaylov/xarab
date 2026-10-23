@@ -65,10 +65,11 @@ export function createToolRegistry({
       name,
       {
         ...definition,
-        async handler(params) {
+        async handler(params, { callId } = {}) {
           const part = {
             type: "tool",
             id: Symbol(name),
+            ...(callId ? { callId } : {}),
             toolName: name,
             params: { ...(params ?? {}) },
             label: toolProgressLabel(name, params),

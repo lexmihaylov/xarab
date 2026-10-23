@@ -2,6 +2,16 @@ const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const RESPONSES_URL = `${CODEX_BASE_URL}/responses`;
 const MODELS_URL = new URL(`${CODEX_BASE_URL}/models`);
 MODELS_URL.searchParams.set("client_version", "0.0.0");
+const KNOWN_CODEX_MODELS = [
+  { id: "gpt-6-astra", name: "GPT-6 Astra" },
+  { id: "gpt-6-astra-fast", name: "GPT-6 Astra Fast" },
+  { id: "gpt-6-luna", name: "GPT-6 Luna" },
+  { id: "gpt-6-luna-fast", name: "GPT-6 Luna Fast" },
+  { id: "gpt-6-sol", name: "GPT-6 Sol" },
+  { id: "gpt-6-sol-fast", name: "GPT-6 Sol Fast" },
+  { id: "gpt-6.1-sol", name: "GPT-6.1 Sol" },
+  { id: "gpt-6.1-sol-fast", name: "GPT-6.1 Sol Fast" },
+];
 
 export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl = fetch }) {
   async function listModels({ signal } = {}) {
@@ -13,12 +23,18 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
     if (!response.ok) throw await responseError(response, "list OpenAI models");
     const body = await response.json();
     const entries = Array.isArray(body) ? body : (body.models ?? []);
-    return entries
-      .filter((model) => model.slug || model.model_slug || model.id)
-      .map((model) => {
-        const id = model.slug ?? model.model_slug ?? model.id;
-        return { id, name: model.display_name || model.name || id };
-      });
+    const models = new Map(
+      entries
+        .filter((model) => model.slug || model.model_slug || model.id)
+        .map((model) => {
+          const id = model.slug ?? model.model_slug ?? model.id;
+          return [id, { id, name: model.display_name || model.name || id }];
+        }),
+    );
+    for (const model of KNOWN_CODEX_MODELS) {
+      if (!models.has(model.id)) models.set(model.id, model);
+    }
+    return [...models.values()];
   }
 
   async function run({
@@ -58,9 +74,9 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
           instructions,
           input: requestInput,
           tools: apiTools,
-          parallel_tool_calls: false,
+          parallel_tool_calls: true,
           reasoning: {
-            effort: "medium",
+            effort: "low",
             summary: "auto",
           },
           store: false,
@@ -137,7 +153,7 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
         onEvent({ type: "tool_call", name: call.name, callId: call.call_id, arguments: args });
         let result;
         try {
-          result = normalizeToolResult(await tool.handler(args));
+          result = normalizeToolResult(await tool.handler(args, { callId: call.call_id, signal }));
         } catch (error) {
           result = {
             ok: false,
@@ -152,10 +168,7 @@ export function createOpenAIResponsesWorkerAdapter({ getCredentials, fetchImpl =
           ok: result.ok,
           errorCode: result.errorCode,
         });
-        // A controller-owned handoff must end this model run. Continuing with a
-        // function result would let the current worker produce a final answer
-        // after it has requested a stronger worker.
-        if (result.stop) return { ...completedResponse, handoff: result.handoff };
+        if (result.handoff) return { handoff: result.handoff };
         functionOutputs.push({
           type: "function_call_output",
           call_id: call.call_id,

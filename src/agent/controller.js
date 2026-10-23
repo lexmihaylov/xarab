@@ -1,7 +1,5 @@
 import os from "node:os";
 import path from "node:path";
-import { createToolRegistry } from "./tool-registry.js";
-import { createEscalationTool } from "./tools/escalation-tool.js";
 import { getTheme } from "../utils/theme-engine.js";
 import { createMessageTimeline } from "./message-timeline.js";
 import { createConfigStore } from "../utils/config-store.js";
@@ -154,15 +152,6 @@ export function createAssistantController({
     setSessionError,
   } = sessionController;
 
-  const { definitions, tools } = createToolRegistry({
-    workspace,
-    configStore,
-    onToolEvent,
-    getMessages: () => messages,
-    getCurrentAgentMessage: () => currentAgentMessage,
-    sessionChanged,
-    notify,
-  });
   worker = createWorker({
     configStore,
     openAIAdapterFactory,

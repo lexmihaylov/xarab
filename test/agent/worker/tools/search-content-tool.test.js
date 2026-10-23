@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { createSearchContentTool } from "../src/agent/tools/search-content-tool.js";
+import { createSearchContentTool } from "../../../../src/agent/worker/tools/search-content-tool.js";
 
 async function withWorkspace(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-content-tool-"));
