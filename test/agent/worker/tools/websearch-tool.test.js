@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createWebsearchTool } from "../src/agent/tools/web-search-tool.js";
+import { createWebsearchTool } from "../../../../src/agent/worker/tools/web-search-tool.js";
 
 function response(payload, status = 200) {
   return {
