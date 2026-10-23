@@ -21,6 +21,7 @@ import { createModelManager } from "./model-manager.js";
 import { createWorker } from "./worker/worker.js";
 import { createCommandHandler } from "./assistant-command-handler.js";
 import { createSessionCompactor } from "./session-compactor.js";
+import { createAutoCompactor } from "./auto-compactor.js";
 
 export function createAssistantController({
   root,
@@ -368,6 +369,9 @@ export function createAssistantController({
         setSessionError(`Session could not be saved: ${error.message}`);
         notify();
       });
+      if (!approvedHandoff && !isShuttingDown) {
+        await autoCompactor.compact();
+      }
       finishWork();
       if (activeWorkDone === workDone) activeWorkDone = undefined;
     }
@@ -547,6 +551,21 @@ export function createAssistantController({
     clearTierClassifier: () => {
       tierClassifier = undefined;
     },
+  });
+
+  const autoCompactor = createAutoCompactor({
+    getMessages: () => messages,
+    setMessages: (next) => { messages = next; },
+    classifyForRouting,
+    worker,
+    addMessage,
+    sessionChanged,
+    notify,
+    updateStatus,
+    setGenerating: (next) => { generating = next; },
+    getAbortController: () => abortController,
+    setAbortController: (next) => { abortController = next; },
+    isShuttingDown: () => isShuttingDown,
   });
 
   const sessionCompactor = createSessionCompactor({
