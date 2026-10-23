@@ -6,8 +6,7 @@ export function createSessionCompactor({
   setCurrentAgentMessage,
   addMessage,
   classifyForRouting,
-  adapter,
-  configStore,
+  worker,
   sessionChanged,
   notify,
   updateStatus,
@@ -29,8 +28,28 @@ export function createSessionCompactor({
     }
 
     const transcript = getMessages()
-      .filter((message) => ["user", "agent"].includes(message.type) && message.message?.trim())
-      .map((message) => `${message.type === "user" ? "User" : "Assistant"}:\n${message.message}`)
+      .filter(
+        (message) =>
+          message.type === "user" ||
+          (message.type === "agent" && (message.message?.trim() || message.parts?.length)),
+      )
+      .map((message) => {
+        if (message.type === "user") return `User:\n${message.message ?? ""}`;
+        const sections = [`Assistant:\n${message.message ?? ""}`];
+        for (const part of message.parts ?? []) {
+          if (part.type !== "tool") continue;
+          sections.push(
+            [
+              `Tool call: ${part.toolName ?? "unknown"}${part.callId ? ` (${part.callId})` : ""}`,
+              `Arguments: ${JSON.stringify(part.params ?? {})}`,
+              part.result
+                ? `Result (${part.result.ok ? "ok" : "error"}):\n${part.result.output ?? ""}`
+                : `Result unavailable (${part.status ?? "unsettled"}).`,
+            ].join("\n"),
+          );
+        }
+        return sections.join("\n\n");
+      })
       .join("\n\n");
     if (!transcript.trim()) {
       addMessage({ type: "system", message: "There is no conversation to compact." });
@@ -54,27 +73,17 @@ export function createSessionCompactor({
     if (!route) {
       addMessage({
         type: "system",
-        message:
-          "Configure a local classifier and OpenAI tier worker with /route before compacting.",
+        message: "Configure a router and tier worker with /route before compacting.",
         severity: "warning",
       });
       return;
     }
 
-    const { classification, worker } = route;
-    if (!worker || worker.provider !== "openai") {
+    const { classification, worker: tierWorker } = route;
+    if (!tierWorker?.configured) {
       addMessage({
         type: "system",
-        message: `Tier ${classification.tier} needs an OpenAI worker before compacting.`,
-        severity: "warning",
-      });
-      return;
-    }
-    const modelId = worker.model || configStore.getOpenAIModel();
-    if (!modelId) {
-      addMessage({
-        type: "system",
-        message: `Tier ${classification.tier} has no OpenAI model selected.`,
+        message: `Tier ${classification.tier} has no worker model selected.`,
         severity: "warning",
       });
       return;
@@ -85,14 +94,13 @@ export function createSessionCompactor({
     let sawDelta = false;
     setGenerating(true);
     setAbortController(controller);
-    updateStatus(`OpenAI ${modelId} compacting…`);
+    updateStatus("Compacting conversation…");
     try {
-      await adapter.run({
-        model: modelId,
+      await worker.complete({
+        tier: classification.tier,
         instructions:
           "Create a concise Markdown summary of the conversation for a future assistant. Preserve the user's goals, decisions, constraints, important facts, files, commands, errors, and unresolved work. Do not address the user or add commentary; return only the summary.",
         input: [{ role: "user", content: `Conversation to compact:\n\n${transcript}` }],
-        tools: [],
         signal: controller.signal,
         onText(chunk) {
           if (!sawDelta) chunks.push(chunk);
