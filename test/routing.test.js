@@ -57,19 +57,25 @@ test("preserves the end when trimming classifier history and request", () => {
   assert.match(prompt, /reply-end/);
 });
 
-test("keeps the last ten conversation messages before truncating the combined history", () => {
+test("keeps four preceding messages without duplicating the latest request", () => {
   const prompt = buildTierClassificationPrompt({
     prompt: "latest request",
-    recentMessages: Array.from({ length: 11 }, (_, index) => ({
-      type: "user",
-      message: `message-${index}`,
-    })),
+    recentMessages: [
+      { type: "user", message: "message-1" },
+      { type: "agent", message: "reply-1" },
+      { type: "user", message: "message-2" },
+      { type: "agent", message: "reply-2" },
+      { type: "user", message: "latest request" },
+    ],
     contextSize: 8192,
   });
 
-  assert.doesNotMatch(prompt, /message-0/);
-  assert.match(prompt, /message-1/);
-  assert.match(prompt, /message-10/);
+  assert.match(
+    prompt,
+    /<conversation_context>\nuser: message-1\nagent: reply-1\nuser: message-2\nagent: reply-2\n<\/conversation_context>/,
+  );
+  assert.match(prompt, /<latest_request>\nlatest request\n<\/latest_request>/);
+  assert.equal(prompt.match(/latest request/g)?.length, 1);
 });
 
 test("parses a valid tier classification and bounds the rationale", () => {

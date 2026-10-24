@@ -41,9 +41,11 @@ export function buildTierClassificationPrompt({ prompt, recentMessages = [], con
   const inputBudget = Math.max(1200, Math.floor((contextSize - 700) * 3));
   const historyBudget = Math.floor(inputBudget * 0.4);
   const requestBudget = inputBudget - historyBudget;
-  const history = recentMessages
-    .filter((message) => ["user", "agent"].includes(message.type))
-    .slice(-10)
+  const conversation = recentMessages.filter((message) => ["user", "agent"].includes(message.type));
+  if (conversation.at(-1)?.type === "user" && conversation.at(-1).message === prompt)
+    conversation.pop();
+  const history = conversation
+    .slice(-4)
     .map((message) => `${message.type}: ${String(message.message ?? "")}`)
     .join("\n")
     .slice(-historyBudget);
