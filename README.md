@@ -16,7 +16,7 @@ Ask a quick question, investigate a tricky bug, or plan a complex change: Xarab 
 
 ## Try it
 
-**Requirements:** Node.js 20+. Local GGUF models additionally need a machine supported by [`node-llama-cpp`](https://github.com/withcatai/node-llama-cpp).
+**Requirements:** Node.js 26.4.0 or newer. Xarab's terminal UI is built with [OpenTUI](https://github.com/anomalyco/opentui) (`@opentui/core` and `@opentui/react`). The default local GGUF classifier and any local GGUF workers require a machine supported by [`node-llama-cpp`](https://github.com/withcatai/node-llama-cpp).
 
 ```sh
 npm install
