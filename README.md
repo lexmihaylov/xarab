@@ -78,6 +78,27 @@ npm run classifier:evaluate -- /path/to/classifier.gguf
 
 The report includes exact tier accuracy, under- and over-routing, two-tier under-routes, rationales, and average classification time. The examples live in `test/fixtures/classifier-cases.json`, making it possible to refine the rubric and measure how a classifier handles your cases. This evaluation does not call a worker provider.
 
+## Contributing
+
+Xarab is being developed as a configurable coding-agent harness: it routes work to models by the capability it needs, while keeping that decision visible and testable. Contributions help improve its routing, tools, provider integrations, usability, and documentation—and make it easier for more people to try and shape the project. Whether you use Xarab every day, are curious about agent routing, or have spotted something confusing, your perspective is valuable.
+
+Useful contributions include:
+
+- Reporting bugs and sharing clear steps to reproduce them.
+- Improving routing, tier guidance, classifier evaluation cases, or evaluation tools.
+- Adding or refining provider integrations and workspace tools.
+- Making the terminal experience easier to understand and use.
+- Improving documentation, examples, and setup instructions.
+
+Not sure whether an idea fits? Open an issue to describe the problem or proposal and discuss a larger change before investing time in it. Pull requests are welcome; please explain what problem the change solves and why you chose this approach. Keep changes focused, and include or update tests when appropriate. Before submitting code changes, run:
+
+```sh
+npm test
+npm run format:check
+```
+
+If a check cannot be run, mention that in the pull request. Thoughtful questions, feedback, and small improvements are just as welcome as major features.
+
 For a focused routing test run:
 
 ```sh
