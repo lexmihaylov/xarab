@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, rm, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createToolRegistry } from "../../../src/agent/worker/tool-registry.js";
@@ -10,12 +10,15 @@ test("skill instructions reach the model but are omitted from the feed and store
   const file = path.join(directory, "SKILL.md");
   const secretInstructions = "Detailed private skill workflow";
   await writeFile(file, `---\nname: review\ndescription: Review code\n---\n${secretInstructions}`);
+  const canonicalFile = await realpath(file);
   const messages = [];
   const agentMessage = { type: "agent", message: "", parts: [] };
   try {
     const { tools } = createToolRegistry({
       workspace: process.cwd(),
-      skills: new Map([["review", { name: "review", description: "Review code", file }]]),
+      skills: new Map([
+        ["review", { name: "review", description: "Review code", file: canonicalFile }],
+      ]),
       configStore: { getApiKey: () => undefined },
       onToolEvent: () => {},
       getMessages: () => messages,
