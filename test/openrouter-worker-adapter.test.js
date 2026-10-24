@@ -36,6 +36,26 @@ test("streams text with bearer authorization", async () => {
   assert.deepEqual(JSON.parse(request.options.body).messages, [{ role: "user", content: "Hello" }]);
 });
 
+test("reports OpenRouter rejection details without exposing secrets", async () => {
+  const adapter = createOpenRouterWorkerAdapter({
+    getApiKey: () => "test-secret",
+    fetchImpl: async () =>
+      new Response(
+        JSON.stringify({
+          error: { message: "Rate limit reached for upstream provider", code: 429 },
+        }),
+        { status: 429, headers: { "content-type": "application/json", "retry-after": "12" } },
+      ),
+  });
+  await assert.rejects(adapter.run({ model: "vendor/model", input: "Hello" }), (error) => {
+    assert.match(error.message, /OpenRouter request failed \(429\)/);
+    assert.match(error.message, /Rate limit reached for upstream provider/);
+    assert.match(error.message, /Retry after 12 seconds/);
+    assert.doesNotMatch(error.message, /test-secret/);
+    return true;
+  });
+});
+
 test("marks stable instructions and tools for any model across tool continuation", async () => {
   const requests = [];
   const adapter = createOpenRouterWorkerAdapter({

@@ -67,7 +67,24 @@ export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) 
         }),
         signal,
       });
-      if (!response.ok) throw new Error(`OpenRouter request failed (${response.status}).`);
+      if (!response.ok) {
+        let detail = "";
+        try {
+          const body = await response.text();
+          const message = JSON.parse(body)?.error?.message;
+          if (typeof message === "string")
+            detail = message.replace(/[\r\n\x00-\x1f\x7f]/g, " ").slice(0, 300);
+        } catch {
+          // A non-JSON error body is not safe to display in the conversation.
+        }
+        const retryAfter = response.headers.get("retry-after");
+        const retry = /^\d{1,6}$/.test(retryAfter ?? "")
+          ? ` Retry after ${retryAfter} seconds.`
+          : "";
+        throw new Error(
+          `OpenRouter request failed (${response.status}).${detail ? ` ${detail}` : ""}${retry}`,
+        );
+      }
       if (!response.body?.getReader) throw new Error("OpenRouter did not return a stream.");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();

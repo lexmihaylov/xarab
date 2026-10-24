@@ -73,6 +73,8 @@ export function ModelChooser({
   const [activeControl, setActiveControl] = useState(0);
   const [classifierIndex, setClassifierIndex] = useState(0);
   const [workerIndex, setWorkerIndex] = useState(0);
+  const [routerQuery, setRouterQuery] = useState("");
+  const [workerQuery, setWorkerQuery] = useState("");
   const classifierScroll = useRef(null);
   const workerScroll = useRef(null);
   const { width: terminalWidth } = useTerminalDimensions();
@@ -128,6 +130,12 @@ export function ModelChooser({
       });
     return options;
   }, [defaultOpenAIModel, models, tierWorkers]);
+  const filterOptions = (options, query) =>
+    options.filter((option) =>
+      `${option.name} ${option.description}`.toLowerCase().includes(query.trim().toLowerCase()),
+    );
+  const visibleClassifiers = filterOptions(classifierOptions, routerQuery);
+  const visibleWorkers = filterOptions(workerOptions, workerQuery);
   const configuredWorker = tierWorkers[tier];
   const worker = configuredWorker?.model || defaultOpenAIModel || "Worker not selected";
   const classifierLabel = classifier
@@ -141,12 +149,12 @@ export function ModelChooser({
     const model = typeof option.value === "string" ? option.value : option.value.model;
     return provider === classifier?.provider && model === classifier?.model;
   };
-  const selectedClassifier = classifierOptions[classifierIndex]?.value;
+  const selectedClassifier = visibleClassifiers[classifierIndex]?.value;
   const canDeleteSelectedClassifier =
     typeof selectedClassifier === "string" || selectedClassifier?.provider === "local";
 
   useEffect(() => {
-    const index = classifierOptions.findIndex((option) =>
+    const index = visibleClassifiers.findIndex((option) =>
       option.value === null
         ? !classifier
         : (typeof option.value === "string" ? "local" : option.value.provider) ===
@@ -154,16 +162,16 @@ export function ModelChooser({
           (typeof option.value === "string" ? option.value : option.value.model) ===
             classifier?.model,
     );
-    if (index >= 0) setClassifierIndex(index);
-  }, [classifier, classifierOptions]);
+    setClassifierIndex(Math.max(0, index));
+  }, [classifier, routerQuery, models]);
 
   useEffect(() => {
-    const index = workerOptions.findIndex(
+    const index = visibleWorkers.findIndex(
       (option) =>
         option.value.provider === configuredWorker?.provider && option.value.model === worker,
     );
-    if (index >= 0) setWorkerIndex(index);
-  }, [worker, workerOptions]);
+    setWorkerIndex(Math.max(0, index));
+  }, [worker, workerQuery, models, tier]);
   const usableWidth = Math.max(1, terminalWidth - 4);
   // Keep all three sections visible at practical widths. The worker section is
   // useful context for the selected tier, so it should not disappear on a
@@ -181,7 +189,7 @@ export function ModelChooser({
   useKeyboard((key) => {
     if (confirmDelete) {
       if (key.name === "return") {
-        const model = classifierOptions[classifierIndex]?.value;
+        const model = visibleClassifiers[classifierIndex]?.value;
         if (typeof model === "string" || model?.provider === "local")
           onDeleteModel(typeof model === "string" ? model : model.model);
         setConfirmDelete(false);
@@ -203,17 +211,17 @@ export function ModelChooser({
     }
     // On narrow terminals only the active pane is rendered, so horizontal
     // navigation moves between the three sections.
-    if (key.name === "left" || key.name === "right") {
+    if (activeControl === 1 && (key.name === "left" || key.name === "right")) {
       key.preventDefault();
       setActiveControl((current) => (current + (key.name === "left" ? 2 : 1)) % 3);
       return;
     }
-    if (["1", "2", "3"].includes(key.name)) {
+    if (activeControl === 1 && ["1", "2", "3"].includes(key.name)) {
       key.preventDefault();
       setActiveControl(Number(key.name) - 1);
       return;
     }
-    if (key.name === "r" && activeControl === 2 && !key.ctrl && !key.meta) {
+    if (key.name === "r" && activeControl === 2 && key.ctrl) {
       key.preventDefault();
       onRefreshWorkerModels();
       return;
@@ -224,14 +232,17 @@ export function ModelChooser({
       return;
     }
     if (activeControl === 0) {
-      if (key.name === "up")
+      if (visibleClassifiers.length && (key.name === "up" || key.name === "down")) {
+        key.preventDefault();
         setClassifierIndex(
-          (current) => (current - 1 + classifierOptions.length) % classifierOptions.length,
+          (current) =>
+            (current + (key.name === "up" ? -1 : 1) + visibleClassifiers.length) %
+            visibleClassifiers.length,
         );
-      if (key.name === "down")
-        setClassifierIndex((current) => (current + 1) % classifierOptions.length);
-      if (key.name === "return") {
-        onSetClassifier(classifierOptions[classifierIndex]?.value ?? null);
+      }
+      if (key.name === "return" && visibleClassifiers[classifierIndex]) {
+        key.preventDefault();
+        onSetClassifier(visibleClassifiers[classifierIndex].value);
         setActiveControl(1);
       }
     } else if (activeControl === 1) {
@@ -239,14 +250,18 @@ export function ModelChooser({
       if (key.name === "down") setTier((value) => (value % 3) + 1);
       if (key.name === "return") setActiveControl(2);
     } else if (key.name === "up" || key.name === "down") {
-      if (!workerOptions.length) return;
+      if (!visibleWorkers.length) return;
+      key.preventDefault();
       setWorkerIndex((current) => {
         const delta = key.name === "up" ? -1 : 1;
-        return (current + delta + workerOptions.length) % workerOptions.length;
+        return (current + delta + visibleWorkers.length) % visibleWorkers.length;
       });
     } else if (key.name === "return") {
-      const option = workerOptions[workerIndex];
-      if (option) onSetTierWorker(tier, option.value);
+      const option = visibleWorkers[workerIndex];
+      if (option) {
+        key.preventDefault();
+        onSetTierWorker(tier, option.value);
+      }
     }
   });
 
@@ -272,11 +287,15 @@ export function ModelChooser({
       >
         {title}
       </text>
-      <box height={1} flexShrink={0} />
-      {children}
-      <text height={1} flexShrink={0} fg={colors.hint} truncate>
-        {footer}
-      </text>
+      {index === 1 && <box height={1} flexShrink={0} />}
+      <box flexGrow={1} flexShrink={1} minHeight={0} overflow="hidden" flexDirection="column">
+        {children}
+      </box>
+      <box height={1} flexShrink={0} overflow="hidden" backgroundColor={colors.overlay}>
+        <text height={1} fg={colors.hint} truncate>
+          {footer}
+        </text>
+      </box>
     </box>
   );
 
@@ -289,8 +308,8 @@ export function ModelChooser({
         confirmDelete ? (
           <DeleteModelDialog
             model={modelLabel(
-              classifierOptions[classifierIndex]?.value?.model ??
-                classifierOptions[classifierIndex]?.value,
+              visibleClassifiers[classifierIndex]?.value?.model ??
+                visibleClassifiers[classifierIndex]?.value,
               modelSettings,
             )}
           />
@@ -321,41 +340,61 @@ export function ModelChooser({
           pane(
             0,
             "01 ROUTER MODEL",
-            <scrollbox
-              ref={classifierScroll}
-              flexGrow={1}
-              minHeight={0}
-              scrollY
-              scrollX={false}
-              contentOptions={{ flexDirection: "column" }}
-            >
-              {classifierOptions.map((option, index) => {
-                const selected = activeControl === 0 && index === classifierIndex;
-                const configured = isClassifierOptionConfigured(option);
-                return (
-                  <box
-                    key={option.name}
-                    id={`router-${index}`}
-                    flexDirection="column"
-                    flexShrink={0}
-                    minWidth={0}
-                    backgroundColor={selected ? colors.selected : undefined}
-                    paddingX={1}
-                  >
-                    <text
-                      fg={configured ? colors.green : selected ? colors.selectedText : colors.text}
-                      bold={selected || configured}
-                      truncate
+            <box flexGrow={1} minHeight={0} flexDirection="column">
+              <box flexShrink={0} flexDirection="column">
+                <box height={1} backgroundColor={colors.border} paddingX={1}>
+                  <input
+                    value={routerQuery}
+                    placeholder="Search router models…"
+                    placeholderColor={colors.text}
+                    focused={activeControl === 0 && !confirmDelete}
+                    onInput={setRouterQuery}
+                    width="100%"
+                  />
+                </box>
+              </box>
+              <box height={1} flexShrink={0} />
+              <scrollbox
+                ref={classifierScroll}
+                flexGrow={1}
+                flexShrink={1}
+                minHeight={0}
+                overflow="hidden"
+                scrollY
+                scrollX={false}
+                contentOptions={{ flexDirection: "column" }}
+              >
+                {visibleClassifiers.map((option, index) => {
+                  const selected = activeControl === 0 && index === classifierIndex;
+                  const configured = isClassifierOptionConfigured(option);
+                  return (
+                    <box
+                      key={option.name}
+                      id={`router-${index}`}
+                      flexDirection="column"
+                      flexShrink={0}
+                      minWidth={0}
+                      backgroundColor={selected ? colors.selected : undefined}
+                      paddingX={1}
                     >
-                      {selected ? "› " : "· "}
-                      {option.name}
-                      {configured ? " ✓" : ""}
-                    </text>
-                  </box>
-                );
-              })}
-            </scrollbox>,
-            loadingClassifier ? "Loading locally…" : "↑↓ select · Enter next",
+                      <text
+                        fg={
+                          configured ? colors.green : selected ? colors.selectedText : colors.text
+                        }
+                        bold={selected || configured}
+                        truncate
+                      >
+                        {selected ? "› " : "· "}
+                        {option.name}
+                        {configured ? " ✓" : ""}
+                      </text>
+                    </box>
+                  );
+                })}
+                {!visibleClassifiers.length && <text fg={colors.muted}>No matching models</text>}
+              </scrollbox>
+            </box>,
+            loadingClassifier ? "Loading locally…" : "Type to filter · ↑↓ select · Enter next",
           )}
         {visible.includes(1) &&
           pane(
@@ -398,42 +437,60 @@ export function ModelChooser({
             2,
             `03 TIER ${tier} WORKER`,
             workerOptions.length ? (
-              <scrollbox
-                ref={workerScroll}
-                flexGrow={1}
-                minHeight={0}
-                scrollY
-                scrollX={false}
-                contentOptions={{ flexDirection: "column" }}
-              >
-                {workerOptions.map((option, index) => {
-                  const selected = activeControl === 2 && index === workerIndex;
-                  const configured =
-                    option.value.provider === configuredWorker?.provider &&
-                    option.value.model === worker;
-                  return (
-                    <box
-                      key={`${option.value.provider}:${option.value.model}`}
-                      flexDirection="column"
-                      flexShrink={0}
-                      backgroundColor={selected ? colors.selected : undefined}
-                      paddingX={1}
-                    >
-                      <text
-                        fg={
-                          configured ? colors.green : selected ? colors.selectedText : colors.text
-                        }
-                        bold={selected || configured}
-                        truncate
+              <box flexGrow={1} minHeight={0} flexDirection="column">
+                <box flexShrink={0} flexDirection="column">
+                  <box height={1} backgroundColor={colors.border} paddingX={1}>
+                    <input
+                      value={workerQuery}
+                      placeholder="Search worker models…"
+                      placeholderColor={colors.text}
+                      focused={activeControl === 2 && !confirmDelete}
+                      onInput={setWorkerQuery}
+                      width="100%"
+                    />
+                  </box>
+                </box>
+                <box height={1} flexShrink={0} />
+                <scrollbox
+                  ref={workerScroll}
+                  flexGrow={1}
+                  flexShrink={1}
+                  minHeight={0}
+                  overflow="hidden"
+                  scrollY
+                  scrollX={false}
+                  contentOptions={{ flexDirection: "column" }}
+                >
+                  {visibleWorkers.map((option, index) => {
+                    const selected = activeControl === 2 && index === workerIndex;
+                    const configured =
+                      option.value.provider === configuredWorker?.provider &&
+                      option.value.model === worker;
+                    return (
+                      <box
+                        key={`${option.value.provider}:${option.value.model}`}
+                        flexDirection="column"
+                        flexShrink={0}
+                        backgroundColor={selected ? colors.selected : undefined}
+                        paddingX={1}
                       >
-                        {selected ? "› " : "· "}
-                        {option.name}
-                        {configured ? " ✓" : ""}
-                      </text>
-                    </box>
-                  );
-                })}
-              </scrollbox>
+                        <text
+                          fg={
+                            configured ? colors.green : selected ? colors.selectedText : colors.text
+                          }
+                          bold={selected || configured}
+                          truncate
+                        >
+                          {selected ? "› " : "· "}
+                          {option.name}
+                          {configured ? " ✓" : ""}
+                        </text>
+                      </box>
+                    );
+                  })}
+                  {!visibleWorkers.length && <text fg={colors.muted}>No matching models</text>}
+                </scrollbox>
+              </box>
             ) : (
               <text fg={colors.muted} wrapMode="word">
                 Download a local model or sign in to OpenAI to choose a worker.
@@ -441,7 +498,7 @@ export function ModelChooser({
             ),
             loadingProviderModels
               ? "Loading providers…"
-              : providerModelError || "↑↓ choose · R refresh",
+              : providerModelError || "Type to filter · ↑↓ choose · Ctrl+R refresh",
           )}
       </box>
       <text
@@ -453,9 +510,9 @@ export function ModelChooser({
         {error || providerModelError || " "}
       </text>
       <text height={1} flexShrink={0} fg={colors.hint} truncate>
-        {`1–3 / Tab choose section · ↑↓ select · Enter apply · ${
+        {`Tab choose section · ←→ edit search · ↑↓ select · Enter apply · ${
           canDeleteSelectedClassifier ? "Ctrl+D delete · " : ""
-        }R refresh · /connect providers · Esc close`}
+        }Ctrl+R refresh · /connect providers · Esc close`}
       </text>
     </Modal>
   );

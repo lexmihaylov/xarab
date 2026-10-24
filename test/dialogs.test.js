@@ -64,9 +64,6 @@ test("model chooser deletes a selected router after confirmation", async () => {
   try {
     await act(async () => view.mockInput.pressArrow("down"));
     await view.flush();
-    await act(async () => view.mockInput.pressKey("d"));
-    await view.flush();
-    assert.doesNotMatch(view.captureCharFrame(), /Delete router\.gguf\? Enter confirm/);
     await act(async () => view.mockInput.pressKey("d", { ctrl: true }));
     await view.flush();
     const confirmation = view.captureCharFrame();
