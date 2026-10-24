@@ -13,7 +13,7 @@ Each document starts with a **Type** tag describing what it records and a **Stat
 
 | Document | Type | Status | Subject |
 | --- | --- | --- | --- |
-| [`openai-response-timeout-recovery.md`](./openai-response-timeout-recovery.md) | `issue` | `planned` | Timeout and retry recovery for stalled OpenAI responses |
+| [`openai-response-timeout-recovery.md`](./openai-response-timeout-recovery.md) | `issue` | `deferred` | Timeout and retry recovery for stalled OpenAI responses |
 | [`responses-websocket-fallback.md`](./responses-websocket-fallback.md) | `issue` | `deferred` | HTTP fallback when a Responses WebSocket continuation is rejected |
 | [`cross-prompt-responses-continuation.md`](./cross-prompt-responses-continuation.md) | `proposal` | `deferred` | Reuse incremental Responses continuation across user prompts |
 

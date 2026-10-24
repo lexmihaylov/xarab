@@ -1,7 +1,7 @@
 # OpenAI response timeout recovery
 
 **Type:** `issue`
-**Status:** `planned`
+**Status:** `deferred`
 
 The OpenAI response path can remain in a generating state if the provider opens or attempts a stream but no data arrives, or if an active stream stops producing chunks. Add timeout recovery without changing the current behavior yet.
 
