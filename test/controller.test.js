@@ -32,27 +32,32 @@ test("controller owns command handling and publishes updated UI state", async (t
 
   await controller.submit("/help");
   assert.match(controller.getState().messages.at(-1).message, /\/route/);
-  assert.match(controller.getState().messages.at(-1).message, /\/openai login/);
+  assert.match(controller.getState().messages.at(-1).message, /\/connect/);
   assert.match(controller.getState().messages.at(-1).message, /\/exit/);
   assert.doesNotMatch(controller.getState().messages.at(-1).message, /\/quit/);
   assert.ok(states.length > 0);
 
-  await controller.submit("/openai status");
-  assert.match(controller.getState().messages.at(-1).message, /not connected/);
-  await controller.submit("/openai login");
-  const loginMessage = controller.getState().messages.at(-1);
-  assert.match(loginMessage.message, /copied to your clipboard/);
-  assert.doesNotMatch(loginMessage.message, /code_challenge=/);
-  assert.match(copiedAuthorizationUrl, /^https:\/\/auth\.openai\.com\/oauth\/authorize\?/);
-  await controller.submit("/openai copy");
-  assert.match(copiedAuthorizationUrl, /^https:\/\/auth\.openai\.com\/oauth\/authorize\?/);
-  assert.match(controller.getState().messages.at(-1).message, /copied/);
-  await controller.submit("/openai use gpt-test-model");
-  assert.match(controller.getState().messages.at(-1).message, /gpt-test-model/);
+  await controller.submit("/connect");
+  assert.equal(controller.getState().providerModal.statuses.openai, "Not connected");
+  assert.equal(controller.getState().providerModal.statuses.openrouter, "No API key saved");
+  await controller.providerAction("openrouter", "complete", "test-secret-key");
   assert.equal(
-    JSON.parse(await readFile(path.join(temporary, "config.json"), "utf8")).openaiModel,
-    "gpt-test-model",
+    controller.getState().providerModal.statuses.openrouter,
+    "API key saved · verify by refreshing models in /route",
   );
+  assert.doesNotMatch(JSON.stringify(controller.getState()), /test-secret-key/);
+  assert.equal(
+    JSON.parse(await readFile(path.join(temporary, "config.json"), "utf8")).apiKeys.openrouter,
+    "test-secret-key",
+  );
+  await controller.providerAction("openrouter", "disconnect");
+  assert.equal(controller.getState().providerModal.statuses.openrouter, "No API key saved");
+  await controller.providerAction("openai", "connect");
+  assert.match(copiedAuthorizationUrl, /^https:\/\/auth\.openai\.com\/oauth\/authorize\?/);
+  assert.equal(controller.getState().providerModal.pending.copied, true);
+  await controller.providerAction("openai", "copy");
+  controller.closeProviderModal();
+  assert.equal(controller.getState().providerModal, null);
 
   await controller.submit("/route");
   assert.equal(controller.getState().modelModal.mode, "chooser");

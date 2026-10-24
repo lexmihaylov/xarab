@@ -127,7 +127,9 @@ export function createOpenAICodexAuth({
     const pending = pendingAuthorization;
     pendingAuthorization = undefined;
     if (!pending || pending.expiresAt <= now())
-      throw new Error("No active sign-in attempt. Run /openai login again.");
+      throw new Error(
+        "No active sign-in attempt. Open Provider Connections (/connect) and start sign-in again.",
+      );
 
     let code;
     let returnedState;
@@ -179,7 +181,7 @@ export function createOpenAICodexAuth({
 
   async function getCredentials() {
     const current = await load();
-    if (!current) throw new Error("Sign in first with /openai login.");
+    if (!current) throw new Error("Sign in first in Provider Connections (/connect).");
     if (current.expires_at > now() + 60_000) return current;
     if (refreshInFlight) return refreshInFlight;
     refreshInFlight = (async () => {

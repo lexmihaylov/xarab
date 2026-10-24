@@ -3,47 +3,11 @@ import WebSocket from "ws";
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const RESPONSES_URL = `${CODEX_BASE_URL}/responses`;
 const WEBSOCKET_RESPONSES_URL = RESPONSES_URL.replace(/^https:/, "wss:");
-const MODELS_URL = new URL(`${CODEX_BASE_URL}/models`);
-MODELS_URL.searchParams.set("client_version", "0.0.0");
-const KNOWN_CODEX_MODELS = [
-  { id: "gpt-6-astra", name: "GPT-6 Astra" },
-  { id: "gpt-6-astra-fast", name: "GPT-6 Astra Fast" },
-  { id: "gpt-6-luna", name: "GPT-6 Luna" },
-  { id: "gpt-6-luna-fast", name: "GPT-6 Luna Fast" },
-  { id: "gpt-6-sol", name: "GPT-6 Sol" },
-  { id: "gpt-6-sol-fast", name: "GPT-6 Sol Fast" },
-  { id: "gpt-6.1-sol", name: "GPT-6.1 Sol" },
-  { id: "gpt-6.1-sol-fast", name: "GPT-6.1 Sol Fast" },
-];
-
 export function createOpenAIResponsesWorkerAdapter({
   getCredentials,
   fetchImpl = fetch,
   webSocketFactory = (url, options) => new WebSocket(url, options),
 }) {
-  async function listModels({ signal } = {}) {
-    const credentials = await getCredentials();
-    const response = await fetchImpl(MODELS_URL, {
-      headers: codexHeaders(credentials, { accept: "application/json" }),
-      signal,
-    });
-    if (!response.ok) throw await responseError(response, "list OpenAI models");
-    const body = await response.json();
-    const entries = Array.isArray(body) ? body : (body.models ?? []);
-    const models = new Map(
-      entries
-        .filter((model) => model.slug || model.model_slug || model.id)
-        .map((model) => {
-          const id = model.slug ?? model.model_slug ?? model.id;
-          return [id, { id, name: model.display_name || model.name || id }];
-        }),
-    );
-    for (const model of KNOWN_CODEX_MODELS) {
-      if (!models.has(model.id)) models.set(model.id, model);
-    }
-    return [...models.values()];
-  }
-
   async function run({
     model,
     instructions,
@@ -260,7 +224,7 @@ export function createOpenAIResponsesWorkerAdapter({
     }
   }
 
-  return { listModels, run };
+  return { run };
 }
 
 async function readResponseStream(response, { onText, onTextDelta, onEvent, signal }) {

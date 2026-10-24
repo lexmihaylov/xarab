@@ -17,9 +17,14 @@ import {
   createLocalLlamaClassifierAdapter,
   createOpenAIResponsesClassifierAdapter,
 } from "./classifier/index.js";
-import { createModelManager } from "./model-manager.js";
+import { createModelManager } from "./local-model-manager.js";
+import { createOpenAIModelManager } from "./openai-model-manager.js";
+import { createOpenRouterModelManager } from "./openrouter-model-manager.js";
 import { createWorker } from "./worker/worker.js";
+import { createOpenRouterWorkerAdapter } from "./worker/openrouter-worker-adapter.js";
+import { createOpenRouterClassifierAdapter } from "./classifier/openrouter-classifier-adapter.js";
 import { createCommandHandler } from "./assistant-command-handler.js";
+import { createProviderConnections } from "./provider-connections.js";
 import { createSessionCompactor } from "./session-compactor.js";
 import { createAutoCompactor } from "./auto-compactor.js";
 
@@ -56,17 +61,21 @@ export function createAssistantController({
   let activeWorkDone;
   let isShuttingDown = false;
   let modelModal = null;
+  let providerModal = null;
+  let providerRequest = 0;
   let activeDownload;
   let nextDownloadId = 0;
   const configStore = createConfigStore(configPath, routingConfigPath);
   const openAIAuth = createOpenAICodexAuth({
     credentialsPath: path.join(path.dirname(configPath), "auth", "openai-chatgpt.json"),
   });
-  const openAIAdapter = openAIAdapterFactory({
+  const openAIModelManager = createOpenAIModelManager({
     getCredentials: () => openAIAuth.getCredentials(),
   });
+  const openRouterModelManager = createOpenRouterModelManager({
+    getApiKey: () => configStore.getApiKey("openrouter"),
+  });
   let worker;
-  let pendingOpenAIAuthUrl;
   let tierClassifier;
 
   let sessionController;
@@ -85,6 +94,7 @@ export function createAssistantController({
       generating: generating || isRouting,
       commandRunning,
       modelModal,
+      providerModal,
       ...sessionController.getState(),
     };
   }
@@ -154,6 +164,8 @@ export function createAssistantController({
   worker = createWorker({
     configStore,
     openAIAdapterFactory,
+    openRouterAdapterFactory: () =>
+      createOpenRouterWorkerAdapter({ getApiKey: () => configStore.getApiKey("openrouter") }),
     localAdapterFactory: localWorkerAdapterFactory,
     getCredentials: () => openAIAuth.getCredentials(),
     workspace,
@@ -172,6 +184,11 @@ export function createAssistantController({
       tierClassifier = classifierFactory({
         getAssignment: () => configStore.getClassifier(),
         localAdapterFactory: localClassifierAdapterFactory,
+        openRouterAdapterFactory: ({ model }) =>
+          createOpenRouterClassifierAdapter({
+            model,
+            getApiKey: () => configStore.getApiKey("openrouter"),
+          }),
         openAIAdapterFactory: ({ model }) =>
           openAIClassifierAdapterFactory({
             getCredentials: () => openAIAuth.getCredentials(),
@@ -184,20 +201,108 @@ export function createAssistantController({
 
   async function loadRouterWorkerModels() {
     if (!modelModal || modelModal.mode !== "chooser") return;
-    modelModal = { ...modelModal, loadingOpenAIModels: true, openAIError: null };
+    modelModal = { ...modelModal, loadingProviderModels: true, providerModelError: null };
+    notify();
+    const results = await Promise.allSettled([
+      openAIModelManager.listModels(),
+      openRouterModelManager.listModels(),
+    ]);
+    if (!modelModal || modelModal.mode !== "chooser") return;
+    const models = [
+      ...modelModal.models.filter((model) => model.provider === "local"),
+      ...results.flatMap((result) => (result.status === "fulfilled" ? result.value : [])),
+    ];
+    const errors = results.flatMap((result, index) =>
+      result.status === "rejected"
+        ? [
+            `${index === 0 ? "OpenAI" : "OpenRouter"}: ${result.reason?.message ?? "Model discovery failed"}`,
+          ]
+        : [],
+    );
+    modelModal = {
+      ...modelModal,
+      models,
+      loadingProviderModels: false,
+      providerModelError: errors.join(" · ") || null,
+    };
+    notify();
+  }
+
+  const providers = createProviderConnections({
+    openAIAuth,
+    clipboardWriter,
+    onOpenAIConnected: loadRouterWorkerModels,
+    onOpenRouterChanged: loadRouterWorkerModels,
+    configStore,
+  });
+
+  async function openProviderModal() {
+    const request = ++providerRequest;
+    modelModal = null;
+    providerModal = {
+      providers: providers.map(({ id, name, method }) => ({ id, name, method })),
+      selected: providers[0]?.id,
+      busy: true,
+    };
+    notify();
+    const statuses = await Promise.all(
+      providers.map(async (provider) => {
+        try {
+          return [provider.id, await provider.status()];
+        } catch (error) {
+          return [provider.id, `Status unavailable: ${error.message}`];
+        }
+      }),
+    );
+    if (request !== providerRequest) return;
+    providerModal = { ...providerModal, statuses: Object.fromEntries(statuses), busy: false };
+    notify();
+  }
+
+  function closeProviderModal() {
+    ++providerRequest;
+    providerModal = null;
+    notify();
+  }
+
+  async function providerAction(id, action, input) {
+    const provider = providers.find((candidate) => candidate.id === id);
+    if (
+      !providerModal ||
+      !provider ||
+      !["connect", "copy", "complete", "disconnect"].includes(action) ||
+      typeof provider[action] !== "function"
+    )
+      return;
+    const request = providerRequest;
+    providerModal = { ...providerModal, busy: true, error: null };
     notify();
     try {
-      const openAIModels = await openAIAdapter.listModels();
-      if (!modelModal || modelModal.mode !== "chooser") return;
-      modelModal = { ...modelModal, openAIModels, loadingOpenAIModels: false };
-    } catch (error) {
-      if (!modelModal || modelModal.mode !== "chooser") return;
-      modelModal = {
-        ...modelModal,
-        openAIModels: [],
-        loadingOpenAIModels: false,
-        openAIError: error.message,
+      const result = await provider[action](input);
+      if (request !== providerRequest) return;
+      const status = await provider.status();
+      providerModal = {
+        ...providerModal,
+        busy: false,
+        statuses: { ...providerModal.statuses, [id]: status },
+        pending:
+          action === "connect"
+            ? { id, url: result.url, copied: result.copied }
+            : action === "copy"
+              ? { ...providerModal.pending, copied: result }
+              : null,
+        feedback:
+          action === "complete"
+            ? provider.method === "apiKey"
+              ? "API key saved locally. Refresh /route to verify available models."
+              : "Connected successfully."
+            : action === "disconnect"
+              ? "Disconnected locally."
+              : null,
       };
+    } catch (error) {
+      if (request !== providerRequest) return;
+      providerModal = { ...providerModal, busy: false, error: error.message };
     }
     notify();
   }
@@ -446,14 +551,6 @@ export function createAssistantController({
     }
     updateDraft({ value: "", cursor: 0 });
     sessionChanged();
-    if (openAIAuth.hasPendingAuthorization() && /^https?:\/\//i.test(text)) {
-      const account = await openAIAuth.completeAuthorization(text);
-      addMessage({
-        type: "system",
-        message: `Codex OAuth connected (account ${account.accountId.slice(0, 8)}…). Use /openai models to select a worker model.`,
-      });
-      return;
-    }
     if (text === "/exit") return onQuit();
     return commandHandler.handle(text);
   }
@@ -556,16 +653,22 @@ export function createAssistantController({
 
   const autoCompactor = createAutoCompactor({
     getMessages: () => messages,
-    setMessages: (next) => { messages = next; },
+    setMessages: (next) => {
+      messages = next;
+    },
     classifyForRouting,
     worker,
     addMessage,
     sessionChanged,
     notify,
     updateStatus,
-    setGenerating: (next) => { generating = next; },
+    setGenerating: (next) => {
+      generating = next;
+    },
     getAbortController: () => abortController,
-    setAbortController: (next) => { abortController = next; },
+    setAbortController: (next) => {
+      abortController = next;
+    },
     isShuttingDown: () => isShuttingDown,
   });
 
@@ -611,21 +714,12 @@ export function createAssistantController({
     setCommandRunning: (next) => {
       commandRunning = next;
     },
-    openAIAuth,
-    clipboardWriter,
-    getPendingOpenAIAuthUrl: () => pendingOpenAIAuthUrl,
-    setPendingOpenAIAuthUrl: (next) => {
-      pendingOpenAIAuthUrl = next;
-    },
-    openAIAdapter,
-    getAbortController: () => abortController,
-    configStore,
-    modelManager,
     openSessionPicker,
     startNewSession,
     saveCurrentSession,
     getActiveSession,
     compactSession: sessionCompactor.compact,
+    openProviderModal,
     openRouteModelModal: () =>
       modelManager.listModels().then((models) => {
         modelModal = {
@@ -635,8 +729,7 @@ export function createAssistantController({
           classifier: configStore.getClassifier(),
           tierWorkers: configStore.get().tierWorkers,
           defaultOpenAIModel: configStore.getOpenAIModel(),
-          openAIModels: [],
-          loadingOpenAIModels: false,
+          loadingProviderModels: false,
           mode: "chooser",
         };
         notify();
@@ -673,6 +766,9 @@ export function createAssistantController({
     renameSession,
     updateDraft,
     closeModelModal,
+    openProviderModal,
+    closeProviderModal,
+    providerAction,
     setRouterClassifier,
     setRouterTierWorker,
     refreshRouterWorkerModels: loadRouterWorkerModels,

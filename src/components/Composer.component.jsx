@@ -8,20 +8,13 @@ const colors = getTheme().colors;
 const commandOptions = [
   { command: "/help", description: "Show available commands" },
   { command: "/route", description: "Configure router and tier workers" },
+  { command: "/connect", description: "Connect to AI providers" },
   { command: "/download", description: "Search Hugging Face for models" },
   { command: "/sessions", description: "Restore, switch, or delete sessions" },
   { command: "/new", description: "Start a new session" },
   { command: "/save", description: "Save or name this session" },
   { command: "/clear", description: "Clear the conversation" },
   { command: "/compact", description: "Summarize and compact the conversation" },
-  { command: "/openai", description: "Show OpenAI command help" },
-  { command: "/openai login", description: "Sign in to ChatGPT" },
-  { command: "/openai copy", description: "Copy the sign-in URL" },
-  { command: "/openai status", description: "Show OpenAI connection status" },
-  { command: "/openai models", description: "List available OpenAI models" },
-  { command: "/openai use", description: "Select an OpenAI model", acceptsArgument: true },
-  { command: "/openai ask", description: "Ask OpenAI directly", acceptsArgument: true },
-  { command: "/openai logout", description: "Sign out of ChatGPT" },
   { command: "/exit", description: "Exit Xarab" },
 ];
 

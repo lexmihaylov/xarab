@@ -5,6 +5,10 @@ import { getTheme } from "../utils/theme-engine.js";
 const colors = getTheme().colors;
 import { Modal } from "./Modal.component.jsx";
 
+function providerLabel(provider) {
+  return { local: "Local", openai: "OpenAI", openrouter: "OpenRouter" }[provider] ?? provider;
+}
+
 function modelLabel(modelPath, settings = {}) {
   return settings[modelPath]?.name?.trim() || modelPath.split(/[\\/]/).at(-1);
 }
@@ -52,17 +56,17 @@ export function ModelChooser({
   modelSettings = {},
   classifier,
   tierWorkers = {},
-  openAIModels = [],
   defaultOpenAIModel,
   loadingClassifier,
-  loadingOpenAIModels,
-  openAIError,
+  loadingProviderModels,
+  providerModelError,
   error,
   onClose,
   onSetClassifier,
   onSetTierWorker,
   onDeleteModel,
   onRefreshWorkerModels,
+  onOpenProviders,
 }) {
   const [tier, setTier] = useState(1);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -76,59 +80,54 @@ export function ModelChooser({
     const options = [
       { name: "Routing disabled", description: "Do not classify requests", value: null },
       ...models.map((model) => ({
-        name: `Local · ${modelLabel(model, modelSettings)}`,
-        description: model,
-        value: model,
-      })),
-      ...openAIModels.map((model) => ({
-        name: `OpenAI · ${model.name}`,
+        name: `${providerLabel(model.provider)} · ${model.name}`,
         description: model.id,
-        value: { provider: "openai", model: model.id },
+        value: { provider: model.provider, model: model.id },
       })),
     ];
     if (
-      classifier?.provider === "openai" &&
-      classifier.model &&
-      !openAIModels.some((model) => model.id === classifier.model)
+      classifier?.provider !== "local" &&
+      classifier?.model &&
+      !models.some(
+        (model) => model.provider === classifier.provider && model.id === classifier.model,
+      )
     )
       options.push({
-        name: `OpenAI · ${classifier.model}`,
+        name: `${providerLabel(classifier.provider)} · ${classifier.model}`,
         description: classifier.model,
         value: classifier,
       });
     return options;
-  }, [classifier, modelSettings, models, openAIModels]);
+  }, [classifier, models]);
   const workerOptions = useMemo(() => {
-    const options = openAIModels.map((model) => ({
-      name: `OpenAI · ${model.name}`,
+    const options = models.map((model) => ({
+      name: `${providerLabel(model.provider)} · ${model.name}`,
       description: model.id,
-      value: { provider: "openai", model: model.id },
+      value: { provider: model.provider, model: model.id },
     }));
-    const known = new Set(openAIModels.map((model) => model.id));
+    const known = new Set(models.map((model) => `${model.provider}:${model.id}`));
     for (const worker of Object.values(tierWorkers)) {
-      if (worker?.provider === "openai" && worker.model && !known.has(worker.model)) {
+      if (
+        worker?.provider !== "local" &&
+        worker?.model &&
+        !known.has(`${worker.provider}:${worker.model}`)
+      ) {
         options.push({
-          name: `OpenAI · ${worker.model}`,
+          name: `${providerLabel(worker.provider)} · ${worker.model}`,
           description: worker.model,
           value: worker,
         });
-        known.add(worker.model);
+        known.add(`${worker.provider}:${worker.model}`);
       }
     }
-    if (defaultOpenAIModel && !known.has(defaultOpenAIModel))
+    if (defaultOpenAIModel && !known.has(`openai:${defaultOpenAIModel}`))
       options.push({
         name: `OpenAI · ${defaultOpenAIModel}`,
         description: defaultOpenAIModel,
         value: { provider: "openai", model: defaultOpenAIModel },
       });
-    for (const model of models)
-      options.push({
-        name: `Local · ${modelLabel(model, modelSettings)}`,
-        description: model,
-        value: { provider: "local", model },
-      });
     return options;
-  }, [defaultOpenAIModel, modelSettings, models, openAIModels, tierWorkers]);
+  }, [defaultOpenAIModel, models, tierWorkers]);
   const configuredWorker = tierWorkers[tier];
   const worker = configuredWorker?.model || defaultOpenAIModel || "Worker not selected";
   const classifierLabel = classifier
@@ -299,7 +298,7 @@ export function ModelChooser({
       }
     >
       <text fg={colors.muted} height={1} flexShrink={0} truncate>
-        Select a router and assign a local or OpenAI worker to each tier.
+        Select a router and assign a provider model to each tier.
       </text>
       <box
         height={3}
@@ -414,7 +413,7 @@ export function ModelChooser({
                     option.value.model === worker;
                   return (
                     <box
-                      key={option.value}
+                      key={`${option.value.provider}:${option.value.model}`}
                       flexDirection="column"
                       flexShrink={0}
                       backgroundColor={selected ? colors.selected : undefined}
@@ -440,21 +439,23 @@ export function ModelChooser({
                 Download a local model or sign in to OpenAI to choose a worker.
               </text>
             ),
-            loadingOpenAIModels ? "Loading OpenAI…" : openAIError || "↑↓ choose · R refresh",
+            loadingProviderModels
+              ? "Loading providers…"
+              : providerModelError || "↑↓ choose · R refresh",
           )}
       </box>
       <text
         height={1}
         flexShrink={0}
-        fg={error || openAIError ? colors.error : colors.muted}
+        fg={error || providerModelError ? colors.error : colors.muted}
         truncate
       >
-        {error || openAIError || " "}
+        {error || providerModelError || " "}
       </text>
       <text height={1} flexShrink={0} fg={colors.hint} truncate>
         {`1–3 / Tab choose section · ↑↓ select · Enter apply · ${
           canDeleteSelectedClassifier ? "Ctrl+D delete · " : ""
-        }R refresh · Esc close`}
+        }R refresh · /connect providers · Esc close`}
       </text>
     </Modal>
   );

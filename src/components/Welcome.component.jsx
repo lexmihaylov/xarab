@@ -11,7 +11,7 @@ const footer = [
   ["Smart routing · workspace-aware tools", "copy"],
   ["", "space"],
   ["Ask a question or describe a change.", "copy"],
-  ["Type !command to run a local command. · Ctrl+O saved sessions", "hint"],
+  ["/connect providers · Ctrl+O saved sessions · !command shell", "hint"],
 ];
 
 // The composer uses four rows at its minimum size and the status bar uses one.

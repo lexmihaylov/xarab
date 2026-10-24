@@ -17,17 +17,24 @@ export function createModelManager({
   getTierClassifier,
   clearTierClassifier,
 }) {
-  async function listModels() {
+  async function listModelPaths() {
     const entries = await readdir(modelsDir, { withFileTypes: true }).catch(() => []);
     return entries
       .filter((entry) => entry.isFile() && entry.name.endsWith(".gguf"))
       .map((entry) => path.join(modelsDir, entry.name));
   }
 
+  async function listModels() {
+    const paths = await listModelPaths();
+    return paths.map((id) => ({
+      provider: "local",
+      id,
+      name: configStore.getModel(id)?.name?.trim() || path.basename(id),
+    }));
+  }
+
   function getModelSettings(models) {
-    return Object.fromEntries(
-      models.map((modelPath) => [modelPath, configStore.getModel(modelPath)]),
-    );
+    return Object.fromEntries(models.map(({ id }) => [id, configStore.getModel(id)]));
   }
 
   async function deleteModel(modelToDelete) {

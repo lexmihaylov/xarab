@@ -4,7 +4,12 @@ import {
   parseTierClassification,
 } from "./instructions.js";
 
-export function createClassifier({ getAssignment, localAdapterFactory, openAIAdapterFactory }) {
+export function createClassifier({
+  getAssignment,
+  localAdapterFactory,
+  openAIAdapterFactory,
+  openRouterAdapterFactory,
+}) {
   const adapters = new Map();
   let disposed = false;
 
@@ -20,6 +25,8 @@ export function createClassifier({ getAssignment, localAdapterFactory, openAIAda
     if (assignment.provider === "local") adapter = localAdapterFactory({ model: assignment.model });
     else if (assignment.provider === "openai")
       adapter = openAIAdapterFactory({ model: assignment.model });
+    else if (assignment.provider === "openrouter")
+      adapter = openRouterAdapterFactory({ model: assignment.model });
     else throw new Error(`Unsupported classifier provider: ${assignment.provider}`);
     adapters.set(key, adapter);
     return adapter;

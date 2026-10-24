@@ -52,6 +52,23 @@ test("starts with empty defaults when the config file does not exist", async () 
   }
 });
 
+test("persists OpenRouter classifier and worker assignments", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-openrouter-routing-"));
+  const configPath = path.join(directory, "config.json");
+  try {
+    const store = createConfigStore(configPath);
+    await store.load();
+    await store.setClassifier({ provider: "openrouter", model: "vendor/router" });
+    await store.setTierWorker(1, { provider: "openrouter", model: "vendor/worker" });
+    const restored = createConfigStore(configPath);
+    await restored.load();
+    assert.deepEqual(restored.getClassifier(), { provider: "openrouter", model: "vendor/router" });
+    assert.deepEqual(restored.getTierWorker(1), { provider: "openrouter", model: "vendor/worker" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("persists local classifier and local or OpenAI tier worker models", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-config-routing-test-"));
   const configPath = path.join(directory, "config.json");

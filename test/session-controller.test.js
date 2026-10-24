@@ -110,14 +110,14 @@ test("restores saved messages and drafts without loading a saved local worker", 
 });
 
 test("keeps OpenAI streamed text and tool activity in event order in one assistant message", async (t) => {
-  const { create } = await setup(t, async ({ onText, tools }) => {
+  const { create, configure } = await setup(t, async ({ onText, tools }) => {
     onText("Before tool. ");
     await tools.list_files.handler({ path: "." });
     onText("After tool.");
   });
   const controller = await create();
-  await controller.submit("/openai use test-model");
-  await controller.submit("/openai ask Inspect the workspace");
+  await configure(controller);
+  await controller.submit("Inspect the workspace");
 
   const assistant = controller.getState().messages.filter((message) => message.type === "agent");
   assert.equal(assistant.length, 1);

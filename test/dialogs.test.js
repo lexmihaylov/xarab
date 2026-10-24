@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
+import { ProviderConnections } from "../src/components/ProviderConnections.component.jsx";
 import { ModelChooser } from "../src/components/ModelChooser.component.jsx";
 import { StatusBar } from "../src/components/StatusBar.component.jsx";
 
@@ -16,10 +17,12 @@ test("model chooser applies the selected router and worker model", async () => {
   const workers = [];
   const view = await render(
     React.createElement(ModelChooser, {
-      models: ["/models/router.gguf"],
+      models: [
+        { provider: "local", id: "/models/router.gguf", name: "router.gguf" },
+        { provider: "openai", id: "gpt-test", name: "Test worker" },
+      ],
       modelSettings: {},
       classifierModel: null,
-      openAIModels: [{ id: "gpt-test", name: "Test worker" }],
       tierWorkers: {},
       onClose() {},
       onSetClassifier: (model) => classifiers.push(model),
@@ -36,8 +39,8 @@ test("model chooser applies the selected router and worker model", async () => {
     await act(async () => view.mockInput.pressEnter());
     await view.flush();
     await act(async () => view.mockInput.pressEnter());
-    assert.deepEqual(classifiers, ["/models/router.gguf"]);
-    assert.deepEqual(workers, [[1, { provider: "openai", model: "gpt-test" }]]);
+    assert.deepEqual(classifiers, [{ provider: "local", model: "/models/router.gguf" }]);
+    assert.deepEqual(workers, [[1, { provider: "local", model: "/models/router.gguf" }]]);
   } finally {
     await view.dispose();
   }
@@ -47,10 +50,9 @@ test("model chooser deletes a selected router after confirmation", async () => {
   const deleted = [];
   const view = await render(
     React.createElement(ModelChooser, {
-      models: ["/models/router.gguf"],
+      models: [{ provider: "local", id: "/models/router.gguf", name: "router.gguf" }],
       modelSettings: {},
       classifierModel: null,
-      openAIModels: [],
       tierWorkers: {},
       onClose() {},
       onSetClassifier() {},
@@ -73,6 +75,53 @@ test("model chooser deletes a selected router after confirmation", async () => {
     assert.match(confirmation, /Enter confirm · Esc cancel/);
     await act(async () => view.mockInput.pressEnter());
     assert.deepEqual(deleted, ["/models/router.gguf"]);
+  } finally {
+    await view.dispose();
+  }
+});
+
+test("provider dialog starts sign-in and offers redirect input", async () => {
+  const actions = [];
+  const props = {
+    providers: [{ id: "openai", name: "OpenAI" }],
+    statuses: { openai: "Not connected" },
+    onClose() {},
+    onAction: (...args) => actions.push(args),
+  };
+  const view = await render(React.createElement(ProviderConnections, props));
+  try {
+    assert.match(view.captureCharFrame(), /PROVIDER CONNECTIONS/);
+    await act(async () => view.mockInput.pressEnter());
+    assert.deepEqual(actions, [["openai", "connect"]]);
+    const pendingView = await render(
+      React.createElement(ProviderConnections, {
+        ...props,
+        pending: { id: "openai", url: "https://example.com/login", copied: true },
+      }),
+    );
+    try {
+      assert.match(pendingView.captureCharFrame(), /Paste redirect URL/);
+      assert.match(pendingView.captureCharFrame(), /Sign-in URL copied/);
+    } finally {
+      await pendingView.dispose();
+    }
+  } finally {
+    await view.dispose();
+  }
+});
+
+test("OpenRouter panel directs users to refresh routing models", async () => {
+  const view = await render(
+    React.createElement(ProviderConnections, {
+      providers: [{ id: "openrouter", name: "OpenRouter", method: "apiKey" }],
+      statuses: { openrouter: "No API key saved" },
+      onClose() {},
+      onAction() {},
+    }),
+  );
+  try {
+    assert.match(view.captureCharFrame(), /Refresh \/route to verify model access/);
+    assert.match(view.captureCharFrame(), /Key entry is visible/);
   } finally {
     await view.dispose();
   }

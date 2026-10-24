@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
 import { createOpenAIResponsesWorkerAdapter } from "../../../src/agent/worker/openai-responses-worker-adapter.js";
+import { createOpenAIModelManager } from "../../../src/agent/openai-model-manager.js";
 
 function streamedResponse(events, { split = false } = {}) {
   const text = `${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`;
@@ -41,7 +42,7 @@ class TestWebSocket extends EventEmitter {
 
 test("lists account models plus known Codex models", async () => {
   const requests = [];
-  const adapter = createOpenAIResponsesWorkerAdapter({
+  const adapter = createOpenAIModelManager({
     getCredentials: async () => ({ access_token: "token-secret", account_id: "account-1" }),
     fetchImpl: async (url, options) => {
       requests.push({ url: String(url), options });
@@ -57,9 +58,9 @@ test("lists account models plus known Codex models", async () => {
 
   const models = await adapter.listModels();
   assert.deepEqual(models.slice(0, 3), [
-    { id: "model-a", name: "Model A" },
-    { id: "model-b", name: "Model B" },
-    { id: "gpt-6-sol", name: "Account GPT-6 Sol" },
+    { provider: "openai", id: "model-a", name: "Model A" },
+    { provider: "openai", id: "model-b", name: "Model B" },
+    { provider: "openai", id: "gpt-6-sol", name: "Account GPT-6 Sol" },
   ]);
   assert.deepEqual(
     models.slice(3).map((model) => model.id),

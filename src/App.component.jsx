@@ -12,6 +12,7 @@ import { UnknownMessage } from "./components/UnknownMessage.component.jsx";
 import { SystemMessage } from "./components/SystemMessage.component.jsx";
 import { ToolMessage } from "./components/ToolMessage.component.jsx";
 import { ModelChooser } from "./components/ModelChooser.component.jsx";
+import { ProviderConnections } from "./components/ProviderConnections.component.jsx";
 import { ModelDownloader } from "./components/ModelDownloader.component.jsx";
 import { SessionBrowser } from "./components/SessionBrowser.component.jsx";
 import { Welcome } from "./components/Welcome.component.jsx";
@@ -88,6 +89,9 @@ export function App({
   onInterrupt,
   onDraftChange,
   onCloseModelModal,
+  onOpenProviders,
+  onCloseProviders,
+  onProviderAction,
   onDownloadSelectedModel,
   onCancelModelDownload,
   onSearchHuggingFace,
@@ -134,7 +138,8 @@ export function App({
   });
 
   useKeyboard((key) => {
-    if (state.modelModal || state.sessionModal || state.sessionOperation) return;
+    if (state.modelModal || state.sessionModal || state.providerModal || state.sessionOperation)
+      return;
     const pageDirection = pageScrollKeys.get(key.name);
     const stepDirection =
       key.ctrl && (key.name === "up" || key.name === "down")
@@ -230,7 +235,7 @@ export function App({
             state.generating ||
             state.commandRunning ||
             state.sessionOperation ||
-            Boolean(state.modelModal || state.sessionModal)
+            Boolean(state.modelModal || state.sessionModal || state.providerModal)
           }
           onSubmit={onSubmit}
           onDraftChange={onDraftChange}
@@ -256,6 +261,13 @@ export function App({
           onRename={(id, title) => void onRenameSession(id, title)}
         />
       )}
+      {state.providerModal && (
+        <ProviderConnections
+          {...state.providerModal}
+          onClose={onCloseProviders}
+          onAction={onProviderAction}
+        />
+      )}
       {state.modelModal?.mode === "chooser" && (
         <ModelChooser
           {...state.modelModal}
@@ -264,6 +276,7 @@ export function App({
           onSetTierWorker={onSetRouterTierWorker}
           onDeleteModel={onDeleteModel}
           onRefreshWorkerModels={onRefreshRouterWorkerModels}
+          onOpenProviders={onOpenProviders}
         />
       )}
       {state.modelModal?.mode === "download" && (

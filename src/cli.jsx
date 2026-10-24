@@ -10,10 +10,17 @@ import { createAssistantController } from "./agent/controller.js";
 import { loadProjectInstructions } from "./agent/worker/instructions.js";
 import { acquireInstanceLock } from "./instance-lock.js";
 import { createMarkdownStyle } from "./utils/markdown-style.js";
+import { createDiagnosticLog } from "./utils/diagnostic-log.js";
 import { App } from "./App.component.jsx";
+
+const diagnostics = createDiagnosticLog(path.join(os.homedir(), ".xarab", "xarab.log"));
+process.on("warning", (warning) => {
+  void diagnostics.append("warning", `${warning.name}: ${warning.message}`);
+});
 
 const releaseInstanceLock = await acquireInstanceLock();
 if (!releaseInstanceLock) {
+  await diagnostics.append("error", "Another Xarab instance is already running for this user.");
   console.error("Another Xarab instance is already running for this user.");
   process.exit(1);
 }
@@ -55,6 +62,9 @@ function renderApp(state) {
       onInterrupt={controller.handleInterrupt}
       onDraftChange={controller.updateDraft}
       onCloseModelModal={controller.closeModelModal}
+      onOpenProviders={controller.openProviderModal}
+      onCloseProviders={controller.closeProviderModal}
+      onProviderAction={controller.providerAction}
       onDownloadSelectedModel={controller.downloadSelectedModel}
       onCancelModelDownload={controller.cancelModelDownload}
       onSearchHuggingFace={controller.searchHuggingFace}
@@ -79,10 +89,18 @@ async function quit() {
   ui.unmount();
   renderer.destroy();
   syntaxStyle.destroy();
-  if (controller.getState().sessionError) console.error(controller.getState().sessionError);
-  await releaseInstanceLock().catch((error) =>
-    console.error(`Could not release Xarab instance lock: ${error.message}`),
-  );
+  if (controller.getState().sessionError) {
+    await diagnostics.append(
+      "error",
+      "Session shutdown reported an error (details displayed on stderr).",
+    );
+    console.error(controller.getState().sessionError);
+  }
+  await releaseInstanceLock().catch(async (error) => {
+    await diagnostics.append("error", `Could not release Xarab instance lock: ${error.message}`);
+    console.error(`Could not release Xarab instance lock: ${error.message}`);
+  });
+  await diagnostics.flush();
 }
 
 controller = createAssistantController({

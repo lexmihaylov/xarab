@@ -6,6 +6,7 @@ import { discoverSkills } from "./skills.js";
 export function createWorker({
   configStore,
   openAIAdapterFactory,
+  openRouterAdapterFactory,
   localAdapterFactory,
   getCredentials,
   workspace,
@@ -30,7 +31,8 @@ export function createWorker({
   }
 
   function validateAssignment(assignment) {
-    if (!assignment || !["openai", "local"].includes(assignment.provider)) return false;
+    if (!assignment || !["openai", "local", "openrouter"].includes(assignment.provider))
+      return false;
     return Boolean(assignment.model);
   }
 
@@ -45,7 +47,9 @@ export function createWorker({
     const adapter =
       assignment.provider === "openai"
         ? openAIAdapterFactory({ getCredentials })
-        : localAdapterFactory();
+        : assignment.provider === "openrouter"
+          ? openRouterAdapterFactory()
+          : localAdapterFactory();
     if (!adapter || typeof adapter.run !== "function")
       throw new TypeError(`The ${assignment.provider} worker adapter must have a run method.`);
     adapters.set(key, adapter);

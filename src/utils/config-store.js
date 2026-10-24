@@ -13,7 +13,7 @@ function normalizeTierWorkers(value) {
   for (const tier of [1, 2, 3]) {
     const worker = value[tier];
     if (!worker || typeof worker !== "object" || Array.isArray(worker)) continue;
-    if (!["openai", "local"].includes(worker.provider)) continue;
+    if (!["openai", "local", "openrouter"].includes(worker.provider)) continue;
     if (worker.provider === "local" && (typeof worker.model !== "string" || !worker.model.trim()))
       continue;
     workers[tier] = {
@@ -33,7 +33,7 @@ function normalizeClassifier(value) {
   if (typeof value === "string" && value.trim())
     return { provider: "local", model: path.resolve(value.trim()) };
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  if (!["local", "openai"].includes(value.provider)) return null;
+  if (!["local", "openai", "openrouter"].includes(value.provider)) return null;
   if (typeof value.model !== "string" || !value.model.trim()) return null;
   return {
     provider: value.provider,
@@ -172,8 +172,8 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
     },
     async setClassifier(assignment) {
       if (assignment !== null) {
-        if (!assignment || !["local", "openai"].includes(assignment.provider))
-          throw new Error("Classifier provider must be openai or local.");
+        if (!assignment || !["local", "openai", "openrouter"].includes(assignment.provider))
+          throw new Error("Classifier provider must be openai, openrouter, or local.");
         if (typeof assignment.model !== "string" || !assignment.model.trim())
           throw new Error("A classifier requires a model.");
       }
@@ -197,8 +197,8 @@ export function createConfigStore(configPath, routingConfigPath = configPath) {
     },
     async setTierWorker(tier, worker) {
       if (![1, 2, 3].includes(tier)) throw new Error("Tier must be 1, 2, or 3.");
-      if (!worker || !["openai", "local"].includes(worker.provider))
-        throw new Error("Tier worker provider must be openai or local.");
+      if (!worker || !["openai", "local", "openrouter"].includes(worker.provider))
+        throw new Error("Tier worker provider must be openai, openrouter, or local.");
       if (typeof worker.model !== "string" || !worker.model.trim())
         throw new Error(
           worker.provider === "local"

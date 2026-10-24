@@ -62,6 +62,26 @@ test("worker uses the OpenAI adapter for the default worker", async () => {
   assert.equal(selected.model, "default-openai");
 });
 
+test("worker dispatches OpenRouter assignments to its adapter", async () => {
+  let selected;
+  const worker = createWorker({
+    configStore: createConfig({ provider: "openrouter", model: "vendor/worker" }),
+    openAIAdapterFactory: () => {
+      throw new Error("wrong adapter");
+    },
+    localAdapterFactory: () => {
+      throw new Error("wrong adapter");
+    },
+    openRouterAdapterFactory: () => ({
+      run: async (request) => {
+        selected = request;
+      },
+    }),
+  });
+  await worker.run({ tier: 2, input: "hello" });
+  assert.equal(selected.model, "vendor/worker");
+});
+
 test("worker disposes an inactive adapter before selecting another assignment", async () => {
   let assignment = { provider: "local", model: "first.gguf" };
   const disposed = [];
