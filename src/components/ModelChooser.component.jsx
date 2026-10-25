@@ -4,6 +4,7 @@ import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
 import { Modal } from "./Modal.component.jsx";
+import { MarqueeText } from "./MarqueeText.component.jsx";
 
 function providerLabel(provider) {
   return { local: "Local", openai: "OpenAI", openrouter: "OpenRouter" }[provider] ?? provider;
@@ -377,17 +378,15 @@ export function ModelChooser({
                       backgroundColor={selected ? colors.selected : undefined}
                       paddingX={1}
                     >
-                      <text
+                      <MarqueeText
                         fg={
                           configured ? colors.green : selected ? colors.selectedText : colors.text
                         }
                         bold={selected || configured}
-                        truncate
+                        active={selected && !confirmDelete}
                       >
-                        {selected ? "› " : "· "}
-                        {option.name}
-                        {configured ? " ✓" : ""}
-                      </text>
+                        {`${selected ? "› " : "· "}${option.name}${configured ? " ✓" : ""}`}
+                      </MarqueeText>
                     </box>
                   );
                 })}
@@ -418,14 +417,13 @@ export function ModelChooser({
                     backgroundColor={selected ? colors.selected : undefined}
                     paddingX={1}
                   >
-                    <text
+                    <MarqueeText
                       fg={configured ? colors.green : selected ? colors.selectedText : colors.text}
                       bold={selected || configured}
-                      truncate
+                      active={selected && !confirmDelete}
                     >
-                      {selected ? "› " : "· "}Tier {number} ·{" "}
-                      {tierWorkers[number]?.model || defaultOpenAIModel || "Not configured"}
-                    </text>
+                      {`${selected ? "› " : "· "}Tier ${number} · ${tierWorkers[number]?.model || defaultOpenAIModel || "Not configured"}`}
+                    </MarqueeText>
                   </box>
                 );
               })}
@@ -474,17 +472,15 @@ export function ModelChooser({
                         backgroundColor={selected ? colors.selected : undefined}
                         paddingX={1}
                       >
-                        <text
+                        <MarqueeText
                           fg={
                             configured ? colors.green : selected ? colors.selectedText : colors.text
                           }
                           bold={selected || configured}
-                          truncate
+                          active={selected && !confirmDelete}
                         >
-                          {selected ? "› " : "· "}
-                          {option.name}
-                          {configured ? " ✓" : ""}
-                        </text>
+                          {`${selected ? "› " : "· "}${option.name}${configured ? " ✓" : ""}`}
+                        </MarqueeText>
                       </box>
                     );
                   })}
