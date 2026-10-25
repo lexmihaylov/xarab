@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import "./runtime-environment.js";
 import React, { useEffect, useState } from "react";
 import os from "node:os";
 import path from "node:path";
