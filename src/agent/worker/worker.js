@@ -9,6 +9,7 @@ export function createWorker({
   openRouterAdapterFactory,
   localAdapterFactory,
   getCredentials,
+  getOpenAIStatus,
   workspace,
   instructionFiles,
   toolRuntime,
@@ -105,7 +106,12 @@ export function createWorker({
 
   async function run({ tier, history, input, onTierAdjustment, ...request }) {
     const skills = await discoverSkills(workspace);
-    const { definitions, tools } = createToolRegistry({ ...registryOptions, skills });
+    const imageConnected = getOpenAIStatus ? (await getOpenAIStatus()).connected : false;
+    const { definitions, tools } = createToolRegistry({
+      ...registryOptions,
+      skills,
+      imageCredentials: imageConnected ? getCredentials : undefined,
+    });
     const tierAdjustmentTool = createTierAdjustmentTool({
       activeTier: tier,
       requestAdjustment: onTierAdjustment,

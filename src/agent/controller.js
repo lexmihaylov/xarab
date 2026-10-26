@@ -168,6 +168,7 @@ export function createAssistantController({
       createOpenRouterWorkerAdapter({ getApiKey: () => configStore.getApiKey("openrouter") }),
     localAdapterFactory: localWorkerAdapterFactory,
     getCredentials: () => openAIAuth.getCredentials(),
+    getOpenAIStatus: () => openAIAuth.getStatus(),
     workspace,
     instructionFiles,
     toolRuntime: {

@@ -9,11 +9,13 @@ import { createWebsearchTool } from "./tools/web-search-tool.js";
 import { createWebfetchTool } from "./tools/web-fetch-tool.js";
 import { createShellTool } from "./tools/shell-tool.js";
 import { createSkillTool } from "./tools/skill-tool.js";
+import { createGenerateImageTool } from "./tools/generate-image-tool.js";
 
 export function createToolRegistry({
   workspace,
   skills = new Map(),
   configStore,
+  imageCredentials,
   onToolEvent,
   getMessages,
   getCurrentAgentMessage,
@@ -61,6 +63,9 @@ export function createToolRegistry({
       onEvent: (event) => onToolEvent("run_command", event),
     }),
     ...(skills.size ? { skill: createSkillTool(skills) } : {}),
+    ...(imageCredentials
+      ? { generate_image: createGenerateImageTool({ workspace, getCredentials: imageCredentials }) }
+      : {}),
   };
 
   const tools = Object.fromEntries(
@@ -68,7 +73,7 @@ export function createToolRegistry({
       name,
       {
         ...definition,
-        async handler(params, { callId } = {}) {
+        async handler(params, { callId, signal } = {}) {
           const part = {
             type: "tool",
             id: Symbol(name),
@@ -76,7 +81,10 @@ export function createToolRegistry({
             toolName: name,
             params: { ...(params ?? {}) },
             label: toolProgressLabel(name, params),
-            title: name === "skill" ? `Loading skill: ${safeToolDetail(params?.name)}` : toolProgressLabel(name, params),
+            title:
+              name === "skill"
+                ? `Loading skill: ${safeToolDetail(params?.name)}`
+                : toolProgressLabel(name, params),
             summary: toolProgressSummary(name, params),
             status: "running",
           };
@@ -94,7 +102,7 @@ export function createToolRegistry({
             await new Promise((resolve) => setImmediate(resolve));
           }
           try {
-            const rawResult = await definition.handler(params);
+            const rawResult = await definition.handler(params, { signal });
             const result = normalizeToolResult(rawResult);
             part.status = result.ok ? "complete" : "error";
             part.result = storedToolResult(result);
@@ -180,6 +188,7 @@ function toolProgressLabel(name, params = {}) {
   if (name === "write") return `Writing ${safeToolDetail(params.path)}`;
   if (name === "websearch") return `Searching the web for “${safeToolDetail(params.query)}”`;
   if (name === "webfetch") return `Fetching ${safeToolDetail(params.url)}`;
+  if (name === "generate_image") return `Generating image in ${safeToolDetail(params.folder)}`;
   return `Running ${name}`;
 }
 
