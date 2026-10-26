@@ -1,32 +1,45 @@
 import { randomUUID } from "node:crypto";
-import { open, unlink } from "node:fs/promises";
+import { open, readFile, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 import { resolveWorkspaceFile } from "../../../utils/workspace-file-utils.js";
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
-export function createGenerateImageTool({
+export function createOpenAIImageGenerationTool(options) {
+  return createOpenAIImageTool({ ...options, edit: false });
+}
+
+export function createOpenAIImageEditTool(options) {
+  return createOpenAIImageTool({ ...options, edit: true });
+}
+
+function createOpenAIImageTool({
   workspace,
   getCredentials,
   fetchImpl = fetch,
   timeoutMs = 240000,
+  edit,
 }) {
   return {
-    description:
-      "Generate a PNG image using the connected Codex account (consumes usage). Provide a prompt and a workspace-relative folder; a new uniquely named PNG is saved there. Never writes outside the workspace.",
+    description: edit
+      ? "Edit a workspace PNG or JPEG with the connected Codex account (consumes usage). Provide a workspace-relative input path, prompt, and output folder. Saves a new PNG without overwriting the original."
+      : "Generate a PNG image using the connected Codex account (consumes usage). Provide a prompt and a workspace-relative folder; a new uniquely named PNG is saved there. Never writes outside the workspace.",
     params: {
       type: "object",
       properties: {
+        ...(edit
+          ? { path: { type: "string", description: "Workspace-relative input PNG or JPEG path." } }
+          : {}),
         prompt: { type: "string", description: "Image description." },
         folder: {
           type: "string",
           description: "Workspace-relative destination folder (created if necessary).",
         },
       },
-      required: ["prompt", "folder"],
+      required: edit ? ["path", "prompt", "folder"] : ["prompt", "folder"],
     },
-    async handler({ prompt, folder } = {}, { signal } = {}) {
+    async handler({ path: inputPath, prompt, folder } = {}, { signal } = {}) {
       if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 10000)
         return { ok: false, output: "Error: provide a prompt of at most 10000 characters." };
       if (
@@ -40,11 +53,32 @@ export function createGenerateImageTool({
           output: "Error: provide a workspace-relative folder without traversal.",
         };
       try {
+        let images;
+        if (edit) {
+          if (
+            typeof inputPath !== "string" ||
+            !inputPath.trim() ||
+            path.isAbsolute(inputPath) ||
+            inputPath.split(/[\\/]/).includes("..")
+          )
+            return { ok: false, output: "Error: provide a workspace-relative input image path." };
+          const source = await resolveWorkspaceFile(workspace, inputPath);
+          if (!source.exists) return { ok: false, output: "Error: input image does not exist." };
+          if ((await stat(source.target)).size > MAX_IMAGE_BYTES)
+            return { ok: false, output: "Error: input image exceeds size limit." };
+          const input = await readFile(source.target);
+          const png = input.subarray(0, 8).equals(PNG_SIGNATURE);
+          const jpeg = input[0] === 0xff && input[1] === 0xd8 && input[2] === 0xff;
+          if (!png && !jpeg) return { ok: false, output: "Error: input must be PNG or JPEG." };
+          images = [
+            { image_url: `data:image/${png ? "png" : "jpeg"};base64,${input.toString("base64")}` },
+          ];
+        }
         const credentials = await getCredentials();
         const timeout = AbortSignal.timeout(timeoutMs);
         const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
         const response = await fetchImpl(
-          "https://chatgpt.com/backend-api/codex/images/generations",
+          `https://chatgpt.com/backend-api/codex/images/${edit ? "edits" : "generations"}`,
           {
             method: "POST",
             headers: {
@@ -58,6 +92,7 @@ export function createGenerateImageTool({
             body: JSON.stringify({
               model: "gpt-image-2",
               prompt,
+              ...(edit ? { images } : {}),
               n: 1,
               size: "1024x1024",
               quality: "low",

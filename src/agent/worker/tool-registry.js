@@ -9,7 +9,10 @@ import { createWebsearchTool } from "./tools/web-search-tool.js";
 import { createWebfetchTool } from "./tools/web-fetch-tool.js";
 import { createShellTool } from "./tools/shell-tool.js";
 import { createSkillTool } from "./tools/skill-tool.js";
-import { createGenerateImageTool } from "./tools/generate-image-tool.js";
+import {
+  createOpenAIImageEditTool,
+  createOpenAIImageGenerationTool,
+} from "./tools/openai-image-tool.js";
 
 export function createToolRegistry({
   workspace,
@@ -64,7 +67,16 @@ export function createToolRegistry({
     }),
     ...(skills.size ? { skill: createSkillTool(skills) } : {}),
     ...(imageCredentials
-      ? { generate_image: createGenerateImageTool({ workspace, getCredentials: imageCredentials }) }
+      ? {
+          generate_image: createOpenAIImageGenerationTool({
+            workspace,
+            getCredentials: imageCredentials,
+          }),
+          edit_image: createOpenAIImageEditTool({
+            workspace,
+            getCredentials: imageCredentials,
+          }),
+        }
       : {}),
   };
 
@@ -189,6 +201,7 @@ function toolProgressLabel(name, params = {}) {
   if (name === "websearch") return `Searching the web for “${safeToolDetail(params.query)}”`;
   if (name === "webfetch") return `Fetching ${safeToolDetail(params.url)}`;
   if (name === "generate_image") return `Generating image in ${safeToolDetail(params.folder)}`;
+  if (name === "edit_image") return `Editing ${safeToolDetail(params.path)}`;
   return `Running ${name}`;
 }
 
