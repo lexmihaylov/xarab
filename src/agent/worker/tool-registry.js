@@ -13,6 +13,7 @@ import {
   createOpenAIImageEditTool,
   createOpenAIImageGenerationTool,
 } from "./tools/openai-image-tool.js";
+import { createOpenAIImageAnalysisTool } from "./tools/openai-image-analysis-tool.js";
 
 export function createToolRegistry({
   workspace,
@@ -73,6 +74,10 @@ export function createToolRegistry({
             getCredentials: imageCredentials,
           }),
           edit_image: createOpenAIImageEditTool({
+            workspace,
+            getCredentials: imageCredentials,
+          }),
+          analyze_image: createOpenAIImageAnalysisTool({
             workspace,
             getCredentials: imageCredentials,
           }),
@@ -202,6 +207,7 @@ function toolProgressLabel(name, params = {}) {
   if (name === "webfetch") return `Fetching ${safeToolDetail(params.url)}`;
   if (name === "generate_image") return `Generating image in ${safeToolDetail(params.folder)}`;
   if (name === "edit_image") return `Editing ${safeToolDetail(params.path)}`;
+  if (name === "analyze_image") return `Analyzing ${safeToolDetail(params.path)}`;
   return `Running ${name}`;
 }
 
