@@ -258,8 +258,8 @@ export function AskQuestionsDialog({ questions, onAnswer }) {
         {focus === "editor"
           ? "Enter newline · Tab actions · Esc cancel"
           : focus === "actions"
-            ? "←→ action · Enter activate · Tab focus · Esc cancel"
-            : "↑↓ move · Space/Enter select · Tab focus · Esc cancel"}
+            ? "←→ action · Enter select · Tab · Esc cancel"
+            : "↑↓ move · Enter select · Tab · Esc cancel"}
       </text>
     </Modal>
   );

@@ -108,7 +108,7 @@ test("renders multiple fenced code blocks without exposing markdown markers", as
   }
 });
 
-test("keeps streamed markdown concealed while code fences arrive incrementally", async () => {
+test("keeps the unfinished block literal until generation ends", async () => {
   let updateState;
   const initialText = "# Example\n\n```js";
   const streamedText = [
@@ -158,17 +158,17 @@ test("keeps streamed markdown concealed while code fences arrive incrementally",
   const view = await testRender(React.createElement(Harness), { width: 80, height: 24 });
   await view.flush();
   try {
-    assert.doesNotMatch(view.captureCharFrame(), /```js|```/);
+    assert.match(view.captureCharFrame(), /```js/);
 
     updateResponse(streamedText, true);
     await view.flush();
     let frame = view.captureCharFrame();
-    assert.doesNotMatch(frame, /```js|```/);
+    assert.match(frame, /```js/);
 
     updateResponse(completedText, true);
     await view.flush();
     frame = view.captureCharFrame();
-    assert.doesNotMatch(frame, /```js|```/);
+    assert.match(frame, /```js/);
 
     updateResponse(completedText, false);
     await view.flush();

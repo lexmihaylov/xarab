@@ -3,6 +3,7 @@ import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
 import { MessageCard } from "./MessageCard.component.jsx";
+import { splitStreamingMarkdown } from "../utils/streaming-markdown.js";
 
 export function AssistantMessage({ message, responseText: providedText, generating, syntaxStyle }) {
   // A responseText prop is used for live timeline parts so text emitted after a
@@ -16,18 +17,26 @@ export function AssistantMessage({ message, responseText: providedText, generati
           ?.filter((part) => part?.type === "text")
           .map((part) => (typeof part.text === "string" ? part.text : String(part.text ?? "")))
           .join("") || "");
+  const { markdown, tail } = splitStreamingMarkdown(responseText, generating);
   return (
     <box flexDirection="column" width="100%" minWidth={0} flexGrow={0} flexShrink={0}>
       {responseText.length > 0 && (
         <MessageCard bordered={false}>
-          <markdown
-            content={responseText}
-            syntaxStyle={syntaxStyle}
-            conceal
-            concealCode
-            streaming={Boolean(generating)}
-            selectable
-          />
+          {markdown && (
+            <markdown
+              content={markdown}
+              syntaxStyle={syntaxStyle}
+              conceal
+              concealCode
+              streaming={Boolean(generating)}
+              selectable
+            />
+          )}
+          {tail && (
+            <text fg={colors.text} selectable>
+              {tail}
+            </text>
+          )}
         </MessageCard>
       )}
       {!responseText && generating && (

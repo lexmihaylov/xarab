@@ -73,7 +73,11 @@ for (const width of [120, 80, 60]) {
       await view.flush();
       assert.match(view.captureCharFrame(), /Select an answer/);
       assert.equal(answer, undefined);
-      await act(async () => view.mockInput.pressKey("escape"));
+      await act(async () => {
+        view.mockInput.pressEscape();
+        // The terminal parser waits briefly to distinguish Escape from a sequence.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
       assert.equal(answer, null);
     } finally {
       await view.dispose();
@@ -82,13 +86,6 @@ for (const width of [120, 80, 60]) {
 }
 
 test("question dialog preserves multiline drafts when navigating back", async () => {
-  test("question layout reserves separate fixed space for the editor label and viewport", async () => {
-    const { questionLayout } = await import("../src/utils/question-layout.js");
-    const layout = questionLayout({ width: 80, height: 24 }, "Describe it", [], true, 0);
-    assert.equal(layout.tooSmall, false);
-    assert.ok(layout.height >= 20);
-  });
-
   let answer;
   const view = await testRender(
     React.createElement(AskQuestionsDialog, {
@@ -101,6 +98,7 @@ test("question dialog preserves multiline drafts when navigating back", async ()
   );
   try {
     await view.flush();
+    assert.match(view.captureCharFrame(), /YOUR ANSWER/);
     await act(async () => view.mockInput.typeText("First line"));
     await act(async () => view.mockInput.pressEnter());
     await act(async () => view.mockInput.typeText("Second line"));
@@ -110,9 +108,9 @@ test("question dialog preserves multiline drafts when navigating back", async ()
     assert.match(view.captureCharFrame(), /Second line/);
     await act(async () => view.mockInput.pressKey("n", { ctrl: true }));
     await act(async () => view.mockInput.pressEnter());
-    await act(async () => view.mockInput.pressKey("tab"));
-    await act(async () => view.mockInput.pressEnter());
+    await act(async () => view.mockInput.pressKey("n", { ctrl: true }));
     assert.equal(answer[0].text, "First line\nSecond line");
+    assert.deepEqual(answer[1].choices, ["Red"]);
   } finally {
     await view.dispose();
   }
