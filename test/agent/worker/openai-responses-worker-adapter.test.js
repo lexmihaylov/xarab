@@ -72,6 +72,7 @@ test("lists account models plus known Codex models", async () => {
       "gpt-6-sol-fast",
       "gpt-6.1-sol",
       "gpt-6.1-sol-fast",
+      "gpt-6.1-terra",
     ],
   );
   assert.equal(requests[0].options.headers.authorization, "Bearer token-secret");

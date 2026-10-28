@@ -9,6 +9,7 @@ const KNOWN_CODEX_MODELS = [
   { id: "gpt-6-sol-fast", name: "GPT-6 Sol Fast" },
   { id: "gpt-6.1-sol", name: "GPT-6.1 Sol" },
   { id: "gpt-6.1-sol-fast", name: "GPT-6.1 Sol Fast" },
+  { id: "gpt-6.1-terra", name: "GPT-6.1 Terra" },
 ];
 
 export function createOpenAIModelManager({ getCredentials, fetchImpl = fetch }) {
