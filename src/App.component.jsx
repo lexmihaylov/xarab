@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
+import { AskQuestionsDialog } from "./components/AskQuestionsDialog.component.jsx";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
 import { copyToClipboard } from "./utils/clipboard.js";
 import { Composer } from "./components/Composer.component.jsx";
@@ -85,6 +86,7 @@ export function App({
   state,
   syntaxStyle,
   onSubmit,
+  onAnswerQuestions,
   onStopGeneration,
   onInterrupt,
   onDraftChange,
@@ -138,7 +140,13 @@ export function App({
   });
 
   useKeyboard((key) => {
-    if (state.modelModal || state.sessionModal || state.providerModal || state.sessionOperation)
+    if (
+      state.questionDialog ||
+      state.modelModal ||
+      state.sessionModal ||
+      state.providerModal ||
+      state.sessionOperation
+    )
       return;
     const pageDirection = pageScrollKeys.get(key.name);
     const stepDirection =
@@ -235,11 +243,13 @@ export function App({
             state.generating ||
             state.commandRunning ||
             state.sessionOperation ||
-            Boolean(state.modelModal || state.sessionModal || state.providerModal)
+            Boolean(
+              state.questionDialog || state.modelModal || state.sessionModal || state.providerModal,
+            )
           }
           onSubmit={onSubmit}
           onDraftChange={onDraftChange}
-          onStopGeneration={onStopGeneration}
+          onStopGeneration={state.questionDialog ? undefined : onStopGeneration}
           onSessions={onOpenSessions}
         />
         <StatusBar
@@ -249,6 +259,9 @@ export function App({
         />
       </box>
       <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
+      {state.questionDialog && (
+        <AskQuestionsDialog {...state.questionDialog} onAnswer={onAnswerQuestions} />
+      )}
       {state.sessionModal && (
         <SessionBrowser
           {...state.sessionModal}

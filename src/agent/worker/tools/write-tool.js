@@ -3,7 +3,7 @@ import {
   replaceWorkspaceText,
   resolveWorkspaceFile,
 } from "../../../utils/workspace-file-utils.js";
-import { formatChangeDiff } from "../../../utils/change-diff.js";
+import { formatChangePreview } from "../../../utils/change-diff.js";
 
 export function createWriteTool({ workspace = process.cwd(), onEvent = () => {} } = {}) {
   return {
@@ -43,7 +43,7 @@ export function createWriteTool({ workspace = process.cwd(), onEvent = () => {} 
           path: displayPath,
           bytes: Buffer.byteLength(content),
           created: !targetInfo.exists,
-          diffText: formatChangeDiff(displayPath, previous, content),
+          ...formatChangePreview(displayPath, previous, content),
         });
         return `${targetInfo.exists ? "Wrote" : "Created"} ${displayPath} (${Buffer.byteLength(content)} bytes).`;
       } catch (error) {

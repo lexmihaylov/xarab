@@ -60,6 +60,7 @@ export function createWorker({
   const registryOptions = {
     workspace,
     configStore,
+    requestQuestions: toolRuntime?.requestQuestions,
     onToolEvent: toolRuntime?.onToolEvent ?? (() => {}),
     getMessages: toolRuntime?.getMessages ?? (() => []),
     getCurrentAgentMessage: toolRuntime?.getCurrentAgentMessage ?? (() => undefined),

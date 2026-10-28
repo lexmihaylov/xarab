@@ -41,7 +41,8 @@ export function ToolMessage({ part, syntaxStyle }) {
       error={isError}
     >
       {diffText && (
-        <box padding={1} marginTop={1} backgroundColor={colors.background}>
+        <box flexDirection="column" padding={1} marginTop={1} backgroundColor={colors.background}>
+          {part.diffNotice && <text fg={colors.muted}>{part.diffNotice}</text>}
           <diff
             diff={diffText}
             view="unified"

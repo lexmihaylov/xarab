@@ -4,7 +4,7 @@ import {
   replaceWorkspaceText,
   resolveWorkspaceFile,
 } from "../../../utils/workspace-file-utils.js";
-import { formatChangeDiff } from "../../../utils/change-diff.js";
+import { formatChangePreview } from "../../../utils/change-diff.js";
 
 export function createEditTool({ workspace = process.cwd(), onEvent = () => {} } = {}) {
   return {
@@ -69,7 +69,7 @@ export function createEditTool({ workspace = process.cwd(), onEvent = () => {} }
           type: "edited",
           path: displayPath,
           replacements: replaceAll ? occurrences : 1,
-          diffText: formatChangeDiff(displayPath, original, updated),
+          ...formatChangePreview(displayPath, original, updated),
         });
         return `Edited ${displayPath} (${replaceAll ? occurrences : 1} replacement${occurrences === 1 ? "" : "s"}).`;
       } catch (error) {

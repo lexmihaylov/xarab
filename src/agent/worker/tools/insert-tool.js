@@ -4,7 +4,7 @@ import {
   replaceWorkspaceText,
   resolveWorkspaceFile,
 } from "../../../utils/workspace-file-utils.js";
-import { formatChangeDiff } from "../../../utils/change-diff.js";
+import { formatChangePreview } from "../../../utils/change-diff.js";
 
 export function createInsertTool({ workspace = process.cwd(), onEvent = () => {}, position }) {
   if (position !== "before" && position !== "after")
@@ -79,7 +79,7 @@ export function createInsertTool({ workspace = process.cwd(), onEvent = () => {}
           path: displayPath,
           action: `Inserted ${direction}`,
           replacements: 1,
-          diffText: formatChangeDiff(displayPath, original, updated),
+          ...formatChangePreview(displayPath, original, updated),
         });
         return `Inserted ${direction} anchor in ${displayPath}.`;
       } catch (error) {

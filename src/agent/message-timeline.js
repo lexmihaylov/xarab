@@ -99,11 +99,13 @@ export function createMessageTimeline({
         ? "1 anchor insertion"
         : `${event.replacements} replacement${event.replacements === 1 ? "" : "s"}`;
       part.diffText = event.diffText;
+      part.diffNotice = event.diffNotice;
       part.status = "complete";
     } else if (event.type === "written") {
       part.title = `${event.created ? "Created" : "Wrote"} ${event.path}`;
       part.summary = `${event.bytes} bytes`;
       part.diffText = event.diffText;
+      part.diffNotice = event.diffNotice;
       part.status = "complete";
     } else if (event.type === "read") {
       part.status = "complete";

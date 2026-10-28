@@ -1,3 +1,4 @@
+import { createQuestionRequest } from "./question-request.js";
 import os from "node:os";
 import path from "node:path";
 import { getTheme } from "../utils/theme-engine.js";
@@ -79,6 +80,7 @@ export function createAssistantController({
   let tierClassifier;
 
   let sessionController;
+  const questionRequest = createQuestionRequest({ notify });
 
   function getState() {
     return {
@@ -93,6 +95,7 @@ export function createAssistantController({
       status,
       generating: generating || isRouting,
       commandRunning,
+      questionDialog: questionRequest.getState(),
       modelModal,
       providerModal,
       ...sessionController.getState(),
@@ -172,6 +175,7 @@ export function createAssistantController({
     workspace,
     instructionFiles,
     toolRuntime: {
+      requestQuestions: questionRequest.request,
       onToolEvent,
       getMessages: () => messages,
       getCurrentAgentMessage: () => currentAgentMessage,
@@ -587,6 +591,7 @@ export function createAssistantController({
   function shutdown() {
     if (shutdownPromise) return shutdownPromise;
     isShuttingDown = true;
+    questionRequest.respond(null);
     abortController?.abort();
     activeDownload?.controller.abort();
     shutdownPromise = (async () => {
@@ -787,6 +792,7 @@ export function createAssistantController({
         }),
       );
     },
+    answerQuestions: questionRequest.respond,
     stopGeneration,
     handleInterrupt,
     shutdown,

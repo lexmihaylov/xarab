@@ -1,3 +1,4 @@
+import { createAskQuestionsTool } from "./tools/ask-questions-tool.js";
 import { createReadFileTool } from "./tools/read-file-tool.js";
 import { createListFilesTool } from "./tools/list-files-tool.js";
 import { createSearchFilesTool } from "./tools/search-files-tool.js";
@@ -20,6 +21,7 @@ export function createToolRegistry({
   skills = new Map(),
   configStore,
   imageCredentials,
+  requestQuestions,
   onToolEvent,
   getMessages,
   getCurrentAgentMessage,
@@ -27,6 +29,7 @@ export function createToolRegistry({
   notify,
 }) {
   const definitions = {
+    ...(requestQuestions ? { ask_questions: createAskQuestionsTool({ requestQuestions }) } : {}),
     read_file: createReadFileTool({
       workspace,
       onEvent: (event) => onToolEvent("read_file", event),
@@ -193,6 +196,7 @@ function safeToolDetail(value) {
 }
 
 function toolProgressLabel(name, params = {}) {
+  if (name === "ask_questions") return "Asking user questions";
   if (name === "run_command") return `Executing ${safeToolDetail(params.command)}`;
   if (name === "read_file") return `Reading ${safeToolDetail(params.path)}`;
   if (name === "list_files") return `Listing ${safeToolDetail(params.path || ".")}`;

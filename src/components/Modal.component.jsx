@@ -12,6 +12,7 @@ export function Modal({
   width = "78%",
   height = "70%",
   fullScreen = false,
+  boundedBackdrop = false,
   dimmed = false,
 }) {
   return (
@@ -22,12 +23,13 @@ export function Modal({
       bottom={0}
       left={0}
       zIndex={100}
-      backgroundColor={colors.overlay}
+      backgroundColor={boundedBackdrop ? undefined : colors.overlay}
       alignItems={fullScreen ? "stretch" : "center"}
       justifyContent={fullScreen ? "flex-start" : "center"}
     >
       <box
         flexDirection="column"
+        backgroundColor={boundedBackdrop ? colors.overlay : undefined}
         width={fullScreen ? "100%" : width}
         height={fullScreen ? "100%" : height}
         paddingX={fullScreen ? 2 : 2}
