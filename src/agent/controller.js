@@ -548,6 +548,9 @@ export function createAssistantController({
       if (!classification?.valid || ![1, 2, 3].includes(classification.tier))
         throw new Error(classification?.error || "The classifier returned an invalid tier.");
       return { classification, worker: worker.getTierInfo(classification.tier) };
+    } catch (error) {
+      if (routingController.signal.aborted) return { cancelled: true };
+      throw error;
     } finally {
       isRouting = false;
       generating = false;

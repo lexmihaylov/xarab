@@ -107,7 +107,14 @@ export function createCommandHandler({
       message: text,
       classification: { status: "classifying" },
     });
-    const route = await classifyForRouting(text);
+    let route;
+    try {
+      route = await classifyForRouting(text);
+    } catch (error) {
+      userMessage.classification = { status: "error" };
+      notify();
+      throw error;
+    }
     if (route?.cancelled) {
       userMessage.classification = { status: "cancelled" };
       notify();

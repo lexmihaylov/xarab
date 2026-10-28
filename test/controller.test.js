@@ -204,6 +204,62 @@ test("controller reassesses remaining work and records adjustment outcomes", asy
   }
 });
 
+test("classification failure and cancellation clear the message spinner", async (t) => {
+  for (const outcome of ["throw", "invalid", "cancel", "success"]) {
+    await t.test(outcome, async (t) => {
+      const temporary = await mkdtemp("/tmp/opencode/xarab-classification-");
+      t.after(() => rm(temporary, { recursive: true, force: true }));
+      let started;
+      const ready = new Promise((resolve) => (started = resolve));
+      const states = [];
+      const controller = createAssistantController({
+        root: temporary,
+        workspace: temporary,
+        instructionFiles: [],
+        configPath: path.join(temporary, "config.json"),
+        onStateChange: (state) =>
+          states.push(state.messages.map((message) => message.classification?.status)),
+        classifierFactory: () => ({
+          load: async () => {},
+          dispose: async () => {},
+          classify: async ({ signal }) => {
+            started();
+            if (outcome === "throw") throw new Error("classifier unavailable");
+            if (outcome === "invalid") return { valid: false, error: "invalid tier" };
+            if (outcome === "cancel") {
+              await new Promise((resolve, reject) => {
+                signal.addEventListener("abort", () => reject(new Error("aborted")), {
+                  once: true,
+                });
+              });
+            }
+            return { valid: true, tier: 1, rationale: "Routine" };
+          },
+        }),
+        localWorkerAdapterFactory: () => ({ dispose: async () => {}, run: async () => ({}) }),
+      });
+      await controller.initialize();
+      t.after(() => controller.shutdown());
+      await controller.setRouterClassifier(path.join(temporary, "router.gguf"));
+      await controller.setRouterTierWorker(1, { provider: "local", model: "small.gguf" });
+      const pending = controller.submit("Hello");
+      await ready;
+      if (outcome === "cancel") controller.stopGeneration();
+      await pending;
+      const state = controller.getState();
+      const user = state.messages.find((message) => message.type === "user");
+      const expected =
+        outcome === "cancel" ? "cancelled" : outcome === "success" ? "done" : "error";
+      assert.equal(user.classification.status, expected);
+      assert.ok(states.some((statuses) => statuses.includes(expected)));
+      assert.equal(state.generating, false);
+      const error = state.messages.find((message) => message.severity === "error");
+      if (outcome === "throw") assert.match(error.message, /classifier unavailable/);
+      else if (outcome === "invalid") assert.match(error.message, /invalid tier/);
+      else assert.equal(error, undefined);
+    });
+  }
+});
 test("selecting a classifier loads it and persists classifier configuration", async (t) => {
   const temporary = await mkdtemp("/tmp/opencode/xarab-model-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));
