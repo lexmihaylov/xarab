@@ -31,7 +31,10 @@ test("worker uses the OpenAI adapter for the default worker", async () => {
   test("worker provides tier adjustment as an internal worker tool", async () => {
     let request;
     const worker = createWorker({
-      configStore: createConfig({ provider: "local", model: "local.gguf" }),
+      configStore: {
+        ...createConfig(),
+        getTierWorker: (tier) => ({ provider: "local", model: `tier-${tier}.gguf` }),
+      },
       openAIAdapterFactory: () => ({ run: async () => {} }),
       localAdapterFactory: () => ({
         run: async (value) => {
@@ -47,7 +50,9 @@ test("worker uses the OpenAI adapter for the default worker", async () => {
       onTierAdjustment: async () => ({ status: "unchanged" }),
     });
     assert.equal(typeof request.tools.tier_adjustment.handler, "function");
-    assert.match(request.instructions, /Tier adjustment/);
+    assert.match(request.instructions, /Your active tier is 1/);
+    assert.match(request.instructions, /Do not wait for repeated failures/);
+    assert.match(request.instructions, /Avoid handoffs for tiny amounts of work/);
   });
   let selected;
   const worker = createWorker({
@@ -60,6 +65,30 @@ test("worker uses the OpenAI adapter for the default worker", async () => {
 
   await worker.run({ input: "hello" });
   assert.equal(selected.model, "default-openai");
+});
+
+test("worker hides adjustment without a routed tier, callback, or distinct model", async () => {
+  for (const mode of ["default", "no-callback", "same-model"]) {
+    let request;
+    const adapter = {
+      run: async (value) => {
+        request = value;
+      },
+    };
+    const worker = createWorker({
+      configStore: createConfig({ provider: "local", model: "same.gguf" }),
+      openAIAdapterFactory: () => adapter,
+      localAdapterFactory: () => adapter,
+    });
+    await worker.run({
+      tier: mode === "default" ? undefined : 1,
+      input: "hello",
+      onTierAdjustment: mode === "no-callback" ? undefined : async () => ({}),
+    });
+    assert.equal(request.tools.tier_adjustment, undefined);
+    assert.doesNotMatch(request.instructions, /## Tier adjustment/);
+    await worker.dispose();
+  }
 });
 
 test("worker dispatches OpenRouter assignments to its adapter", async () => {

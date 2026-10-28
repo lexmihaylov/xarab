@@ -509,6 +509,41 @@
     "prompt": "Assess the software supply-chain risks across repositories, dependencies, CI, artifacts, and deployment, then design a defense-in-depth program with detection, response, and migration steps."
   },
   {
+    "id": "t1-established-security-header",
+    "tier": 1,
+    "category": "security",
+    "difficulty": "boundary",
+    "labelRationale": "A security-related edit follows an explicit established pattern.",
+    "prompt": "Add X-Content-Type-Options: nosniff in the existing response-header middleware, following the adjacent header assignments, and extend its header assertion test."
+  },
+  {
+    "id": "t2-standard-threejs-scene",
+    "tier": 2,
+    "category": "graphics",
+    "difficulty": "boundary",
+    "labelRationale": "Standard graphics integration needs bounded implementation judgment, not novel graphics reasoning.",
+    "prompt": "Add a Three.js scene with a rotating cube and documented OrbitControls to this app. Inspect the app lifecycle to integrate initialization, resize handling, and cleanup."
+  },
+  {
+    "id": "t3-local-concurrency-bug",
+    "tier": 3,
+    "category": "debugging",
+    "difficulty": "boundary",
+    "labelRationale": "A single-function defect requires reasoning about competing interleavings and correctness invariants.",
+    "prompt": "One transaction function occasionally commits twice when cancellation races with retry. Reproduce the possible interleavings, distinguish the competing causes, and derive a fix preserving exactly-once effects even after recovery."
+  },
+  {
+    "id": "t2-reviewed-plan-execution",
+    "tier": 2,
+    "category": "migration",
+    "difficulty": "boundary",
+    "labelRationale": "The current phase executes a reviewed bounded plan rather than redesigning the migration.",
+    "recentMessages": [
+      { "type": "user", "message": "The reviewed migration design is approved. Implement only the compatibility reader: accept both old and new record formats, normalize to the existing internal type, and test both formats. No writes, cutover, or recovery changes are in scope." }
+    ],
+    "prompt": "Implement that compatibility reader and run the focused tests."
+  },
+  {
     "id": "t3-global-data-move",
     "tier": 3,
     "category": "migration",

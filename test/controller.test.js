@@ -135,6 +135,75 @@ test("publishes a running shell message before command completion", async (t) =>
   await controller.shutdown();
 });
 
+test("controller reassesses remaining work and records adjustment outcomes", async (t) => {
+  for (const outcome of ["approved", "same-model", "rejected"]) {
+    await t.test(outcome, async (t) => {
+      const temporary = await mkdtemp("/tmp/opencode/xarab-adjustment-");
+      t.after(() => rm(temporary, { recursive: true, force: true }));
+      let classifications = 0;
+      let runs = 0;
+      const controller = createAssistantController({
+        root: temporary,
+        workspace: temporary,
+        instructionFiles: [],
+        configPath: path.join(temporary, "config.json"),
+        classifierFactory: () => ({
+          load: async () => {},
+          dispose: async () => {},
+          classify: async ({ prompt }) => {
+            classifications++;
+            if (classifications > 1) {
+              assert.match(prompt, /current tier is 1/);
+              assert.match(prompt, /Reassess only the remaining work/);
+            }
+            return {
+              valid: true,
+              tier: classifications === 1 || outcome === "rejected" ? 1 : 3,
+              rationale: "Coupled invariants",
+            };
+          },
+        }),
+        localWorkerAdapterFactory: () => ({
+          dispose: async () => {},
+          run: async ({ tools }) => {
+            runs++;
+            if (runs > 1) {
+              assert.equal(tools.tier_adjustment, undefined);
+              return {};
+            }
+            const result = await tools.tier_adjustment.handler({
+              direction: "up",
+              reason: "Cancellation races with retries",
+              findings: "Competing interleavings violate commit invariants",
+              requested_capability: "concurrency reasoning",
+            });
+            return result.handoff ? { handoff: result.handoff } : {};
+          },
+        }),
+      });
+      await controller.initialize();
+      t.after(() => controller.shutdown());
+      await controller.setRouterClassifier(path.join(temporary, "router.gguf"));
+      await controller.setRouterTierWorker(1, { provider: "local", model: "small.gguf" });
+      await controller.setRouterTierWorker(2, { provider: "local", model: "medium.gguf" });
+      await controller.setRouterTierWorker(3, {
+        provider: "local",
+        model: outcome === "same-model" ? "small.gguf" : "large.gguf",
+      });
+      await controller.submit("Investigate duplicate commits");
+      assert.equal(runs, outcome === "approved" ? 2 : 1);
+      const transcript = controller
+        .getState()
+        .messages.map((message) => message.message)
+        .join("\n");
+      assert.match(transcript, /Tier adjustment requested \(up\)/);
+      if (outcome === "same-model") assert.match(transcript, /same worker model/);
+      if (outcome === "approved") assert.match(transcript, /adjusted from 1 to 3/);
+      if (outcome === "rejected") assert.match(transcript, /no suitable tier/);
+    });
+  }
+});
+
 test("selecting a classifier loads it and persists classifier configuration", async (t) => {
   const temporary = await mkdtemp("/tmp/opencode/xarab-model-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));

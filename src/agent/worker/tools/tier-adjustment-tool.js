@@ -3,8 +3,8 @@ const DIRECTIONS = new Set(["up", "down"]);
 export function createTierAdjustmentTool({ activeTier, requestAdjustment } = {}) {
   return {
     description:
-      "Request reassignment to a stronger or weaker worker tier when investigation shows the current tier is unsuitable. " +
-      "Use only with concrete evidence. You cannot select a model or tier. If the request is not applied, continue at the current tier and do not repeat it for the same reason.",
+      "Reassess routing after investigation: request up when remaining work reveals competing causes, subtle interleavings, or coupled correctness constraints beyond the current tier; request down when a precise approach leaves substantial routine work. " +
+      "Provide concrete evidence and a handoff preserving acceptance criteria and approval requirements. Do not wait for repeated failures or hand off tiny amounts of work. You cannot select a model or tier. If not applied, continue at the current tier and do not repeat it for the same reason.",
     params: {
       type: "object",
       additionalProperties: false,

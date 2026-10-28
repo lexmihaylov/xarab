@@ -8,11 +8,11 @@ import {
   TIER_CLASSIFIER_INSTRUCTIONS,
 } from "../src/agent/classifier/index.js";
 
-test("classifier instructions distinguish focused, advanced, and specialized work", () => {
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Focused capability/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Advanced capability/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /3 — Specialized or highest-capability execution/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /broad and tightly interdependent context/);
+test("classifier instructions distinguish routine execution, investigation, and deep reasoning", () => {
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Routine execution/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Investigation and implementation/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /3 — Deep reasoning and high-risk decisions/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /tightly coupled correctness constraints/);
   assert.match(
     TIER_CLASSIFIER_INSTRUCTIONS,
     /Classify planning, design, and research by the complexity/,
@@ -21,7 +21,15 @@ test("classifier instructions distinguish focused, advanced, and specialized wor
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /Plan or research a bounded feature/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /reusable skills system requiring discovery/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /External research is evidence of complexity/);
-  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /polished interactive Three\.js 3D model/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /not domain names/);
+  assert.match(
+    TIER_CLASSIFIER_INSTRUCTIONS,
+    /Optimize total cost, including retries and corrections/,
+  );
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /Route the current phase/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /Do not assume an unseen repository/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /intermittent duplicate commits.* -> 3/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /reviewed migration plan.* -> 2/);
   assert.doesNotMatch(TIER_CLASSIFIER_INSTRUCTIONS, /Astra|Sol|Luna/);
 });
 

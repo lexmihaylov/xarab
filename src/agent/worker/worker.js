@@ -84,7 +84,7 @@ export function createWorker({
       ],
     });
     if (!tierAdjustmentTool) return prompt;
-    return `${prompt}\n\n## Tier adjustment\nRequest tier adjustment only after investigation gives concrete evidence that the remaining work needs materially more capability or is routine enough for a lower tier. Do not use it merely because work is long or tools are needed. Request a capability, never a model or tier. If the request is not applied, continue at the current tier and do not repeat it for the same reason.`;
+    return `${prompt}\n\n## Tier adjustment\nYour active tier is ${tier}. Tier 1 follows a known approach with clear local verification. Tier 2 discovers a bounded approach using established techniques. Tier 3 resolves competing explanations, novel reasoning, or coupled correctness constraints where errors are costly or hard to detect.\nAdjustment is normal routing maintenance, not an admission of failure. After investigation, request up when evidence shows the remaining work exceeds your tier: for example, subtle interleavings, competing root causes, or coupled security and recovery invariants. Do not wait for repeated failures. Request down when investigation has established a precise approach and substantial remaining work fits a lower tier. Avoid handoffs for tiny amounts of work.\nUse concrete findings, preserve acceptance criteria and approval requirements, and describe the remaining work rather than repeating the original project scope. Do not adjust merely because work is long or tools are needed. Request a capability, never a model or tier. At most one approved handoff is allowed per request. If not applied, continue at the current tier and do not repeat it for the same reason.`;
   }
 
   async function execute({ tier, instructions, input, tools, ...request }) {
@@ -113,16 +113,26 @@ export function createWorker({
       skills,
       imageCredentials: imageConnected ? getCredentials : undefined,
     });
-    const tierAdjustmentTool = createTierAdjustmentTool({
-      activeTier: tier,
-      requestAdjustment: onTierAdjustment,
+    const current = getAssignment(tier);
+    const hasAlternative = [1, 2, 3].some((candidate) => {
+      const alternative = getAssignment(candidate);
+      return (
+        candidate !== tier &&
+        validateAssignment(alternative) &&
+        (alternative.provider !== current?.provider || alternative.model !== current?.model)
+      );
     });
+    const tierAdjustmentTool =
+      [1, 2, 3].includes(tier) &&
+      typeof onTierAdjustment === "function" &&
+      hasAlternative &&
+      createTierAdjustmentTool({ activeTier: tier, requestAdjustment: onTierAdjustment });
     return execute({
       ...request,
       tier,
       input: buildWorkerHistory(history, input),
       instructions: systemPromptFor(tier, tierAdjustmentTool, definitions),
-      tools: { ...tools, tier_adjustment: tierAdjustmentTool },
+      tools: { ...tools, ...(tierAdjustmentTool ? { tier_adjustment: tierAdjustmentTool } : {}) },
     });
   }
 
