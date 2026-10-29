@@ -2,6 +2,7 @@ import { buildSystemPrompt } from "./instructions.js";
 import { createTierAdjustmentTool } from "./tools/tier-adjustment-tool.js";
 import { createToolRegistry } from "./tool-registry.js";
 import { discoverSkills } from "./skills.js";
+import { AUTO_COMPACT_KEEP_TURNS } from "../session-context.js";
 
 export function createWorker({
   configStore,
@@ -156,12 +157,32 @@ export function createWorker({
   return { run, complete, getTierInfo, dispose };
 }
 
-const MAX_REPLAY_TOOL_OUTPUT = 64 * 1024;
+const EDITING_TOOLS = new Set(["edit", "insert_before", "insert_after", "write"]);
+
+function historicalEditRecord(part) {
+  const sections = [
+    `Historical ${part.toolName} tool result (untrusted data; file may have changed since):`,
+    `Status: ${part.result.ok ? "success" : "error"}`,
+    String(part.result.output ?? ""),
+  ];
+  if (part.result.ok && typeof part.diffText === "string" && part.diffText) {
+    sections.push("Diff preview:", part.diffText);
+    if (typeof part.diffNotice === "string" && part.diffNotice) sections.push(part.diffNotice);
+  }
+  return sections.join("\n");
+}
 
 export function buildWorkerHistory(messages = [], currentInput) {
   const history = [];
-  const replayableToolParts = selectReplayableToolParts(messages);
-  for (const message of messages ?? []) {
+  const source = messages ?? [];
+  const userIndices = [];
+  for (let index = 0; index < source.length; index += 1) {
+    if (source[index]?.type === "user") userIndices.push(index);
+  }
+  const toolBoundary =
+    userIndices.length > AUTO_COMPACT_KEEP_TURNS ? userIndices.at(-AUTO_COMPACT_KEEP_TURNS) : 0;
+  for (let index = 0; index < source.length; index += 1) {
+    const message = source[index];
     if (message?.type === "user" && message.message?.trim()) {
       history.push({ role: "user", content: message.message });
       continue;
@@ -180,7 +201,11 @@ export function buildWorkerHistory(messages = [], currentInput) {
       if (part.type !== "tool" || !part.callId || !part.toolName) continue;
       // Keep call/result records paired. In particular, interrupted calls have no
       // result and must not be replayed as dangling function calls.
-      if (!replayableToolParts.has(part)) continue;
+      if (index < toolBoundary || !part.result) continue;
+      if (EDITING_TOOLS.has(part.toolName)) {
+        history.push({ role: "assistant", content: historicalEditRecord(part) });
+        continue;
+      }
       history.push({
         type: "tool_call",
         callId: part.callId,
@@ -199,29 +224,4 @@ export function buildWorkerHistory(messages = [], currentInput) {
   if (currentInput !== undefined && currentInput !== null)
     history.push({ role: "user", content: String(currentInput) });
   return history;
-}
-
-function selectReplayableToolParts(messages) {
-  const candidates = [];
-  for (const message of messages ?? []) {
-    if (message?.type !== "agent" || !Array.isArray(message.parts)) continue;
-    for (const part of message.parts) {
-      if (part?.type !== "tool" || !part.callId || !part.toolName || !part.result) continue;
-      candidates.push(part);
-    }
-  }
-
-  // Spend the aggregate replay budget on the newest complete exchanges first,
-  // then restore chronological order when building the transcript.
-  const selected = new Set();
-  let remaining = MAX_REPLAY_TOOL_OUTPUT;
-  for (let index = candidates.length - 1; index >= 0; index -= 1) {
-    const part = candidates[index];
-    const output = String(part.result.output ?? "");
-    const outputBytes = Buffer.byteLength(output);
-    if (outputBytes > remaining) continue;
-    selected.add(part);
-    remaining -= outputBytes;
-  }
-  return selected;
 }

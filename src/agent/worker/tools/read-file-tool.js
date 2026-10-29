@@ -2,6 +2,7 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 const DEFAULT_TOKEN_BUDGET = 4_096;
+const DEFAULT_LINES_PER_READ = 200;
 const MAX_LINES_PER_READ = 2_000;
 const MAX_READ_BYTES = 50 * 1024;
 function isWithinDirectory(directory, target) {
@@ -29,7 +30,7 @@ export function createReadFileTool({
   const rootPath = path.resolve(workspace);
 
   return {
-    description: `Read a UTF-8 workspace file as an exact, unnumbered source excerpt. Provide path; optionally set offset (1-based line number, default 1) and limit (maximum lines, default ${MAX_LINES_PER_READ}). Each call returns at most ${MAX_LINES_PER_READ} lines and 50 KiB. If more content remains, the result gives the next offset to continue. Results are capped to a safe response size.`,
+    description: `Read a UTF-8 workspace file as an exact, unnumbered source excerpt. Provide path; optionally set offset (1-based line number, default 1) and limit (maximum lines, default ${DEFAULT_LINES_PER_READ}). Each call returns at most ${MAX_LINES_PER_READ} lines and 50 KiB. If more content remains, the result gives the next offset to continue. Results are capped to a safe response size.`,
     params: {
       type: "object",
       properties: {
@@ -47,12 +48,12 @@ export function createReadFileTool({
           type: "integer",
           minimum: 1,
           maximum: MAX_LINES_PER_READ,
-          description: `Maximum number of lines to return (1-${MAX_LINES_PER_READ}); defaults to ${MAX_LINES_PER_READ}. The 50 KiB page and safe response-size limit may return fewer lines.`,
+          description: `Maximum number of lines to return (1-${MAX_LINES_PER_READ}); defaults to ${DEFAULT_LINES_PER_READ}. The 50 KiB page and safe response-size limit may return fewer lines.`,
         },
       },
       required: ["path"],
     },
-    async handler({ path: requestedPath, offset = 1, limit = MAX_LINES_PER_READ } = {}) {
+    async handler({ path: requestedPath, offset = 1, limit = DEFAULT_LINES_PER_READ } = {}) {
       if (typeof requestedPath !== "string" || requestedPath.trim() === "") {
         return "Error: provide a non-empty file path.";
       }
@@ -109,6 +110,12 @@ export function createReadFileTool({
           if (bytes + nextBytes > MAX_READ_BYTES) break;
           visibleLines.push(line);
           bytes += nextBytes;
+        }
+
+        if (selected.length > 0 && visibleLines.length === 0) {
+          const message = `Line ${offset} of ${displayPath} exceeds the 50 KiB page limit and cannot be returned as an exact excerpt.`;
+          onEvent({ type: "error", path: displayPath, message });
+          return `Error: ${message}`;
         }
 
         let truncated = visibleLines.length < sourceLines.length - offset + 1;

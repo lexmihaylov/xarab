@@ -20,6 +20,34 @@ test("documents distinctive content-search phrases", () => {
   assert.match(tool.params.properties.query.description, /Avoid single words and common terms/);
 });
 
+test("limits results by default and supports a larger explicit limit", async () => {
+  await withWorkspace(async (workspace) => {
+    await Promise.all(
+      Array.from({ length: 15 }, (_, index) =>
+        writeFile(
+          path.join(workspace, `file-${String(index).padStart(2, "0")}.txt`),
+          "distinctive search phrase\n",
+        ),
+      ),
+    );
+    const events = [];
+    const tool = createSearchContentTool({ workspace, onEvent: (event) => events.push(event) });
+    const result = await tool.handler({ query: "distinctive search phrase" });
+    assert.equal(result.split("\n").length - 1, 10);
+    assert.match(result, /search\/result limit reached/);
+    assert.equal(events.at(-1).truncated, true);
+    const expanded = await tool.handler({ query: "distinctive search phrase", limit: 30 });
+    assert.equal(expanded.split("\n").length - 1, 15);
+    assert.doesNotMatch(expanded, /search\/result limit reached/);
+    assert.equal(events.at(-1).truncated, false);
+    for (const limit of [0, 31, 1.5, "10", null])
+      assert.match(
+        await tool.handler({ query: "distinctive search phrase", limit }),
+        /limit must be an integer/,
+      );
+  });
+});
+
 test("fuzzy-searches text contents and returns file paths and line numbers", async () => {
   await withWorkspace(async (workspace) => {
     await mkdir(path.join(workspace, "src"), { recursive: true });

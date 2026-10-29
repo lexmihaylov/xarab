@@ -9,6 +9,7 @@ const MAX_DEPTH = 6;
 const MAX_FILE_BYTES = 128 * 1024;
 const MAX_TOTAL_BYTES = 16 * 1024 * 1024;
 const MAX_RESULTS = 30;
+const DEFAULT_RESULTS = 10;
 const MAX_LINE_CHARS = 320;
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules"]);
 
@@ -25,7 +26,7 @@ export function createSearchContentTool({ workspace = process.cwd(), onEvent = (
 
   return {
     description:
-      "Fuzzy-search text file contents line by line within the workspace. The path may be a workspace-relative directory or a specific text file. Use a distinctive 2-3 word phrase unique to the target location; avoid single words or common terms. Returns ranked file and line matches; skips .git, node_modules, binary, and oversized files.",
+      "Fuzzy-search text file contents line by line within the workspace. Choose the narrowest relevant directory or specific text file. Use a distinctive 2-3 word phrase unique to the target location; avoid single words or common terms. Returns ranked file and line matches; skips .git, node_modules, binary, and oversized files.",
     params: {
       type: "object",
       properties: {
@@ -39,14 +40,22 @@ export function createSearchContentTool({ workspace = process.cwd(), onEvent = (
           description:
             "Optional workspace-relative directory or text file to search. Defaults to the workspace root.",
         },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: MAX_RESULTS,
+          description: `Maximum matches to return (1-${MAX_RESULTS}); defaults to ${DEFAULT_RESULTS}.`,
+        },
       },
       required: ["query"],
     },
-    async handler({ query, path: requestedPath = "." } = {}) {
+    async handler({ query, path: requestedPath = ".", limit = DEFAULT_RESULTS } = {}) {
       if (typeof query !== "string" || query.trim().length < 2) {
         return "Error: provide a search query with at least two characters.";
       }
       if (typeof requestedPath !== "string") return "Error: search path must be a string.";
+      if (!Number.isInteger(limit) || limit < 1 || limit > MAX_RESULTS)
+        return `Error: limit must be an integer from 1 to ${MAX_RESULTS}.`;
 
       const normalizedQuery = query.trim().replace(/\s+/g, " ");
       const searchDirectory = requestedPath.trim() || ".";
@@ -160,9 +169,9 @@ export function createSearchContentTool({ workspace = process.cwd(), onEvent = (
             left.path.localeCompare(right.path) ||
             left.lineNumber - right.lineNumber,
         );
-        const results = matches.slice(0, MAX_RESULTS);
+        const results = matches.slice(0, limit);
         const displayPath = path.relative(realRoot, directory) || ".";
-        const wasTruncated = truncated || matches.length > MAX_RESULTS;
+        const wasTruncated = truncated || matches.length > limit;
         onEvent({
           type: "searched",
           query: normalizedQuery,
@@ -172,7 +181,7 @@ export function createSearchContentTool({ workspace = process.cwd(), onEvent = (
           truncated: wasTruncated,
         });
         if (results.length === 0)
-          return `No content matched “${normalizedQuery}” in ${displayPath}.`;
+          return `No content matched “${normalizedQuery}” in ${displayPath}.${wasTruncated ? " Search limit reached; results may be incomplete." : ""}`;
 
         const formatted = results.map(({ path: filePath, lineNumber, line }) => {
           const visibleLine =

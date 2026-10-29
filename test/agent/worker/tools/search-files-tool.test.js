@@ -32,6 +32,41 @@ test("fuzzy-searches file paths and ranks closer matches first", async () => {
   });
 });
 
+test("limits ranked results by default and allows an explicit limit", async () => {
+  await withWorkspace(async (workspace) => {
+    await Promise.all(
+      Array.from({ length: 15 }, (_, index) =>
+        writeFile(path.join(workspace, `target-${String(index).padStart(2, "0")}.js`), ""),
+      ),
+    );
+    const events = [];
+    const tool = createSearchFilesTool({ workspace, onEvent: (event) => events.push(event) });
+    const result = await tool.handler({ query: "target" });
+    assert.equal(result.split("\n").length - 1, 10);
+    assert.match(result, /search\/result limit reached/);
+    assert.equal(events.at(-1).truncated, true);
+    const expanded = await tool.handler({ query: "target", limit: 30 });
+    assert.equal(expanded.split("\n").length - 1, 15);
+    assert.doesNotMatch(expanded, /search\/result limit reached/);
+    assert.equal(events.at(-1).truncated, false);
+    for (const limit of [0, 31, 1.5, "10", null]) {
+      assert.match(await tool.handler({ query: "target", limit }), /limit must be an integer/);
+    }
+  });
+});
+
+test("reports incomplete scans even when no files match", async () => {
+  await withWorkspace(async (workspace) => {
+    await mkdir(path.join(workspace, ...Array(9).fill("nested")), { recursive: true });
+    const events = [];
+    const tool = createSearchFilesTool({ workspace, onEvent: (event) => events.push(event) });
+    const result = await tool.handler({ query: "missing-file" });
+    assert.match(result, /No files matched/);
+    assert.match(result, /Search limit reached; results may be incomplete/);
+    assert.equal(events.at(-1).truncated, true);
+  });
+});
+
 test("supports searching within a directory and reports empty results", async () => {
   await withWorkspace(async (workspace) => {
     await mkdir(path.join(workspace, "src"));

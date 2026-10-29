@@ -56,8 +56,27 @@ test("documents OpenCode-style offset and limit parameters", async () => {
     const tool = createReadFileTool({ workspace });
     assert.match(tool.description, /offset \(1-based line number, default 1\)/);
     assert.match(tool.description, /50 KiB/);
+    assert.match(tool.params.properties.limit.description, /defaults to 200/);
     assert.deepEqual(tool.params.required, ["path"]);
     assert.deepEqual(Object.keys(tool.params.properties), ["path", "offset", "limit"]);
+  });
+});
+
+test("defaults to 200 lines and continues at the next line", async () => {
+  await withWorkspace(async (workspace) => {
+    await writeFile(
+      path.join(workspace, "many.txt"),
+      Array.from({ length: 250 }, (_, index) => `line ${index + 1}`).join("\n"),
+    );
+    const tool = createReadFileTool({ workspace });
+    const first = await tool.handler({ path: "many.txt" });
+    assert.match(first, /Lines 1-200 \(more available\)/);
+    assert.match(first, /continue with offset: 201/);
+    assert.doesNotMatch(first, /line 201/);
+    const next = await tool.handler({ path: "many.txt", offset: 201 });
+    assert.match(next, /Lines 201-250/);
+    assert.match(next, /line 250/);
+    assert.doesNotMatch(next, /more available/);
   });
 });
 
@@ -130,7 +149,7 @@ test("caps pages at 50 KiB without shortening source lines", async () => {
       tokenize: (text) => Array.from(text),
       getTokenBudget: () => 100_000,
     });
-    const result = await tool.handler({ path: "many.txt" });
+    const result = await tool.handler({ path: "many.txt", limit: 2_000 });
     assert.match(result, /Lines 1-20 \(more available\)/);
     assert.doesNotMatch(result, /line shortened/);
     assert.match(result, /continue with offset: 21/);
@@ -145,7 +164,7 @@ test("caps line count at 2,000 and respects the requested model context budget",
       Array.from({ length: 2_100 }, (_, index) => `line ${index + 1}`).join("\n"),
     );
     const tool = createReadFileTool({ workspace, getTokenBudget: () => 100_000 });
-    const result = await tool.handler({ path: "many.txt" });
+    const result = await tool.handler({ path: "many.txt", limit: 2_000 });
     assert.match(result, /Lines 1-2000 \(more available\)/);
     assert.match(result, /continue with offset: 2001/);
   });
@@ -180,5 +199,21 @@ test("rejects reads when the response-size limit cannot fit an excerpt", async (
       await normalTool.handler({ path: "file.txt", limit: 2_001 }),
       /limit must be an integer/,
     );
+  });
+});
+
+test("reports an oversized first line rather than returning a non-advancing offset", async () => {
+  await withWorkspace(async (workspace) => {
+    await writeFile(
+      path.join(workspace, "large-line.txt"),
+      `short\n${"x".repeat(50 * 1024 + 1)}\nlast`,
+    );
+    const tool = createReadFileTool({ workspace });
+    const first = await tool.handler({ path: "large-line.txt" });
+    assert.match(first, /continue with offset: 2/);
+    const result = await tool.handler({ path: "large-line.txt", offset: 2 });
+    assert.match(result, /Line 2 .* exceeds the 50 KiB page limit/);
+    assert.doesNotMatch(result, /continue with offset/);
+    assert.match(await tool.handler({ path: "large-line.txt", offset: 3 }), /last/);
   });
 });

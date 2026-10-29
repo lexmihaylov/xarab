@@ -14,7 +14,7 @@ async function withWorkspace(run) {
   }
 }
 
-test("lists workspace files recursively while skipping heavy metadata directories", async () => {
+test("lists only immediate workspace entries while skipping heavy metadata directories", async () => {
   await withWorkspace(async (workspace) => {
     await mkdir(path.join(workspace, "src"), { recursive: true });
     await mkdir(path.join(workspace, "node_modules", "pkg"), { recursive: true });
@@ -29,9 +29,10 @@ test("lists workspace files recursively while skipping heavy metadata directorie
     const result = await tool.handler({});
 
     assert.match(result, /README\.md/);
-    assert.match(result, /src\/cli\.js/);
+    assert.match(result, /src\//);
+    assert.doesNotMatch(result, /src\/cli\.js/);
     assert.doesNotMatch(result, /node_modules|\.git/);
-    assert.deepEqual(events, [{ type: "listed", path: ".", entries: 3, truncated: false }]);
+    assert.deepEqual(events, [{ type: "listed", path: ".", entries: 2, truncated: false }]);
   });
 });
 
@@ -42,10 +43,13 @@ test("supports listing a subdirectory without recursion", async () => {
     await writeFile(path.join(workspace, "src", "nested", "b.js"), "b");
     const tool = createListFilesTool({ workspace });
 
-    const result = await tool.handler({ path: "src", recursive: false });
+    const result = await tool.handler({ path: "src" });
     assert.match(result, /src\/a\.js/);
     assert.doesNotMatch(result, /nested\/b\.js/);
-    assert.match(await tool.handler({ path: "" }), /src\/a\.js/);
+    assert.match(await tool.handler({ path: "" }), /src\//);
+    assert.match(await tool.handler({ recursive: true }), /recursive listing is unavailable/);
+    assert.match(await tool.handler({ recursive: false }), /recursive listing is unavailable/);
+    assert.equal(tool.params.properties.recursive, undefined);
   });
 });
 

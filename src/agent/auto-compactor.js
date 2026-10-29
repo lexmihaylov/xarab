@@ -1,7 +1,9 @@
 import { getTheme } from "../utils/theme-engine.js";
+import { AUTO_COMPACT_KEEP_TURNS } from "./session-context.js";
+
+export { AUTO_COMPACT_KEEP_TURNS } from "./session-context.js";
 
 export const AUTO_COMPACT_INTERVAL = 50;
-export const AUTO_COMPACT_KEEP_TURNS = 10;
 
 export function createAutoCompactor({
   getMessages,

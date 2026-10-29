@@ -5,6 +5,7 @@ import { fuzzyScore } from "../../../utils/fuzzy-score.js";
 const MAX_SCANNED_ENTRIES = 10_000;
 const MAX_DEPTH = 8;
 const MAX_RESULTS = 30;
+const DEFAULT_RESULTS = 10;
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules"]);
 
 function isWithinDirectory(directory, target) {
@@ -20,7 +21,7 @@ export function createSearchFilesTool({ workspace = process.cwd(), onEvent = () 
 
   return {
     description:
-      "Fuzzy-search file names and workspace-relative paths. Skips .git and node_modules and returns the best matches.",
+      "Fuzzy-search file names and workspace-relative paths. Choose the narrowest relevant directory. Skips .git and node_modules and returns the best matches.",
     params: {
       type: "object",
       properties: {
@@ -33,13 +34,21 @@ export function createSearchFilesTool({ workspace = process.cwd(), onEvent = () 
           description:
             "Optional workspace-relative directory to search. Defaults to the workspace root.",
         },
+        limit: {
+          type: "integer",
+          minimum: 1,
+          maximum: MAX_RESULTS,
+          description: `Maximum matches to return (1-${MAX_RESULTS}); defaults to ${DEFAULT_RESULTS}.`,
+        },
       },
       required: ["query"],
     },
-    async handler({ query, path: requestedPath = "." } = {}) {
+    async handler({ query, path: requestedPath = ".", limit = DEFAULT_RESULTS } = {}) {
       if (typeof query !== "string" || query.trim() === "")
         return "Error: provide a non-empty search query.";
       if (typeof requestedPath !== "string") return "Error: directory path must be a string.";
+      if (!Number.isInteger(limit) || limit < 1 || limit > MAX_RESULTS)
+        return `Error: limit must be an integer from 1 to ${MAX_RESULTS}.`;
 
       const normalizedQuery = query.trim().replaceAll("\\", "/");
       const searchDirectory = requestedPath.trim() || ".";
@@ -91,9 +100,9 @@ export function createSearchFilesTool({ workspace = process.cwd(), onEvent = () 
         matches.sort(
           (left, right) => left.score - right.score || left.path.localeCompare(right.path),
         );
-        const results = matches.slice(0, MAX_RESULTS);
+        const results = matches.slice(0, limit);
         const displayPath = path.relative(realRoot, directory) || ".";
-        const wasTruncated = truncated || matches.length > MAX_RESULTS;
+        const wasTruncated = truncated || matches.length > limit;
         onEvent({
           type: "searched",
           query: normalizedQuery,
@@ -101,7 +110,8 @@ export function createSearchFilesTool({ workspace = process.cwd(), onEvent = () 
           results: results.length,
           truncated: wasTruncated,
         });
-        if (results.length === 0) return `No files matched “${normalizedQuery}” in ${displayPath}.`;
+        if (results.length === 0)
+          return `No files matched “${normalizedQuery}” in ${displayPath}.${wasTruncated ? " Search limit reached; results may be incomplete." : ""}`;
         return `Best file matches for “${normalizedQuery}” in ${displayPath}:${wasTruncated ? " (search/result limit reached)" : ""}\n${results.map(({ path: filePath }) => filePath).join("\n")}`;
       } catch (error) {
         const message = error.code === "ENOENT" ? "Directory does not exist." : error.message;
