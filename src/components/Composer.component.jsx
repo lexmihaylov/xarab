@@ -27,6 +27,7 @@ export function Composer({
   onDraftChange,
   onStopGeneration,
   onSessions,
+  contextTokens,
 }) {
   const inputRef = useRef(null);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
@@ -146,7 +147,14 @@ export function Composer({
           </text>
         </box>
       )}
-      <box border borderStyle="rounded" paddingX={1} minHeight={3} maxHeight={8}>
+      <box
+        flexDirection="column"
+        border
+        borderStyle="rounded"
+        paddingX={1}
+        minHeight={3}
+        maxHeight={8}
+      >
         <textarea
           ref={inputRef}
           initialValue={draft?.value ?? ""}
@@ -165,6 +173,15 @@ export function Composer({
             else submit();
           }}
         />
+        {contextTokens !== undefined && (
+          <box flexDirection="row" justifyContent="flex-end" width="100%" overflow="hidden">
+            <text fg={colors.hint}>
+              {contextTokens === null
+                ? "Context unavailable"
+                : `${contextTokens.toLocaleString("en-US")} tokens`}
+            </text>
+          </box>
+        )}
       </box>
     </box>
   );

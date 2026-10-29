@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
+import { getTheme } from "./utils/theme-engine.js";
 import { AskQuestionsDialog } from "./components/AskQuestionsDialog.component.jsx";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
 import { copyToClipboard } from "./utils/clipboard.js";
@@ -18,6 +19,8 @@ import { ModelDownloader } from "./components/ModelDownloader.component.jsx";
 import { SessionBrowser } from "./components/SessionBrowser.component.jsx";
 import { Welcome } from "./components/Welcome.component.jsx";
 import { ToastNotifications } from "./components/ToastNotifications.component.jsx";
+
+const colors = getTheme().colors;
 
 const pageScrollKeys = new Map([
   ["pageup", -1],
@@ -220,6 +223,32 @@ export function App({
                 }));
               }
 
+              if (
+                message.type === "agent" &&
+                (message.workerUsage || message.workerUsageUnavailable)
+              ) {
+                entries.push({
+                  key: `usage-${index}`,
+                  element: (
+                    <box
+                      flexDirection="column"
+                      alignItems="flex-end"
+                      width="100%"
+                      paddingRight={1}
+                      marginBottom={1}
+                      border={["top", "bottom"]}
+                      borderColor={colors.border}
+                    >
+                      <text fg={colors.hint}>
+                        {`TOKENS  ${message.workerUsage?.input_tokens.toLocaleString("en-US") ?? "unavailable"} in  ·  ${message.workerUsage?.output_tokens.toLocaleString("en-US") ?? "unavailable"} out  ·  ${message.workerUsage?.total_tokens.toLocaleString("en-US") ?? "unavailable"} total${message.workerUsagePartial ? "  ·  partial" : ""}`}
+                      </text>
+                      <text fg={colors.hint}>
+                        {`${Number.isSafeInteger(message.workerUsage?.cached_tokens) ? message.workerUsage.cached_tokens.toLocaleString("en-US") : "unavailable"} cached  ·  ${Number.isSafeInteger(message.workerUsage?.reasoning_tokens) ? message.workerUsage.reasoning_tokens.toLocaleString("en-US") : "unavailable"} reasoning`}
+                      </text>
+                    </box>
+                  ),
+                });
+              }
               return entries.map(({ key, element }) => (
                 <box
                   key={key}
@@ -239,6 +268,7 @@ export function App({
           flexShrink={0}
           sessionId={state.currentSession?.id}
           draft={state.sessionDraft}
+          contextTokens={state.currentSession?.contextTokens}
           disabled={
             state.generating ||
             state.commandRunning ||

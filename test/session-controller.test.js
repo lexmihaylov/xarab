@@ -69,6 +69,38 @@ test("routes chat through the local classifier to an OpenAI worker and autosaves
   });
 });
 
+test("worker usage accumulates once per response and survives session restore", async (t) => {
+  const { create, configure, store } = await setup(t, async ({ onText, onEvent }) => {
+    for (const [id, input] of [
+      ["tool-round", 10],
+      ["final", 16],
+      ["final", 16],
+    ])
+      onEvent({
+        type: "response.completed",
+        response: { id, usage: { input_tokens: input, output_tokens: 5, total_tokens: input + 5 } },
+      });
+    onText("Reply");
+  });
+  const controller = await create();
+  await configure(controller);
+  await controller.submit("Count tokens");
+  const id = controller.getState().currentSession.id;
+  assert.equal(controller.getState().currentSession.workerUsage.total_tokens, 36);
+  assert.equal(controller.getState().currentSession.contextTokens, 16);
+  const record = await store.load(id);
+  assert.equal(record.workerUsage.total_tokens, 36);
+  assert.equal(record.contextTokens, 16);
+  assert.equal(record.messages.find((m) => m.type === "agent").workerUsage.total_tokens, 36);
+  await controller.startNewSession();
+  assert.equal(controller.getState().currentSession.contextTokens, undefined);
+  await controller.restoreSession(id);
+  assert.equal(controller.getState().currentSession.contextTokens, 16);
+  await controller.submit("Count again");
+  assert.equal(controller.getState().currentSession.workerUsage.total_tokens, 72);
+  assert.equal(controller.getState().currentSession.contextTokens, 16);
+});
+
 test("does not use a local model as a fallback when routing is disabled", async (t) => {
   const { create } = await setup(t);
   const controller = await create();

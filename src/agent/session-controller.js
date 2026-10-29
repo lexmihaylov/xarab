@@ -37,6 +37,8 @@ export function createSessionController({
         id: activeSession.id,
         title: activeSession.title,
         updatedAt: activeSession.updatedAt,
+        workerUsage: activeSession.workerUsage,
+        contextTokens: activeSession.contextTokens,
       },
       sessionDraft: { ...draft },
       sessionModal,

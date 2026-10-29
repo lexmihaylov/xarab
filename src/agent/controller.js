@@ -8,6 +8,7 @@ import { downloadModelFile } from "../utils/model-downloader.js";
 import { createSessionStore } from "./session-store.js";
 import { createSessionController } from "./session-controller.js";
 import { createOpenAICodexAuth } from "../utils/openai-codex-auth.js";
+import { addTokenUsage } from "./token-usage.js";
 import { copyToClipboard } from "../utils/clipboard.js";
 import {
   createOpenAIResponsesWorkerAdapter,
@@ -448,6 +449,11 @@ export function createAssistantController({
     });
     activeWorkDone = workDone;
     let approvedHandoff;
+    const usageResponses = new Set();
+    const tracksUsage =
+      configStore.getTierWorker(tier)?.provider === "openai" ||
+      (tier == null && Boolean(configStore.getOpenAIModel()));
+    if (tracksUsage) assistantMessage.workerUsageUnavailable = true;
     try {
       const result = await worker.run({
         tier,
@@ -455,6 +461,29 @@ export function createAssistantController({
         history,
         input: requestText,
         signal: abortController.signal,
+        onEvent(event) {
+          if (!tracksUsage || !["response.completed", "response.done"].includes(event.type)) return;
+          const response = event.response;
+          if (!response || (response.id && usageResponses.has(response.id))) return;
+          if (response.id) usageResponses.add(response.id);
+          const session = sessionController.getActiveSession();
+          session.contextTokens =
+            Number.isSafeInteger(response.usage?.input_tokens) && response.usage.input_tokens >= 0
+              ? response.usage.input_tokens
+              : null;
+          sessionChanged();
+          notify();
+          const next = addTokenUsage(assistantMessage.workerUsage, response.usage);
+          if (next === assistantMessage.workerUsage) {
+            assistantMessage.workerUsagePartial = true;
+            return;
+          }
+          assistantMessage.workerUsage = next;
+          assistantMessage.workerUsageUnavailable = false;
+          session.workerUsage = addTokenUsage(session.workerUsage, response.usage);
+          sessionChanged();
+          notify();
+        },
         onTierAdjustment:
           configStore.getClassifier() && adjustmentCount < 1
             ? async (request) => {
