@@ -68,9 +68,11 @@ export function createModelManager({
       } catch (error) {
         errorMessage = `Model deleted, but its config could not be removed: ${error.message}`;
       }
+      const currentModal = getModelModal();
+      if (!currentModal || currentModal.mode !== "chooser") return;
       setModelModal({
-        ...getModelModal(),
-        models,
+        ...currentModal,
+        models: [...models, ...currentModal.models.filter((model) => model.provider !== "local")],
         modelSettings: getModelSettings(models),
         error: errorMessage,
       });
