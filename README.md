@@ -62,6 +62,8 @@ Models are stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to use
 - `Esc` — stop generation
 
 Workers can use project `AGENTS.md` instructions and discover reusable skills from `.agents/skills` in the project or home directory. Available tools include file reading, listing and searching, focused edits, writing files, shell commands, and web search/fetch; web search requires a Tavily API key.
+Xarab also supports local and remote MCP tools with global and workspace configuration. See [MCP server setup and approval](docs/mcp.md).
+
 
 ## Develop and evaluate
 

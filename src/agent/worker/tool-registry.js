@@ -19,6 +19,7 @@ import { createOpenAIImageAnalysisTool } from "./tools/openai-image-analysis-too
 export function createToolRegistry({
   workspace,
   skills = new Map(),
+  externalTools = {},
   configStore,
   imageCredentials,
   requestQuestions,
@@ -29,6 +30,7 @@ export function createToolRegistry({
   notify,
 }) {
   const definitions = {
+    ...externalTools,
     ...(requestQuestions ? { ask_questions: createAskQuestionsTool({ requestQuestions }) } : {}),
     read_file: createReadFileTool({
       workspace,

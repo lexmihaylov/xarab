@@ -1,3 +1,4 @@
+import { logoutMcpOAuth } from "./worker/mcp-oauth.js";
 import { runShellCommand } from "./worker/tools/shell-command-executor.js";
 import {
   appendShellContext,
@@ -72,6 +73,24 @@ export function createCommandHandler({
         type: "system",
         message:
           "Commands: /help, /new [name], /sessions, /save [name], /route, /connect, /download [query], /compact, /clear, /exit.\nUse /route to configure the router and tier workers. Routers and workers can use OpenAI or local GGUF models.\nUse /connect to connect providers, then select their models with /route.\nUse /compact to replace the conversation with an AI-generated summary.\nSessions autosave; Ctrl+O opens the session browser. Use /download to search Hugging Face.\nPrefix a shell command with ! to run it and attach its output to your next message.\nEnter sends; Shift+Enter/Ctrl+N adds a line; PgUp/PgDn scroll; Esc stops generation.",
+      });
+      return;
+    }
+    if (text === "/mcp logout") {
+      if (isGenerating() || isRouting()) {
+        addMessage({
+          type: "system",
+          message: "Stop the active request before signing out of MCP servers.",
+          severity: "warning",
+        });
+        return;
+      }
+      await logoutMcpOAuth();
+      addMessage({
+        type: "system",
+        message:
+          "Removed stored OAuth credentials for all MCP servers. This does not revoke tokens at the provider.",
+        severity: "info",
       });
       return;
     }

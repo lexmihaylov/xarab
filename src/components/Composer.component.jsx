@@ -9,6 +9,8 @@ const commandOptions = [
   { command: "/help", description: "Show available commands" },
   { command: "/route", description: "Configure router and tier workers" },
   { command: "/connect", description: "Connect to AI providers" },
+  { command: "/mcp logout", description: "Remove stored MCP OAuth credentials" },
+
   { command: "/download", description: "Search Hugging Face for models" },
   { command: "/sessions", description: "Restore, switch, or delete sessions" },
   { command: "/new", description: "Start a new session" },

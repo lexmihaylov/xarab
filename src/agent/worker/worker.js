@@ -2,6 +2,7 @@ import { buildSystemPrompt } from "./instructions.js";
 import { createTierAdjustmentTool } from "./tools/tier-adjustment-tool.js";
 import { createToolRegistry } from "./tool-registry.js";
 import { discoverSkills } from "./skills.js";
+import { createMcpClient } from "./mcp-client.js";
 import { AUTO_COMPACT_KEEP_TURNS } from "../session-context.js";
 
 export function createWorker({
@@ -23,6 +24,13 @@ export function createWorker({
     throw new TypeError("A local adapter factory is required.");
 
   const adapters = new Map();
+  const mcp = createMcpClient({
+    workspace,
+    configStore,
+    requestQuestions: toolRuntime?.requestQuestions,
+    onError: (message) =>
+      toolRuntime?.onToolEvent?.("mcp", { type: "error", path: "connection", message }),
+  });
 
   function getAssignment(tier) {
     if (tier == null) {
@@ -109,32 +117,38 @@ export function createWorker({
   async function run({ tier, history, input, onTierAdjustment, ...request }) {
     const skills = await discoverSkills(workspace);
     const imageConnected = getOpenAIStatus ? (await getOpenAIStatus()).connected : false;
-    const { definitions, tools } = createToolRegistry({
-      ...registryOptions,
-      skills,
-      imageCredentials: imageConnected ? getCredentials : undefined,
-    });
-    const current = getAssignment(tier);
-    const hasAlternative = [1, 2, 3].some((candidate) => {
-      const alternative = getAssignment(candidate);
-      return (
-        candidate !== tier &&
-        validateAssignment(alternative) &&
-        (alternative.provider !== current?.provider || alternative.model !== current?.model)
-      );
-    });
-    const tierAdjustmentTool =
-      [1, 2, 3].includes(tier) &&
-      typeof onTierAdjustment === "function" &&
-      hasAlternative &&
-      createTierAdjustmentTool({ activeTier: tier, requestAdjustment: onTierAdjustment });
-    return execute({
-      ...request,
-      tier,
-      input: buildWorkerHistory(history, input),
-      instructions: systemPromptFor(tier, tierAdjustmentTool, definitions),
-      tools: { ...tools, ...(tierAdjustmentTool ? { tier_adjustment: tierAdjustmentTool } : {}) },
-    });
+    const connection = await mcp.discover({ signal: request.signal });
+    try {
+      const { definitions, tools } = createToolRegistry({
+        ...registryOptions,
+        externalTools: connection.definitions,
+        skills,
+        imageCredentials: imageConnected ? getCredentials : undefined,
+      });
+      const current = getAssignment(tier);
+      const hasAlternative = [1, 2, 3].some((candidate) => {
+        const alternative = getAssignment(candidate);
+        return (
+          candidate !== tier &&
+          validateAssignment(alternative) &&
+          (alternative.provider !== current?.provider || alternative.model !== current?.model)
+        );
+      });
+      const tierAdjustmentTool =
+        [1, 2, 3].includes(tier) &&
+        typeof onTierAdjustment === "function" &&
+        hasAlternative &&
+        createTierAdjustmentTool({ activeTier: tier, requestAdjustment: onTierAdjustment });
+      return await execute({
+        ...request,
+        tier,
+        input: buildWorkerHistory(history, input),
+        instructions: systemPromptFor(tier, tierAdjustmentTool, definitions),
+        tools: { ...tools, ...(tierAdjustmentTool ? { tier_adjustment: tierAdjustmentTool } : {}) },
+      });
+    } finally {
+      await connection.close();
+    }
   }
 
   function complete({ tier, instructions, input, ...request }) {
@@ -150,6 +164,7 @@ export function createWorker({
   }
 
   async function dispose() {
+    await mcp.dispose();
     await Promise.all([...adapters.values()].map((adapter) => adapter.dispose?.()));
     adapters.clear();
   }
