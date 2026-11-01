@@ -152,6 +152,164 @@ test("legacy SSE discovers and calls tools", async (t) => {
   await connection.close();
 });
 
+test("SSE OAuth challenge reconnects with a fresh transport", async (t) => {
+  const { workspace } = await fixture(t);
+  const server = new Server({ name: "oauth-sse", version: "1" }, { capabilities: { tools: {} } });
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [{ name: "ping", inputSchema: { type: "object" } }],
+  }));
+  server.setRequestHandler(CallToolRequestSchema, async () => ({
+    content: [{ type: "text", text: "authenticated" }],
+  }));
+  let transport;
+  let base;
+  let challenged = false;
+  let tokenExchanged = false;
+  const json = (res, body) =>
+    res.writeHead(200, { "Content-Type": "application/json" }).end(JSON.stringify(body));
+  const http = createServer((req, res) => {
+    if (req.url.includes("oauth-protected-resource"))
+      return json(res, { resource: `${base}/sse`, authorization_servers: [base] });
+    if (req.url.includes(".well-known/"))
+      return json(res, {
+        issuer: base,
+        authorization_endpoint: `${base}/authorize`,
+        token_endpoint: `${base}/token`,
+        response_types_supported: ["code"],
+        code_challenge_methods_supported: ["S256"],
+      });
+    if (req.url === "/token") {
+      tokenExchanged = true;
+      return json(res, { access_token: "fixture-token", token_type: "Bearer" });
+    }
+    if (req.headers.authorization !== "Bearer fixture-token") {
+      challenged = true;
+      res.writeHead(401).end();
+      return;
+    }
+    if (req.method === "GET" && req.url === "/sse") {
+      transport = new SSEServerTransport("/messages", res);
+      server.connect(transport).catch(() => res.end());
+    } else if (req.method === "POST" && transport)
+      transport.handlePostMessage(req, res).catch(() => res.end());
+    else res.writeHead(404).end();
+  });
+  await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
+  base = `http://127.0.0.1:${http.address().port}`;
+  t.after(async () => {
+    await server.close();
+    http.closeAllConnections();
+    http.close();
+  });
+  let tokens;
+  let verifier;
+  let redirected = false;
+  const errors = [];
+  const client = createMcpClient({
+    workspace,
+    configStore: {
+      get: () => ({
+        mcp: { authenticated: { type: "remote", transport: "sse", url: `${base}/sse` } },
+      }),
+    },
+    requestQuestions: async () => answer(true),
+    onError: (error) => errors.push(error),
+    oauthFactory: async () => ({
+      provider: {
+        redirectUrl: "http://127.0.0.1:19847/callback",
+        clientMetadata: {
+          redirect_uris: ["http://127.0.0.1:19847/callback"],
+          token_endpoint_auth_method: "none",
+        },
+        clientInformation: () => ({ client_id: "fixture-client" }),
+        tokens: () => tokens,
+        saveTokens: (value) => {
+          tokens = value;
+        },
+        saveCodeVerifier: (value) => {
+          verifier = value;
+        },
+        codeVerifier: () => verifier,
+        redirectToAuthorization: async () => {
+          redirected = true;
+        },
+      },
+      waitForCode: async () => "fixture-code",
+      close() {},
+    }),
+  });
+  t.after(() => client.dispose());
+  const connection = await client.discover();
+  assert.deepEqual(errors, []);
+  assert.ok(challenged && redirected && tokenExchanged);
+  assert.match(
+    (await Object.values(connection.definitions)[0].handler({})).output,
+    /authenticated/,
+  );
+  await connection.close();
+});
+
+test("invalid entries and malformed workspace files do not disable other tools", async (t) => {
+  const { workspace, save } = await fixture(t);
+  await save({ broken: { type: "local", command: [] } });
+  const errors = [];
+  const client = createMcpClient({
+    workspace,
+    configStore: { get: () => ({ mcp: { good: config } }) },
+    onError: (error) => errors.push(error),
+  });
+  t.after(() => client.dispose());
+  let connection = await client.discover();
+  assert.equal(Object.keys(connection.definitions).length, 1);
+  await connection.close();
+  await writeFile(path.join(workspace, ".xarab", "mcp.json"), "{");
+  connection = await client.discover();
+  assert.equal(Object.keys(connection.definitions).length, 1);
+  await connection.close();
+  assert.equal(errors.length, 2);
+});
+
+test("stalled SSE startup times out and responds to cancellation", async (t) => {
+  const { workspace } = await fixture(t);
+  let received;
+  const http = createServer(() => received?.());
+  await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
+  t.after(() => {
+    http.closeAllConnections();
+    http.close();
+  });
+  const errors = [];
+  const client = createMcpClient({
+    workspace,
+    configStore: {
+      get: () => ({
+        mcp: {
+          stalled: {
+            type: "remote",
+            transport: "sse",
+            oauth: false,
+            url: `http://127.0.0.1:${http.address().port}/sse`,
+            timeout: 100,
+          },
+        },
+      }),
+    },
+    onError: (error) => errors.push(error),
+  });
+  t.after(() => client.dispose());
+  const connection = await client.discover();
+  assert.deepEqual(connection.definitions, {});
+  assert.equal(errors.length, 1);
+  const controller = new AbortController();
+  const started = new Promise((resolve) => {
+    received = resolve;
+  });
+  const pending = client.discover({ signal: controller.signal });
+  await started;
+  controller.abort(new Error("test cancellation"));
+  await assert.rejects(pending, /test cancellation/);
+});
+
 test("workspace entries replace global entries, preserving distinct servers", async (t) => {
   const { workspace, save } = await fixture(t);
   await save({ shared: { enabled: false } });
@@ -160,7 +318,17 @@ test("workspace entries replace global entries, preserving distinct servers", as
   assert.equal(entries[0].workspaceDefined, true);
   assert.equal(entries[1].workspaceDefined, false);
   await save({ bad: { type: "local", command: [] } });
-  await assert.rejects(loadMcpConfig(workspace), /command/);
+  await assert.rejects(loadMcpConfig(workspace), /Invalid MCP server/);
+  await save({ shared: { type: "local", command: [] } });
+  const errors = [];
+  const isolated = await loadMcpConfig(workspace, { shared: config, other: config }, (error) =>
+    errors.push(error),
+  );
+  assert.deepEqual(
+    isolated.map((entry) => entry.name),
+    ["other"],
+  );
+  assert.equal(errors.length, 1);
 });
 
 test("stdio discovery, call approval, bounded output and cleanup", async (t) => {

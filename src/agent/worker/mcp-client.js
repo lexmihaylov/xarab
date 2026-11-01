@@ -16,11 +16,43 @@ const safe = (text) =>
 const bounded = (text) =>
   text.length > LIMIT ? `${text.slice(0, LIMIT)}\n[MCP output truncated.]` : text;
 
+// SDK request timeouts do not cover transport.start(), including a stalled SSE handshake.
+async function boundedOperation(operation, cleanup, { signal, timeout }) {
+  let timer;
+  let abort;
+  const interrupted = new Promise((_, reject) => {
+    abort = () => {
+      reject(signal?.reason ?? new Error("MCP connection cancelled."));
+      Promise.resolve()
+        .then(cleanup)
+        .catch(() => {});
+    };
+    timer = setTimeout(() => {
+      reject(new Error("MCP connection timed out."));
+      Promise.resolve()
+        .then(cleanup)
+        .catch(() => {});
+    }, timeout);
+    signal?.addEventListener("abort", abort, { once: true });
+  });
+  try {
+    if (signal?.aborted) {
+      abort();
+      return await interrupted;
+    }
+    return await Promise.race([Promise.resolve().then(operation), interrupted]);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", abort);
+  }
+}
+
 export function createMcpClient({
   workspace = process.cwd(),
   configStore,
   requestQuestions,
   onError = () => {},
+  oauthFactory = createMcpOAuth,
 }) {
   const approved = new Set();
   const active = new Set();
@@ -55,7 +87,7 @@ export function createMcpClient({
       );
     };
     try {
-      const entries = await loadMcpConfig(workspace, configStore.get?.()?.mcp ?? {});
+      const entries = await loadMcpConfig(workspace, configStore.get?.()?.mcp ?? {}, onError);
       for (const { name, config, workspaceDefined } of entries) {
         if (signal?.aborted) throw signal.reason ?? new Error("Cancelled.");
         if (config.enabled === false) continue;
@@ -82,7 +114,7 @@ export function createMcpClient({
           const timeout = config.timeout ?? 30000;
           const options = { signal, timeout, maxTotalTimeout: timeout };
           if (config.type === "remote" && config.oauth !== false) {
-            oauth = await createMcpOAuth({
+            oauth = await oauthFactory({
               identity: JSON.stringify({ workspace, name, config }),
               config: config.oauth ?? {},
               signal,
@@ -96,7 +128,7 @@ export function createMcpClient({
           }
           const RemoteTransport =
             config.transport === "sse" ? SSEClientTransport : StreamableHTTPClientTransport;
-          const transport =
+          const makeTransport = () =>
             config.type === "local"
               ? new StdioClientTransport({
                   command: config.command[0],
@@ -111,12 +143,27 @@ export function createMcpClient({
                   authProvider: oauth?.provider,
                   reconnectionOptions: { maxRetries: 0 },
                 });
+          let transport = makeTransport();
+          const connect = () =>
+            boundedOperation(
+              () => client.connect(transport, options),
+              () => transport.close(),
+              { signal, timeout },
+            );
           try {
-            await client.connect(transport, options);
+            await connect();
           } catch (error) {
-            if (!(error instanceof UnauthorizedError) || !oauth) throw error;
-            await transport.finishAuth(await oauth.waitForCode());
-            await client.connect(transport, options);
+            if (!(error instanceof UnauthorizedError) || !oauth || signal?.aborted) throw error;
+            const code = await oauth.waitForCode();
+            await boundedOperation(
+              () => transport.finishAuth(code),
+              () => transport.close(),
+              { signal, timeout },
+            );
+            // Startup failures can leave the protocol attached; transports are single-use.
+            await client.close();
+            transport = makeTransport();
+            await connect();
           } finally {
             oauth?.close();
             authSessions.delete(oauth);
@@ -179,6 +226,7 @@ export function createMcpClient({
           for (const key of serverKeys) delete definitions[key];
           await client.close().catch(() => {});
           active.delete(client);
+          if (signal?.aborted) throw signal.reason ?? new Error("Cancelled.");
           onError(
             `MCP server ${safe(name)} unavailable. Check its configuration, authentication and connectivity.`,
           );
