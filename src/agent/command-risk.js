@@ -23,7 +23,11 @@ export async function authorizeCommand({ command, workspace, signal, assess, req
     assessment = { risk: "unclassified", scope: "uncertain", reason: "Command validation failed." };
   }
   if (signal?.aborted) return { approved: false, reason: "Command cancelled." };
-  if (assessment.risk === "low") return { approved: true };
+  if (
+    assessment.risk === "low" ||
+    (assessment.risk === "medium" && assessment.scope === "workspace")
+  )
+    return { approved: true };
   if (!requestQuestions) return { approved: false, reason: "Command approval is unavailable." };
   try {
     const result = await requestQuestions([], {

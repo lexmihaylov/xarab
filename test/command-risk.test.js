@@ -5,14 +5,21 @@ import { createShellTool } from "../src/agent/worker/tools/shell-tool.js";
 import { createQuestionRequest } from "../src/agent/question-request.js";
 import { createTaskIntegration } from "../src/agent/task-integration.js";
 
-const assessment = (risk) => ({ risk, scope: "workspace", reason: "Test assessment" });
-test("low risk bypasses approval; medium/high require exact approval", async () => {
-  for (const risk of ["low", "medium", "high"]) {
+const assessment = (risk, scope = "workspace") => ({ risk, scope, reason: "Test assessment" });
+test("workspace medium risk bypasses approval; other medium/high risks require it", async () => {
+  for (const [risk, scope, requiresApproval] of [
+    ["low", "workspace", false],
+    ["medium", "workspace", false],
+    ["medium", "outside", true],
+    ["medium", "uncertain", true],
+    ["high", "workspace", true],
+    ["high", "outside", true],
+  ]) {
     let asked = false;
     const result = await authorizeCommand({
       command: "echo test",
       workspace: "/work",
-      assess: async () => assessment(risk),
+      assess: async () => assessment(risk, scope),
       requestQuestions: async (_, options) => {
         asked = true;
         assert.equal(options.commandApproval.command, "echo test");
@@ -23,7 +30,7 @@ test("low risk bypasses approval; medium/high require exact approval", async () 
       },
     });
     assert.equal(result.approved, true);
-    assert.equal(asked, risk !== "low");
+    assert.equal(asked, requiresApproval);
   }
 });
 test("invalid assessment offers unclassified dialog and returns denial feedback", async () => {
