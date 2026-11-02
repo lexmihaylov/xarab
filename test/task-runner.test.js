@@ -89,6 +89,83 @@ test("utility queue is bounded and timeout and shutdown propagate cancellation",
   }
 });
 
+test("utility timeout captures pending task approval and preserves cleanup failure", async () => {
+  const keepAlive = setInterval(() => {}, 100);
+  try {
+    const runner = createTaskRunner({
+      timeoutMs: 15,
+      classify: async () => ({ valid: true, tier: 2 }),
+      createWorker: ({ onToolEvent }) => ({
+        getTierInfo: () => ({ configured: true }),
+        async complete({ signal }) {
+          onToolEvent("run_command", { type: "invoked", callId: "1" });
+          onToolEvent("approval", { type: "pending" });
+          await new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true }));
+          onToolEvent("approval", { type: "finished" });
+        },
+        async dispose() {
+          throw new Error("secret cleanup details");
+        },
+      }),
+    });
+    const result = await runner.run({ brief: "review" });
+    assert.equal(result.status, "timed-out");
+    assert.equal(result.diagnostics.phase, "running");
+    assert.equal(result.diagnostics.approvalPending, true);
+    assert.deepEqual(result.diagnostics.lastTool, { name: "run_command", outcome: "running" });
+    assert.equal(result.cleanupError, "Task resource cleanup failed.");
+    assert.ok(result.diagnostics.elapsedMs >= 0);
+  } finally {
+    clearInterval(keepAlive);
+  }
+});
+
+test("agentic tasks have no deadline and remain cancellable", async () => {
+  let started;
+  const ready = new Promise((resolve) => {
+    started = resolve;
+  });
+  const runner = createTaskRunner({
+    timeoutMs: 10,
+    classify: async () => ({ valid: true, tier: 2 }),
+    createWorker: () => ({
+      getTierInfo: () => ({ configured: true }),
+      async run({ signal }) {
+        started();
+        await new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true }));
+      },
+    }),
+  });
+  const controller = new AbortController();
+  const pending = runner.run({ mode: "agentic", brief: "review", signal: controller.signal });
+  await ready;
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  assert.equal(controller.signal.aborted, false);
+  controller.abort();
+  const result = await pending;
+  assert.equal(result.status, "cancelled");
+  assert.equal(result.diagnostics.phase, "running");
+});
+test("timeout records classification phase", async () => {
+  const keepAlive = setInterval(() => {}, 100);
+  try {
+    const runner = createTaskRunner({
+      timeoutMs: 15,
+      classify: ({ signal }) =>
+        new Promise((resolve) => signal.addEventListener("abort", resolve, { once: true })),
+      createWorker: () => {
+        throw new Error("unexpected worker");
+      },
+    });
+    const result = await runner.run({ brief: "review" });
+    assert.equal(result.status, "timed-out");
+    assert.equal(result.diagnostics.phase, "classifying");
+    assert.equal(result.diagnostics.approvalPending, false);
+  } finally {
+    clearInterval(keepAlive);
+  }
+});
+
 function setup({
   classify = async () => ({ valid: true, tier: 2 }),
   complete,

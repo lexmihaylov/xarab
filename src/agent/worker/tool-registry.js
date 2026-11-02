@@ -1,4 +1,6 @@
 import { createToolTimelineObserver } from "./tool-timeline-observer.js";
+import { loadApprovedPolicy } from "../policy-consent.js";
+import { authorizeNativeTool, isPolicyTool } from "../native-policy.js";
 import { createAskQuestionsTool } from "./tools/ask-questions-tool.js";
 import { createReadFileTool } from "./tools/read-file-tool.js";
 import { createListFilesTool } from "./tools/list-files-tool.js";
@@ -27,6 +29,7 @@ export function createToolRegistry({
   imageCredentials,
   requestQuestions,
   onToolEvent,
+  onDiagnosticEvent,
   getMessages,
   getCurrentAgentMessage,
   sessionChanged,
@@ -109,13 +112,28 @@ export function createToolRegistry({
         ...definition,
         async handler(params, { callId, signal } = {}) {
           const part = await observer.start(name, params, callId);
+          onDiagnosticEvent?.(name, { type: "invoked", callId });
           try {
             if (signal?.aborted) throw signal.reason ?? new Error("Tool call cancelled.");
+            if (isPolicyTool(name)) {
+              const policy = await loadApprovedPolicy({ workspace, requestQuestions, signal });
+              const approved = await authorizeNativeTool({
+                policy,
+                workspace,
+                name,
+                params,
+                requestQuestions,
+                signal,
+              });
+              if (!approved) throw new Error("Access denied or cancelled by workspace policy.");
+            }
             const rawResult = await definition.handler(params, { signal, callId });
             const result = normalizeToolResult(rawResult);
+            onDiagnosticEvent?.(name, { type: "finished", callId, ok: result.ok });
             observer.complete(part, name, params, result);
             return result;
           } catch (error) {
+            onDiagnosticEvent?.(name, { type: "finished", callId, ok: false });
             const result = {
               ok: false,
               output: `Error: ${error?.message ?? String(error)}`,

@@ -18,5 +18,6 @@ Each document starts with a **Type** tag describing what it records and a **Stat
 | [`cross-prompt-responses-continuation.md`](./cross-prompt-responses-continuation.md) | `proposal` | `deferred` | Reuse incremental Responses continuation across user prompts |
 | [`parallel-session-orchestration.md`](./parallel-session-orchestration.md) | `proposal` | `deferred` | Parallel sessions in one Xarab instance and general-purpose task agent prerequisite |
 | [`general-purpose-task-runner.md`](./general-purpose-task-runner.md) | `proposal` | `in-progress` | Utility and isolated agentic tasks, routing, and automatic session titles |
+| [`command-policy.md`](./command-policy.md) | `decision` | `in-progress` | Workspace command and native file-tool authorization rules |
 
 Use `planned`, `deferred`, `in-progress`, and `done` for status values. Add a `fix`-type document when a completed fix needs a durable implementation record; ordinary implementation details belong in code, tests, or release notes.

@@ -1,5 +1,6 @@
 import { runShellCommand } from "./shell-command-executor.js";
 import { authorizeCommand } from "../../command-risk.js";
+import { loadApprovedPolicy } from "../../policy-consent.js";
 
 const MAX_AGENT_OUTPUT_BYTES = 64 * 1024;
 const MAX_MODEL_OUTPUT_BYTES = 8 * 1024;
@@ -30,8 +31,10 @@ export function createShellTool({
       if (typeof command !== "string" || !command.trim())
         return "Error: provide a non-empty shell command.";
 
+      const policy = await loadApprovedPolicy({ workspace: root, requestQuestions, signal });
       const authorization = await authorizeCommand({
         command,
+        policy,
         workspace: root,
         signal,
         assess: assessCommand,

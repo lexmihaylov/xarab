@@ -57,12 +57,16 @@ export function createTaskTool({ runner, workspace, onProgress = () => {} }) {
         signal,
         onProgress: (event) => onProgress({ ...event, callId }),
       });
+      const diagnostic = result.diagnostics;
+      const details = diagnostic
+        ? `\nDiagnostics: phase=${diagnostic.phase}; elapsed=${diagnostic.elapsedMs}ms; approval=${diagnostic.approvalPending ? "pending" : "not pending"}${diagnostic.lastTool ? `; last tool=${diagnostic.lastTool.name} (${diagnostic.lastTool.outcome})` : ""}. Cancellation is cooperative; side effects may continue.`
+        : "";
       return {
         ok: result.status === "completed",
         output:
           result.status === "completed"
             ? result.value
-            : `Task ${result.status}: ${result.error}${result.partial ? `\nPartial output (unfinished):\n${result.partial}` : ""}`,
+            : `Task ${result.status}: ${result.error}${details}${result.cleanupError ? `\n${result.cleanupError}` : ""}${result.partial ? `\nPartial output (unfinished):\n${result.partial}` : ""}`,
       };
     },
   };

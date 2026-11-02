@@ -99,9 +99,17 @@ export function createAssistantController({
         workspace,
         instructionFiles,
         toolRuntime: {
-          requestQuestions: questionRequest.request,
+          async requestQuestions(questions, options) {
+            onToolEvent?.("approval", { type: "pending" });
+            try {
+              return await questionRequest.request(questions, options);
+            } finally {
+              onToolEvent?.("approval", { type: "finished" });
+            }
+          },
           assessCommand: (request) => tasks.assessCommand(request),
           onToolEvent,
+          onDiagnosticEvent: onToolEvent,
         },
       }),
     getSession: () => sessionController.getActiveSession(),

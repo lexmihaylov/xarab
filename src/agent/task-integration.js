@@ -36,7 +36,11 @@ export function createTaskIntegration({
       if (event.type === "text")
         part.summary = `${part.summary ?? ""}${event.text}`.slice(-16 * 1024);
       else if (event.type === "status") part.title = `Task ${event.status}`;
-      else if (event.type === "tool") part.title = `Task: ${event.name}`;
+      else if (event.type === "tool")
+        part.title =
+          event.name === "approval" && event.event?.type === "pending"
+            ? "Task: awaiting response"
+            : `Task: ${event.name}`;
       else if (event.type === "assignment")
         part.taskExecution = `Tier ${event.tier} · ${event.provider} · ${event.model}`;
       sessionChanged();

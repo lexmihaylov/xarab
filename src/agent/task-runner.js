@@ -130,14 +130,29 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
     const record = { controller, done: null };
     active.add(record);
     const id = randomUUID();
+    const startedAt = Date.now();
+    let phase = mode === "utility" ? "queued" : "starting";
+    let lastTool;
+    let approvalPending = false;
+    let timeoutSnapshot;
+    const snapshot = () => ({
+      phase,
+      elapsedMs: Date.now() - startedAt,
+      ...(lastTool ? { lastTool } : {}),
+      approvalPending,
+    });
     let worker;
     let failureStatus;
-    const timer = setTimeout(() => {
-      if (controller.signal.aborted) return;
-      failureStatus = "timed-out";
-      controller.abort(new Error("Task timed out."));
-    }, timeoutMs);
-    timer.unref?.();
+    const timer =
+      mode === "utility"
+        ? setTimeout(() => {
+            if (controller.signal.aborted) return;
+            failureStatus = "timed-out";
+            timeoutSnapshot = snapshot();
+            controller.abort(new Error("Task timed out."));
+          }, timeoutMs)
+        : undefined;
+    timer?.unref?.();
     const check = () => {
       if (controller.signal.aborted) throw controller.signal.reason ?? new Error("Task cancelled.");
     };
@@ -153,6 +168,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
       let result;
       try {
         check();
+        phase = "classifying";
         onProgress({ id, type: "status", status: "classifying" });
         const classification = await classify({
           prompt: brief.slice(0, 4096),
@@ -164,10 +180,22 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
           throw new Error(classification?.error || "Task classification failed.");
         worker = createWorker({
           mode,
-          onToolEvent: (name, event) => onProgress({ id, type: "tool", name, event }),
+          onToolEvent: (name, event) => {
+            if (name === "approval") approvalPending = event?.type === "pending";
+            else if (["invoked", "finished"].includes(event?.type)) {
+              lastTool = {
+                name: String(name)
+                  .replace(/[^a-zA-Z0-9_.-]/g, "")
+                  .slice(0, 80),
+                outcome: event.type === "invoked" ? "running" : event.ok ? "success" : "failed",
+              };
+            }
+            onProgress({ id, type: "tool", name, event });
+          },
         });
         if (!worker.getTierInfo(classification.tier).configured)
           throw new Error(`Task worker tier ${classification.tier} is not configured.`);
+        phase = "running";
         onProgress({ id, type: "status", status: "running" });
         await executeWorker({
           worker,
@@ -183,6 +211,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
         });
         check();
         if (!output.text.trim()) throw new Error("Task returned empty output.");
+        phase = "parsing";
         const value = await parse(output.text.trim());
         check();
         result = { id, status: "completed", value };
@@ -194,18 +223,40 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
           failureStatus,
           partial: output.text,
         });
+        result.diagnostics = timeoutSnapshot ?? snapshot();
       } finally {
+        phase = "cleanup";
         try {
           await worker?.dispose?.();
         } catch {
-          result = {
-            id,
-            status: "failed",
-            error: "Task resource cleanup failed.",
-            partial: output.text,
-          };
+          result =
+            failureStatus === "timed-out"
+              ? {
+                  ...failureResult({
+                    id,
+                    signal: controller.signal,
+                    failureStatus,
+                    partial: output.text,
+                  }),
+                  cleanupError: "Task resource cleanup failed.",
+                }
+              : {
+                  id,
+                  status: "failed",
+                  error: "Task resource cleanup failed.",
+                  partial: output.text,
+                };
         }
       }
+      if (failureStatus === "timed-out" && result?.status !== "timed-out") {
+        result = failureResult({
+          id,
+          signal: controller.signal,
+          failureStatus,
+          partial: output.text,
+        });
+      }
+      if (result?.status !== "completed") result.diagnostics ??= timeoutSnapshot ?? snapshot();
       return result;
     };
     record.done = (mode === "utility" ? utilityQueue.then(run) : run()).finally(() => {

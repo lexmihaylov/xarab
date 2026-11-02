@@ -73,6 +73,7 @@ export function createWorker({
     assessCommand: toolRuntime?.assessCommand,
     requestQuestions: toolRuntime?.requestQuestions,
     onToolEvent: toolRuntime?.onToolEvent ?? (() => {}),
+    onDiagnosticEvent: toolRuntime?.onDiagnosticEvent,
     getMessages: toolRuntime?.getMessages ?? (() => []),
     getCurrentAgentMessage: toolRuntime?.getCurrentAgentMessage ?? (() => undefined),
     sessionChanged: toolRuntime?.sessionChanged ?? (() => {}),
