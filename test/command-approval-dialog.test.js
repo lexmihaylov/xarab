@@ -111,6 +111,43 @@ test("long multiline commands remain scrollable with actions visible", async () 
   }
 });
 
+test("long assessment details cannot obscure the command or actions", async () => {
+  const command = Array.from({ length: 20 }, (_, i) => `echo line-${i}`).join("\n");
+  const view = await testRender(
+    React.createElement(CommandApprovalDialog, {
+      commandApproval: {
+        ...commandApproval,
+        command,
+        reason: Array.from({ length: 30 }, (_, i) => `reason-${i}`).join("\n"),
+        workspace: `/work/${"long-path/".repeat(30)}end-workspace`,
+      },
+      onAnswer() {},
+    }),
+    { width: 48, height: 21 },
+  );
+  try {
+    await view.flush();
+    let frame = view.captureCharFrame();
+    assert.match(frame, /echo line-0/);
+    assert.match(frame, /\[ Deny \]/);
+    assert.match(frame, /\[ Approve \]/);
+    await press(view, "tab");
+    for (let i = 0; i < 30; i++) {
+      await act(async () => view.mockInput.pressArrow("down"));
+      await view.flush();
+    }
+    assert.match(view.captureCharFrame(), /echo line-19/);
+    await press(view, "tab");
+    for (let i = 0; i < 100; i++) await act(async () => view.mockInput.pressArrow("down"));
+    await view.flush();
+    frame = view.captureCharFrame();
+    assert.match(frame, /end-workspace/);
+    assert.match(frame, /\[ Approve \]/);
+  } finally {
+    await act(async () => view.dispose());
+  }
+});
+
 test("command display distinguishes literal escape sequences from controls", () => {
   assert.equal(visibleCommand("a\r\u001b\u202eb\n"), "a\\u000d\\u001b\\u202eb\n");
   assert.notEqual(visibleCommand("\\u001b"), visibleCommand("\u001b"));

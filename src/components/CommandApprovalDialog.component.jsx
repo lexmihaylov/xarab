@@ -19,12 +19,18 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
   const [size, setSize] = useState({ width: renderer.width, height: renderer.height });
   useOnResize((width, height) => setSize({ width, height }));
   const editor = useRef(null);
+  const commandScroll = useRef(null);
+  const detailsScroll = useRef(null);
   const [focus, setFocus] = useState("actions");
   const [action, setAction] = useState(1);
   const actions = ["Deny", "Approve"];
   const risk = commandApproval.risk.toUpperCase();
   const scope =
-    commandApproval.scope === "outside" ? "OUTSIDE WORKSPACE" : commandApproval.scope.toUpperCase();
+    commandApproval.scope === "outside"
+      ? size.width < 60
+        ? "OUTSIDE"
+        : "OUTSIDE WORKSPACE"
+      : commandApproval.scope.toUpperCase();
   const riskColor =
     commandApproval.risk === "high" || commandApproval.risk === "unclassified"
       ? colors.error
@@ -47,8 +53,14 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
     }
     if (key.name === "tab") {
       key.preventDefault();
-      const areas = ["command", "feedback", "actions"];
-      setFocus(areas[(areas.indexOf(focus) + (key.shift ? 2 : 1)) % 3]);
+      const areas = ["command", "details", "feedback", "actions"];
+      setFocus(areas[(areas.indexOf(focus) + (key.shift ? areas.length - 1 : 1)) % areas.length]);
+      return;
+    }
+    if ((focus === "command" || focus === "details") && ["up", "down"].includes(key.name)) {
+      key.preventDefault();
+      const scroll = focus === "command" ? commandScroll : detailsScroll;
+      scroll.current?.scrollBy(key.name === "up" ? -1 : 1);
       return;
     }
     if (focus !== "actions") return;
@@ -77,23 +89,25 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
 
   return (
     <Modal title="COMMAND APPROVAL" boundedBackdrop width={width} height={height}>
-      <text fg={colors.muted} flexShrink={0}>
-        Review this exact command before it runs
-      </text>
-      <box flexDirection="column" flexGrow={1} minHeight={0} marginY={1}>
+      <box flexDirection="column" flexGrow={1} minHeight={0}>
         <box
           flexDirection="column"
           border
           borderStyle="rounded"
-          borderColor={riskColor}
+          borderColor={focus === "details" ? colors.accent : riskColor}
           paddingX={1}
+          height={4}
           flexShrink={0}
         >
-          <text fg={riskColor} bold>
+          <text fg={riskColor} bold height={1} flexShrink={0}>
             {`RISK: ${risk} · SCOPE: ${scope}`}
           </text>
-          <text fg={colors.text}>{visibleCommand(commandApproval.reason)}</text>
-          <text fg={colors.muted}>{visibleCommand(`Workspace: ${commandApproval.workspace}`)}</text>
+          <scrollbox ref={detailsScroll} flexGrow={1} minHeight={0}>
+            <text fg={colors.text}>{visibleCommand(commandApproval.reason)}</text>
+            <text fg={colors.muted}>
+              {visibleCommand(`Workspace: ${commandApproval.workspace}`)}
+            </text>
+          </scrollbox>
         </box>
         <box
           flexDirection="column"
@@ -102,13 +116,12 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
           borderColor={focus === "command" ? colors.accent : colors.border}
           paddingX={1}
           flexGrow={1}
-          minHeight={0}
-          marginTop={1}
+          minHeight={4}
         >
           <text fg={colors.label} height={1} flexShrink={0}>
             COMMAND · controls escaped visibly
           </text>
-          <scrollbox focused={focus === "command"} flexGrow={1} minHeight={0}>
+          <scrollbox ref={commandScroll} flexGrow={1} minHeight={0}>
             <text fg={colors.text}>{visibleCommand(commandApproval.command)}</text>
           </scrollbox>
         </box>
@@ -118,15 +131,14 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
           borderStyle="rounded"
           borderColor={focus === "feedback" ? colors.accent : colors.border}
           paddingX={1}
-          height={5}
-          minHeight={5}
-          marginTop={1}
+          height={3}
+          minHeight={3}
           flexShrink={0}
         >
           <text fg={colors.label} height={1} flexShrink={0}>
             OPTIONAL DENIAL FEEDBACK
           </text>
-          <box height={4} minHeight={0} flexGrow={1} overflow="hidden">
+          <box height={1} minHeight={0} flexGrow={1} overflow="hidden">
             <textarea
               ref={editor}
               focused={focus === "feedback"}
@@ -159,12 +171,12 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
           </box>
         ))}
       </box>
-      <text fg={colors.muted} flexShrink={0} marginTop={1}>
+      <text fg={colors.muted} flexShrink={0}>
         {focus === "feedback"
-          ? "Enter newline · Tab actions · Esc cancel"
+          ? "Enter newline · Tab next · Esc cancel"
           : focus === "actions"
-            ? "←→ action · Enter select · Tab command · Esc cancel"
-            : "↑↓ scroll · Tab feedback/actions · Esc cancel"}
+            ? "←→ select · Enter · Tab · Esc cancel"
+            : "↑↓ scroll · Tab next · Esc cancel"}
       </text>
     </Modal>
   );
