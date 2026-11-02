@@ -19,9 +19,18 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
   const [size, setSize] = useState({ width: renderer.width, height: renderer.height });
   useOnResize((width, height) => setSize({ width, height }));
   const editor = useRef(null);
-  const [focus, setFocus] = useState("command");
-  const [action, setAction] = useState(0);
+  const [focus, setFocus] = useState("actions");
+  const [action, setAction] = useState(1);
   const actions = ["Deny", "Approve once"];
+  const risk = commandApproval.risk.toUpperCase();
+  const scope =
+    commandApproval.scope === "outside" ? "OUTSIDE WORKSPACE" : commandApproval.scope.toUpperCase();
+  const riskColor =
+    commandApproval.risk === "high" || commandApproval.risk === "unclassified"
+      ? colors.error
+      : commandApproval.risk === "medium"
+        ? colors.warning
+        : colors.green;
   const finish = () =>
     onAnswer([
       {
@@ -76,10 +85,25 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
           flexDirection="column"
           border
           borderStyle="rounded"
+          borderColor={riskColor}
+          paddingX={1}
+          flexShrink={0}
+        >
+          <text fg={riskColor} bold>
+            {`RISK: ${risk} · SCOPE: ${scope}`}
+          </text>
+          <text fg={colors.text}>{visibleCommand(commandApproval.reason)}</text>
+          <text fg={colors.muted}>{visibleCommand(`Workspace: ${commandApproval.workspace}`)}</text>
+        </box>
+        <box
+          flexDirection="column"
+          border
+          borderStyle="rounded"
           borderColor={focus === "command" ? colors.accent : colors.border}
           paddingX={1}
           flexGrow={1}
           minHeight={0}
+          marginTop={1}
         >
           <text fg={colors.label} height={1} flexShrink={0}>
             COMMAND · controls escaped visibly
@@ -88,14 +112,6 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
             <text fg={colors.text}>{visibleCommand(commandApproval.command)}</text>
           </scrollbox>
         </box>
-        <text fg={colors.warning} flexShrink={0} marginTop={1}>
-          {visibleCommand(
-            `${commandApproval.risk} · ${commandApproval.scope}: ${commandApproval.reason}`,
-          )}
-        </text>
-        <text fg={colors.muted} flexShrink={0}>
-          {visibleCommand(`Workspace: ${commandApproval.workspace}`)}
-        </text>
         <box
           flexDirection="column"
           border
@@ -147,7 +163,7 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
         {focus === "feedback"
           ? "Enter newline · Tab actions · Esc cancel"
           : focus === "actions"
-            ? "←→ action · Enter select · Tab · Esc cancel"
+            ? "←→ action · Enter select · Tab command · Esc cancel"
             : "↑↓ scroll · Tab feedback/actions · Esc cancel"}
       </text>
     </Modal>

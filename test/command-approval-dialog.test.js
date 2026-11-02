@@ -24,7 +24,7 @@ async function press(view, key) {
   await view.flush();
 }
 
-test("approval dialog defaults to denial and returns typed feedback", async () => {
+test("approval dialog emphasizes risk details and initially selects approval", async () => {
   const answers = [];
   const view = await testRender(
     React.createElement(CommandApprovalDialog, {
@@ -39,21 +39,19 @@ test("approval dialog defaults to denial and returns typed feedback", async () =
     assert.match(frame, /COMMAND APPROVAL/);
     assert.match(frame, /rm \.\.\/outside/);
     assert.match(frame, /OPTIONAL DENIAL FEEDBACK/);
+    assert.match(frame, /RISK: HIGH/);
+    assert.match(frame, /SCOPE: OUTSIDE WORKSPACE/);
+    assert.match(frame, /Deletes outside workspace/);
     assert.match(frame, /\[ Deny \]/);
     assert.match(frame, /\[ Approve once \]/);
-    await press(view, "tab");
-    await act(async () => view.mockInput.typeText("Use a workspace path"));
-    await view.flush();
-    await press(view, "tab");
     await press(view, "return");
-    assert.equal(answers[0][0].choices[0], "Deny");
-    assert.equal(answers[0][0].text, "Use a workspace path");
+    assert.equal(answers[0][0].choices[0], "Approve once");
   } finally {
     await act(async () => view.dispose());
   }
 });
 
-test("approval requires action focus and explicit selection; Ctrl-C cancels", async () => {
+test("approve is preselected; denial requires selecting it; Ctrl-C cancels", async () => {
   const answers = [];
   const view = await testRender(
     React.createElement(CommandApprovalDialog, {
@@ -65,15 +63,10 @@ test("approval requires action focus and explicit selection; Ctrl-C cancels", as
   try {
     await view.flush();
     await press(view, "return");
-    assert.equal(answers.length, 0);
-    await press(view, "tab");
-    await press(view, "tab");
-    await act(async () => view.mockInput.pressArrow("right"));
-    await press(view, "return");
     assert.equal(answers[0][0].choices[0], "Approve once");
-    await act(async () => view.mockInput.pressKey("c", { ctrl: true }));
-    await view.flush();
-    assert.equal(answers[1], null);
+    await act(async () => view.mockInput.pressArrow("left"));
+    await press(view, "return");
+    assert.equal(answers[1][0].choices[0], "Deny");
   } finally {
     await act(async () => view.dispose());
   }
@@ -106,6 +99,7 @@ test("long multiline commands remain scrollable with actions visible", async () 
   try {
     await view.flush();
     assert.match(view.captureCharFrame(), /echo line-0/);
+    await press(view, "tab");
     for (let i = 0; i < 110; i++) {
       await act(async () => view.mockInput.pressArrow("down"));
     }
