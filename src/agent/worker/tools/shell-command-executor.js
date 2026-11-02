@@ -2,9 +2,14 @@ import { spawn } from "node:child_process";
 
 export function runShellCommand(
   command,
-  { cwd = process.cwd(), timeoutMs = 30_000, maxOutputBytes = 64 * 1024 } = {},
+  { cwd = process.cwd(), timeoutMs = 30_000, maxOutputBytes = 64 * 1024, signal } = {},
 ) {
+  const abortSignal = signal;
   return new Promise((resolve) => {
+    if (signal?.aborted) {
+      resolve({ code: null, stdout: "", stderr: "", error: "Command cancelled.", cancelled: true });
+      return;
+    }
     let child;
     try {
       child = spawn(command, {
@@ -43,11 +48,27 @@ export function runShellCommand(
       }
     }
 
+    let killTimer;
+    function cancel() {
+      stopProcess();
+      killTimer ??= setTimeout(() => {
+        try {
+          if (process.platform !== "win32" && child.pid) process.kill(-child.pid, "SIGKILL");
+          else child.kill("SIGKILL");
+        } catch {
+          // The process may already have exited.
+        }
+      }, 1000);
+      killTimer.unref?.();
+    }
+    signal?.addEventListener("abort", cancel, { once: true });
+    if (signal?.aborted) cancel();
+
     function collect(target, chunk) {
       const remaining = maxOutputBytes - outputBytes;
       if (remaining <= 0) {
         truncated = true;
-        stopProcess();
+        cancel();
         return;
       }
       const kept = chunk.subarray(0, remaining);
@@ -55,7 +76,7 @@ export function runShellCommand(
       outputBytes += kept.length;
       if (kept.length < chunk.length) {
         truncated = true;
-        stopProcess();
+        cancel();
       }
     }
 
@@ -67,7 +88,7 @@ export function runShellCommand(
 
     const timeout = setTimeout(() => {
       timedOut = true;
-      stopProcess();
+      cancel();
     }, timeoutMs);
     timeout.unref?.();
 
@@ -75,9 +96,13 @@ export function runShellCommand(
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      clearTimeout(killTimer);
+      // The close event's signal is distinct from the caller's AbortSignal.
+      abortSignal?.removeEventListener("abort", cancel);
       resolve({
         code,
         signal,
+        cancelled: abortSignal?.aborted ?? false,
         stdout: Buffer.concat(stdout).toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
         error: spawnError,

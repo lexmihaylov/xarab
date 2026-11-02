@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useKeyboard, useTerminalDimensions } from "@opentui/react";
-import { getHuggingFaceModelDetails } from "../utils/huggingface-model-search.js";
+import { useModelDetails } from "./hooks/use-model-details.js";
 import {
   cleanModelText as clean,
   compactCount,
@@ -74,11 +74,9 @@ export function ModelDownloader({
   const [fileIndex, setFileIndex] = useState(0);
   const [active, setActive] = useState(0);
   const [detailTab, setDetailTab] = useState("Overview");
-  const [detailState, setDetailState] = useState({});
   const resultScroll = useRef(null);
   const fileScroll = useRef(null);
   const detailScroll = useRef(null);
-  const cache = useRef(new Map());
   const { width: terminalWidth } = useTerminalDimensions();
   const screenWidth = Math.max(1, terminalWidth - 4);
   const narrow = screenWidth < 76;
@@ -102,6 +100,7 @@ export function ModelDownloader({
   const fileSizeWidth = Math.min(12, Math.max(8, Math.floor(fileContentWidth / 2)));
   const fileNameWidth = Math.max(1, fileContentWidth - fileSizeWidth);
   const model = downloads[modelIndex];
+  const detailState = useModelDetails(model?.name);
   const details = detailState.id === model?.name ? detailState.data : null;
   const files = details?.files ?? model?.files ?? [];
   const file = files[fileIndex];
@@ -129,29 +128,6 @@ export function ModelDownloader({
 
   useEffect(() => {
     setFileIndex(0);
-    if (!model) return;
-    const id = model.name;
-    if (cache.current.has(id)) {
-      setDetailState({ id, data: cache.current.get(id) });
-      return;
-    }
-    const controller = new AbortController();
-    setDetailState({ id, loading: true });
-    const timer = setTimeout(async () => {
-      try {
-        const data = await getHuggingFaceModelDetails(id, { signal: controller.signal });
-        if (!controller.signal.aborted) {
-          cache.current.set(id, data);
-          setDetailState({ id, data });
-        }
-      } catch (detailError) {
-        if (!controller.signal.aborted) setDetailState({ id, error: detailError.message });
-      }
-    }, 180);
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
   }, [model?.name]);
 
   const submitSearch = () => {

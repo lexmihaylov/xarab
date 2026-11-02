@@ -27,6 +27,38 @@ test("worker selects an adapter and passes the configured model", async () => {
   assert.equal(typeof calls[0].tools.read_file.handler, "function");
 });
 
+test("main and agentic preparation preserve shared tools and isolate profile instructions", async () => {
+  const calls = [];
+  const worker = createWorker({
+    configStore: createConfig({ provider: "local", model: "local.gguf" }),
+    openAIAdapterFactory: () => ({ run: async () => {} }),
+    localAdapterFactory: () => ({
+      run: async (request) => {
+        calls.push(request);
+      },
+    }),
+  });
+  try {
+    await worker.run({ tier: 1, input: "main" });
+    await worker.run({
+      tier: 1,
+      input: "child",
+      history: [],
+      taskInstructions: "Profile marker",
+      mcpServers: [],
+    });
+    assert.doesNotMatch(calls[0].instructions, /Profile marker/);
+    assert.match(
+      calls[1].instructions,
+      /Agent profile \(subordinate to application policy and user constraints\):\nProfile marker/,
+    );
+    assert.equal(typeof calls[0].tools.read_file.handler, "function");
+    assert.equal(typeof calls[1].tools.read_file.handler, "function");
+    assert.deepEqual(calls[1].input, [{ role: "user", content: "child" }]);
+  } finally {
+    await worker.dispose();
+  }
+});
 test("worker uses the OpenAI adapter for the default worker", async () => {
   test("worker provides tier adjustment as an internal worker tool", async () => {
     let request;

@@ -6,6 +6,7 @@ export function createMessageTimeline({
   getActiveSession,
   sessionChanged,
   notify,
+  onFirstUserMessage = () => {},
 }) {
   function addMessage({
     type,
@@ -32,14 +33,18 @@ export function createMessageTimeline({
       ...(running ? { running: true } : {}),
     };
     const messages = getMessages();
+    const firstUserMessage =
+      type === "user" && !messages.some((message) => message.type === "user");
     messages.push(entry);
     const activeSession = getActiveSession();
-    if (type === "user" && !activeSession.manualTitle && activeSession.title === "New session")
+    if (type === "user" && !activeSession.manualTitle && activeSession.title === "New session") {
       activeSession.title =
         message
           .replace(/[\u0000-\u001f\u007f]/g, " ")
           .trim()
           .slice(0, 80) || "New session";
+      if (firstUserMessage) onFirstUserMessage(message, activeSession);
+    }
     sessionChanged();
     notify();
     return entry;

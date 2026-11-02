@@ -13,7 +13,7 @@
     "classifier:evaluate": "node scripts/evaluate-classifier.js",
     "make:install": "node scripts/make-install.js",
     "postinstall": "node scripts/install-classifier.js",
-    "test": "node --import tsx --test"
+    "test": "node --import tsx --test \"test/**/*.test.js\""
   },
   "keywords": [],
   "author": "",

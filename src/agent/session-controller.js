@@ -19,6 +19,7 @@ export function createSessionController({
   isShuttingDown,
   getSessionPersisted,
   setSessionPersisted,
+  onSessionLeave = () => {},
 }) {
   let activeSession = newSession(workspace);
   let draft = { value: "", cursor: 0 };
@@ -139,6 +140,7 @@ export function createSessionController({
     notify();
     try {
       await saveCurrentSession();
+      onSessionLeave();
       activeSession = newSession(workspace, name?.trim().slice(0, 80));
       setSessionPersisted(false);
       sessionRevision = 0;
@@ -210,6 +212,7 @@ export function createSessionController({
           "This session belongs to another workspace. Open Xarab in that workspace to resume it.",
         );
       await saveCurrentSession();
+      onSessionLeave();
       activeSession = record;
       setSessionPersisted(true);
       sessionRevision = 0;
@@ -300,6 +303,7 @@ export function createSessionController({
     try {
       await sessionStore.remove(id);
       if (removingActive) {
+        onSessionLeave();
         clearTimeout(saveTimer);
         saveTimer = undefined;
         activeSession = newSession(workspace);

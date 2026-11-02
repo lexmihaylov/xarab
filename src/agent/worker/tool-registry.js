@@ -1,3 +1,4 @@
+import { createToolTimelineObserver } from "./tool-timeline-observer.js";
 import { createAskQuestionsTool } from "./tools/ask-questions-tool.js";
 import { createReadFileTool } from "./tools/read-file-tool.js";
 import { createListFilesTool } from "./tools/list-files-tool.js";
@@ -20,6 +21,7 @@ export function createToolRegistry({
   workspace,
   skills = new Map(),
   externalTools = {},
+  taskTool,
   configStore,
   imageCredentials,
   requestQuestions,
@@ -31,6 +33,7 @@ export function createToolRegistry({
 }) {
   const definitions = {
     ...externalTools,
+    ...(taskTool ? { task: taskTool } : {}),
     ...(requestQuestions ? { ask_questions: createAskQuestionsTool({ requestQuestions }) } : {}),
     read_file: createReadFileTool({
       workspace,
@@ -90,53 +93,24 @@ export function createToolRegistry({
       : {}),
   };
 
+  const observer = createToolTimelineObserver({
+    getMessages,
+    getCurrentAgentMessage,
+    sessionChanged,
+    notify,
+  });
   const tools = Object.fromEntries(
     Object.entries(definitions).map(([name, definition]) => [
       name,
       {
         ...definition,
         async handler(params, { callId, signal } = {}) {
-          const part = {
-            type: "tool",
-            id: Symbol(name),
-            ...(callId ? { callId } : {}),
-            toolName: name,
-            params: { ...(params ?? {}) },
-            label: toolProgressLabel(name, params),
-            title:
-              name === "skill"
-                ? `Loading skill: ${safeToolDetail(params?.name)}`
-                : toolProgressLabel(name, params),
-            summary: toolProgressSummary(name, params),
-            status: "running",
-          };
-          const currentAgentMessage = getCurrentAgentMessage();
-          const messages = getMessages();
-          if (currentAgentMessage) {
-            // Attach the assistant timeline as soon as a tool starts. Tool calls
-            // can happen before the model emits its first text token, so waiting
-            // for appendAssistantText() makes the running tool invisible.
-            if (!messages.includes(currentAgentMessage)) messages.push(currentAgentMessage);
-            currentAgentMessage.parts.push(part);
-            sessionChanged();
-            notify();
-            // Let the UI paint the running tool card before the handler starts.
-            await new Promise((resolve) => setImmediate(resolve));
-          }
+          const part = await observer.start(name, params, callId);
           try {
-            const rawResult = await definition.handler(params, { signal });
+            if (signal?.aborted) throw signal.reason ?? new Error("Tool call cancelled.");
+            const rawResult = await definition.handler(params, { signal, callId });
             const result = normalizeToolResult(rawResult);
-            part.status = result.ok ? "complete" : "error";
-            part.result = storedToolResult(result);
-            // These tools emit concise UI summaries separately; keep their full
-            // result payload available to the model without rendering it in chat.
-            const preservesEventSummary = name === "read_file" || name === "search_content";
-            if (name === "skill" && result.ok) {
-              part.title = `Loaded skill: ${safeToolDetail(params?.name)}`;
-              part.summary = "";
-            } else if (!result.ok || !preservesEventSummary || !part.summary) {
-              part.summary = result.output;
-            }
+            observer.complete(part, name, params, result);
             return result;
           } catch (error) {
             const result = {
@@ -144,13 +118,10 @@ export function createToolRegistry({
               output: `Error: ${error?.message ?? String(error)}`,
               errorCode: error?.code,
             };
-            part.status = "error";
-            part.result = storedToolResult(result);
-            part.summary = result.output.slice(0, 240);
+            observer.fail(part, result);
             return result;
           } finally {
-            sessionChanged();
-            notify();
+            observer.finish();
           }
         },
       },
@@ -171,53 +142,4 @@ function normalizeToolResult(result) {
   const output = serialized === undefined ? String(result) : serialized;
   const failed = /^\s*(?:error|failed|failure)\s*:/i.test(output);
   return { ok: !failed, output };
-}
-
-const MAX_STORED_TOOL_OUTPUT = 16 * 1024;
-
-function storedToolResult(result) {
-  const output = result.output.slice(0, MAX_STORED_TOOL_OUTPUT);
-  return {
-    ok: result.ok,
-    output:
-      output.length < result.output.length
-        ? `${output}\n[Tool output truncated for session history.]`
-        : output,
-    ...(output.length < result.output.length ? { truncated: true } : {}),
-    ...(result.errorCode ? { errorCode: result.errorCode } : {}),
-  };
-}
-
-function safeToolDetail(value) {
-  return String(value ?? "")
-    .replace(
-      /[\u0000-\u001f\u007f]/g,
-      (character) => `\\x${character.charCodeAt(0).toString(16).padStart(2, "0")}`,
-    )
-    .slice(0, 100);
-}
-
-function toolProgressLabel(name, params = {}) {
-  if (name === "ask_questions") return "Asking user questions";
-  if (name === "run_command") return `Executing ${safeToolDetail(params.command)}`;
-  if (name === "read_file") return `Reading ${safeToolDetail(params.path)}`;
-  if (name === "list_files") return `Listing ${safeToolDetail(params.path || ".")}`;
-  if (name === "search_files") return `Searching filenames for “${safeToolDetail(params.query)}”`;
-  if (name === "search_content")
-    return `Searching file contents for “${safeToolDetail(params.query)}”`;
-  if (name === "edit") return `Editing ${safeToolDetail(params.path)}`;
-  if (name === "insert_before") return `Inserting before anchor in ${safeToolDetail(params.path)}`;
-  if (name === "insert_after") return `Inserting after anchor in ${safeToolDetail(params.path)}`;
-  if (name === "write") return `Writing ${safeToolDetail(params.path)}`;
-  if (name === "websearch") return `Searching the web for “${safeToolDetail(params.query)}”`;
-  if (name === "webfetch") return `Fetching ${safeToolDetail(params.url)}`;
-  if (name === "generate_image") return `Generating image in ${safeToolDetail(params.folder)}`;
-  if (name === "edit_image") return `Editing ${safeToolDetail(params.path)}`;
-  if (name === "analyze_image") return `Analyzing ${safeToolDetail(params.path)}`;
-  return `Running ${name}`;
-}
-
-function toolProgressSummary(name, params = {}) {
-  if (name === "run_command") return safeToolDetail(params.command);
-  return undefined;
 }

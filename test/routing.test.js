@@ -8,6 +8,66 @@ import {
   TIER_CLASSIFIER_INSTRUCTIONS,
 } from "../src/agent/classifier/index.js";
 
+test("shared classifier waits for in-flight work before replacing its adapter", async () => {
+  let assignment = { provider: "openai", model: "one" };
+  let release;
+  const disposed = [];
+  const classifier = createClassifier({
+    getAssignment: () => assignment,
+    openAIAdapterFactory: ({ model }) => ({
+      async run() {
+        if (model === "one")
+          await new Promise((resolve) => {
+            release = resolve;
+          });
+        return '{"tier":1,"rationale":"bounded"}';
+      },
+      async dispose() {
+        disposed.push(model);
+      },
+    }),
+  });
+  const first = classifier.classify({ prompt: "First" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assignment = { provider: "openai", model: "two" };
+  const second = classifier.classify({ prompt: "Second" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(disposed, []);
+  release();
+  assert.equal((await first).valid, true);
+  assert.equal((await second).valid, true);
+  assert.deepEqual(disposed, ["one"]);
+  await classifier.dispose();
+  assert.deepEqual(disposed, ["one", "two"]);
+});
+
+test("cancelling queued classification returns without waiting for another request", async () => {
+  let release;
+  let runs = 0;
+  const classifier = createClassifier({
+    getAssignment: () => ({ provider: "openai", model: "test" }),
+    openAIAdapterFactory: () => ({
+      async run() {
+        runs++;
+        await new Promise((resolve) => {
+          release = resolve;
+        });
+        return '{"tier":1,"rationale":"bounded"}';
+      },
+    }),
+  });
+  const first = classifier.classify({ prompt: "First" });
+  await new Promise((resolve) => setImmediate(resolve));
+  const controller = new AbortController();
+  const queued = classifier.classify({ prompt: "Queued", signal: controller.signal });
+  controller.abort(new Error("Stop queued request"));
+  await assert.rejects(queued, /Stop queued/);
+  release();
+  await first;
+  await classifier.dispose();
+  assert.equal(runs, 1);
+});
+
 test("classifier instructions distinguish routine execution, investigation, and deep reasoning", () => {
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /1 — Routine execution/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /2 — Investigation and implementation/);

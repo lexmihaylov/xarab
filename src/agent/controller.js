@@ -29,6 +29,8 @@ import { createCommandHandler } from "./assistant-command-handler.js";
 import { createProviderConnections } from "./provider-connections.js";
 import { createSessionCompactor } from "./session-compactor.js";
 import { createAutoCompactor } from "./auto-compactor.js";
+import { createTaskIntegration } from "./task-integration.js";
+import { createLocalWorkerRuntime } from "./worker/local-worker-runtime.js";
 
 export function createAssistantController({
   root,
@@ -46,6 +48,7 @@ export function createAssistantController({
   openAIClassifierAdapterFactory = createOpenAIResponsesClassifierAdapter,
   openAIAdapterFactory = createOpenAIResponsesWorkerAdapter,
   localWorkerAdapterFactory = createLocalLlamaWorkerAdapter,
+  automaticTitles,
   sessionsDir = path.join(path.dirname(configPath), "sessions"),
 }) {
   let status = "Ready";
@@ -79,8 +82,42 @@ export function createAssistantController({
   });
   let worker;
   let tierClassifier;
-
+  const localRuntime = createLocalWorkerRuntime(localWorkerAdapterFactory);
   let sessionController;
+  const tasks = createTaskIntegration({
+    workspace,
+    classify: (request) => getTierClassifier().classify(request),
+    createWorker: ({ onToolEvent, mode }) =>
+      createWorker({
+        configStore,
+        openAIAdapterFactory,
+        openRouterAdapterFactory: () =>
+          createOpenRouterWorkerAdapter({ getApiKey: () => configStore.getApiKey("openrouter") }),
+        localAdapterFactory: () => localRuntime.createAdapter({ wait: mode === "utility" }),
+        getCredentials: () => openAIAuth.getCredentials(),
+        getOpenAIStatus: () => openAIAuth.getStatus(),
+        workspace,
+        instructionFiles,
+        toolRuntime: {
+          requestQuestions: questionRequest.request,
+          onToolEvent,
+        },
+      }),
+    getSession: () => sessionController.getActiveSession(),
+    async applyTitle(session, title) {
+      if (isShuttingDown || sessionController.getActiveSession() !== session || session.manualTitle)
+        return;
+      session.title = title;
+      sessionController.sessionChanged();
+      notify();
+      await sessionController.saveCurrentSession();
+    },
+    warn: (message) => addMessage({ type: "system", message, severity: "warning" }),
+    getCurrentAgentMessage: () => currentAgentMessage,
+    sessionChanged: () => sessionController.sessionChanged(),
+    notify,
+    titlesEnabled: () => automaticTitles ?? configStore.get().automaticTitles !== false,
+  });
   const questionRequest = createQuestionRequest({ notify });
 
   function getState() {
@@ -116,6 +153,7 @@ export function createAssistantController({
     getMessages: () => messages,
     getCurrentAgentMessage: () => currentAgentMessage,
     getActiveSession: () => sessionController?.getActiveSession(),
+    onFirstUserMessage: tasks.onFirstUserMessage,
     sessionChanged: () => sessionController?.sessionChanged(),
     notify,
   });
@@ -124,6 +162,7 @@ export function createAssistantController({
   sessionController = createSessionController({
     workspace,
     sessionStore,
+    onSessionLeave: tasks.cancelTitle,
     getMessages: () => messages,
     setMessages: (next) => {
       messages = next;
@@ -170,12 +209,13 @@ export function createAssistantController({
     openAIAdapterFactory,
     openRouterAdapterFactory: () =>
       createOpenRouterWorkerAdapter({ getApiKey: () => configStore.getApiKey("openrouter") }),
-    localAdapterFactory: localWorkerAdapterFactory,
+    localAdapterFactory: () => localRuntime.createAdapter({ wait: true }),
     getCredentials: () => openAIAuth.getCredentials(),
     getOpenAIStatus: () => openAIAuth.getStatus(),
     workspace,
     instructionFiles,
     toolRuntime: {
+      taskTool: tasks.taskTool,
       requestQuestions: questionRequest.request,
       onToolEvent,
       getMessages: () => messages,
@@ -638,6 +678,7 @@ export function createAssistantController({
   function shutdown() {
     if (shutdownPromise) return shutdownPromise;
     isShuttingDown = true;
+    tasks.cancelTitle();
     questionRequest.respond(null);
     abortController?.abort();
     activeDownload?.controller.abort();
@@ -652,6 +693,7 @@ export function createAssistantController({
         });
       }
       await activeWorkDone;
+      await tasks.shutdown();
       try {
         await saveCurrentSession();
         await sessionStore.flush();
@@ -665,6 +707,7 @@ export function createAssistantController({
       await activeDownload?.promise;
       await tierClassifier?.dispose?.();
       await worker.dispose();
+      await localRuntime.dispose();
     })();
     return shutdownPromise;
   }

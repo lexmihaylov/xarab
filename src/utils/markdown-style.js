@@ -27,6 +27,7 @@ export function createMarkdownStyle(nativeScene) {
       "markup.heading.4": { fg: color(colors.heading), bold: true },
       "markup.heading.5": { fg: color(colors.heading), bold: true },
       "markup.heading.6": { fg: color(colors.heading), bold: true },
+      "markup.strong": { bold: true },
       "markup.list": { fg: color(colors.list), bold: true },
       "markup.list.checked": { fg: color(colors.list), bold: true },
       "markup.list.unchecked": { fg: color(colors.list), bold: true },

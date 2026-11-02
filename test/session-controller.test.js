@@ -14,6 +14,7 @@ async function setup(t, behavior = async ({ onText }) => onText("Reply")) {
   });
   const create = async () => {
     const controller = createAssistantController({
+      automaticTitles: false,
       root,
       workspace: root,
       modelsDir: path.join(root, "models"),

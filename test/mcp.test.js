@@ -11,6 +11,29 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { loadMcpConfig } from "../src/agent/worker/mcp-config.js";
 import { createMcpClient } from "../src/agent/worker/mcp-client.js";
+test("task MCP selection filters servers before consent or connection", async (t) => {
+  const { workspace, save } = await fixture(t);
+  await save({ unselected: { type: "local", command: ["/must-not-start"] } });
+  const errors = [];
+  let approvals = 0;
+  const client = createMcpClient({
+    workspace,
+    configStore: { get: () => ({ mcp: {} }) },
+    requestQuestions: async () => {
+      approvals++;
+      return answer(true);
+    },
+    onError: (error) => errors.push(error),
+  });
+  t.after(() => client.dispose());
+  const connection = await client.discover({ servers: [] });
+  assert.deepEqual(connection.definitions, {});
+  assert.equal(approvals, 0);
+  assert.deepEqual(errors, []);
+  await connection.close();
+  await assert.rejects(client.discover({ servers: "bad" }), /array/);
+});
+
 test("failed servers are isolated and aborted discovery rejects", async (t) => {
   const { workspace } = await fixture(t);
   const errors = [];

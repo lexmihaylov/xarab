@@ -20,7 +20,7 @@ export function createShellTool({ workspace = process.cwd(), onEvent = () => {} 
       },
       required: ["command"],
     },
-    async handler({ command } = {}) {
+    async handler({ command } = {}, { signal } = {}) {
       if (typeof command !== "string" || !command.trim())
         return "Error: provide a non-empty shell command.";
 
@@ -29,6 +29,7 @@ export function createShellTool({ workspace = process.cwd(), onEvent = () => {} 
         cwd: root,
         timeoutMs: COMMAND_TIMEOUT_MS,
         maxOutputBytes: MAX_AGENT_OUTPUT_BYTES,
+        signal,
       });
       onEvent({ type: "completed", command, ...result });
       return formatCommandResult(result);
@@ -68,9 +69,19 @@ function formatCommandOutput(output, label, maxBytes) {
   return result;
 }
 
-function formatCommandResult({ code, signal, stdout, stderr, error, timedOut, truncated }) {
+function formatCommandResult({
+  code,
+  signal,
+  stdout,
+  stderr,
+  error,
+  timedOut,
+  truncated,
+  cancelled,
+}) {
   const lines = [`Exit code: ${code ?? "unknown"}`];
   if (signal) lines.push(`Signal: ${signal}`);
+  if (cancelled) lines.push("Command cancelled; already-started effects have not been undone.");
   if (timedOut) lines.push("Command timed out.");
   if (truncated) lines.push("Captured output was truncated at 64 KiB.");
   if (error) lines.push(`Execution error: ${error}`);

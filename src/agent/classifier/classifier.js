@@ -12,6 +12,33 @@ export function createClassifier({
 }) {
   const adapters = new Map();
   let disposed = false;
+  let queue = Promise.resolve();
+  function enqueue(operation, signal) {
+    const result = queue.then(() => {
+      if (signal?.aborted) throw signal.reason ?? new Error("Classification cancelled.");
+      return operation();
+    });
+    queue = result.catch(() => {});
+    if (!signal) return result;
+    return new Promise((resolve, reject) => {
+      const abort = () => {
+        signal.removeEventListener("abort", abort);
+        reject(signal.reason ?? new Error("Classification cancelled."));
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+      result.then(
+        (value) => {
+          signal.removeEventListener("abort", abort);
+          resolve(value);
+        },
+        (error) => {
+          signal.removeEventListener("abort", abort);
+          reject(error);
+        },
+      );
+    });
+  }
 
   function assignmentKey(assignment) {
     return assignment ? `${assignment.provider}:${assignment.model}` : "";
@@ -40,30 +67,34 @@ export function createClassifier({
   }
 
   return {
-    async load() {
-      if (disposed) throw new Error("Classifier has been disposed.");
-      const assignment = getAssignment();
-      await reconcileAdapters(assignment);
-      const adapter = getAdapter(assignment);
-      await adapter?.load?.();
-    },
-    async classify(input) {
-      if (disposed) throw new Error("Classifier has been disposed.");
-      const assignment = getAssignment();
-      await reconcileAdapters(assignment);
-      if (!assignment?.model) return null;
-      const adapter = getAdapter(assignment);
-      const output = await adapter.run({
-        instructions: TIER_CLASSIFIER_INSTRUCTIONS,
-        input: [
-          {
-            role: "user",
-            content: buildTierClassificationPrompt(input),
-          },
-        ],
-        signal: input.signal,
+    load() {
+      return enqueue(async () => {
+        if (disposed) throw new Error("Classifier has been disposed.");
+        const assignment = getAssignment();
+        await reconcileAdapters(assignment);
+        const adapter = getAdapter(assignment);
+        await adapter?.load?.();
       });
-      return parseTierClassification(output);
+    },
+    classify(input) {
+      return enqueue(async () => {
+        if (disposed) throw new Error("Classifier has been disposed.");
+        const assignment = getAssignment();
+        await reconcileAdapters(assignment);
+        if (!assignment?.model) return null;
+        const adapter = getAdapter(assignment);
+        const output = await adapter.run({
+          instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+          input: [
+            {
+              role: "user",
+              content: buildTierClassificationPrompt(input),
+            },
+          ],
+          signal: input.signal,
+        });
+        return parseTierClassification(output);
+      }, input.signal);
     },
     getInfo() {
       const assignment = getAssignment();
@@ -74,6 +105,7 @@ export function createClassifier({
     async dispose() {
       if (disposed) return;
       disposed = true;
+      await queue;
       await Promise.allSettled([...adapters.values()].map((adapter) => adapter.dispose?.()));
       adapters.clear();
     },

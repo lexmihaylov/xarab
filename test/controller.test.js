@@ -11,6 +11,7 @@ test("controller owns command handling and publishes updated UI state", async (t
   let quitRequested = false;
   let copiedAuthorizationUrl;
   const controller = createAssistantController({
+    automaticTitles: false,
     root: process.cwd(),
     workspace: process.cwd(),
     instructionFiles: [],
@@ -74,6 +75,7 @@ test("manual shell commands persist command, output, and severity", async (t) =>
   const temporary = await mkdtemp("/tmp/opencode/xarab-shell-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const controller = createAssistantController({
+    automaticTitles: false,
     root: temporary,
     workspace: temporary,
     instructionFiles: [],
@@ -112,6 +114,7 @@ test("publishes a running shell message before command completion", async (t) =>
   const temporary = await mkdtemp("/tmp/opencode/xarab-shell-running-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const controller = createAssistantController({
+    automaticTitles: false,
     root: temporary,
     workspace: temporary,
     instructionFiles: [],
@@ -143,6 +146,7 @@ test("controller reassesses remaining work and records adjustment outcomes", asy
       let classifications = 0;
       let runs = 0;
       const controller = createAssistantController({
+        automaticTitles: false,
         root: temporary,
         workspace: temporary,
         instructionFiles: [],
@@ -213,6 +217,7 @@ test("classification failure and cancellation clear the message spinner", async 
       const ready = new Promise((resolve) => (started = resolve));
       const states = [];
       const controller = createAssistantController({
+        automaticTitles: false,
         root: temporary,
         workspace: temporary,
         instructionFiles: [],
@@ -265,6 +270,7 @@ test("selecting a classifier loads it and persists classifier configuration", as
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const loadedModels = [];
   const controller = createAssistantController({
+    automaticTitles: false,
     root: temporary,
     workspace: temporary,
     instructionFiles: [],

@@ -18,7 +18,15 @@ export function createLocalLlamaWorkerAdapter({
     await disposeResources();
     const llama = await modelRuntime.getLlama({ logLevel: "warn" });
     const loadedModel = await llama.loadModel({ modelPath });
-    const loadedContext = await loadedModel.createContext({ contextSize, flashAttention: true });
+    let loadedContext;
+    try {
+      loadedContext = await loadedModel.createContext({ contextSize, flashAttention: true });
+    } catch (error) {
+      await Promise.resolve()
+        .then(() => loadedModel.dispose?.())
+        .catch(() => {});
+      throw error;
+    }
     model = { modelPath, value: loadedModel };
     context = loadedContext;
     return model;
@@ -29,8 +37,11 @@ export function createLocalLlamaWorkerAdapter({
     const currentModel = model?.value;
     context = undefined;
     model = undefined;
-    await currentContext?.dispose?.();
-    await currentModel?.dispose?.();
+    try {
+      await currentContext?.dispose?.();
+    } finally {
+      await currentModel?.dispose?.();
+    }
   }
 
   async function run({

@@ -31,11 +31,11 @@ By default, installation downloads and configures the [Google Gemma 4 E2B Q4_0 G
 
 Tiers describe **the capability needed to do the work well**—not a fixed model size, task length, or number of files. Xarab classifies each new request using the request and a limited amount of recent conversation context, then sends it to that tier's configured worker.
 
-| Tier | Best fit | Examples |
-| --- | --- | --- |
-| **1 — Focused** | Clear, bounded work with established patterns | Explain a concept; make a small, straightforward change |
-| **2 — Advanced** | Bounded work that needs investigation, debugging, or architectural judgment | Trace a bug across related modules; implement a feature after understanding existing conventions |
-| **3 — Specialized** | Work where quality depends on unusually deep reasoning, specialized expertise, or careful handling of high-consequence trade-offs | Difficult graphics/performance work; complex security or distributed-systems design |
+| Tier                | Best fit                                                                                                                          | Examples                                                                                         |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **1 — Focused**     | Clear, bounded work with established patterns                                                                                     | Explain a concept; make a small, straightforward change                                          |
+| **2 — Advanced**    | Bounded work that needs investigation, debugging, or architectural judgment                                                       | Trace a bug across related modules; implement a feature after understanding existing conventions |
+| **3 — Specialized** | Work where quality depends on unusually deep reasoning, specialized expertise, or careful handling of high-consequence trade-offs | Difficult graphics/performance work; complex security or distributed-systems design              |
 
 **Why tiers?** A small, well-scoped request and a difficult investigation may not need the same worker. Assign models by capability level, then inspect the classifier's choice. If a worker discovers that the remaining work needs materially different capability, it can request a tier adjustment; the router checks the request and only hands off when an appropriate worker is configured. Tiering is a strategy, not a guarantee of lower cost, faster answers, or better results. Outcomes depend on the classifier, assignments, and task.
 
@@ -64,6 +64,15 @@ Models are stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to use
 Workers can use project `AGENTS.md` instructions and discover reusable skills from `.agents/skills` in the project or home directory. Available tools include file reading, listing and searching, focused edits, writing files, shell commands, and web search/fetch; web search requires a Tavily API key.
 Xarab also supports local and remote MCP tools with global and workspace configuration. See [MCP server setup and approval](docs/mcp.md).
 
+## Isolated tasks and automatic titles
+
+The main worker can delegate work through the `task` tool. Each task is classified independently and runs with a clean conversation context, the supplied brief and selected context, and a built-in `general-purpose` or project agent profile. Tasks can use existing tools but cannot delegate further. MCP servers must be explicitly selected and remain subject to existing consent rules. Progress appears in the task card; the completion summary returns to the main worker. Stopping the parent turn cancels its task, but does not undo edits or other effects already performed.
+
+One agentic task may run per session at a time. Local worker inference uses one shared adapter: utility and main-worker requests wait for capacity, while an agentic task fails explicitly if the local worker is already occupied (including a local parent waiting for its child). The classifier retains its independent runtime. These limits do not provide file isolation or a sandbox.
+
+Session titles are generated automatically from at most the first 4,096 characters of the first user message, with the existing first-message title as fallback. Both classification and title generation may use configured remote providers and consume usage. Manual titles are preserved. To disable automatic generation, set `"automaticTitles": false` in `~/.xarab/config.json` before starting Xarab.
+
+Project profiles use `.agents/agents/<name>.md`; this is a Xarab format, not a cross-tool standard. Malformed or oversized profiles are reported and skipped without blocking valid profiles or the built-in agent. Directory-level discovery errors still prevent task invocation. Profiles are rediscovered on invocation. See the [task-runner design and profile format](docs/general-purpose-task-runner.md).
 
 ## Develop and evaluate
 

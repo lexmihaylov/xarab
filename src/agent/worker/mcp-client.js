@@ -75,7 +75,13 @@ export function createMcpClient({
       result.answers?.find((a) => a.id === "mcp_approval")?.choices?.[0] === "Approve"
     );
   }
-  async function discover({ signal } = {}) {
+  async function discover({ signal, servers } = {}) {
+    if (
+      servers !== undefined &&
+      (!Array.isArray(servers) || servers.some((name) => typeof name !== "string"))
+    )
+      throw new TypeError("MCP servers must be an array of names.");
+    const selected = servers === undefined ? null : new Set(servers);
     const definitions = {};
     const connections = [];
     const close = async () => {
@@ -88,7 +94,14 @@ export function createMcpClient({
     };
     try {
       const entries = await loadMcpConfig(workspace, configStore.get?.()?.mcp ?? {}, onError);
+      if (selected) {
+        for (const name of selected) {
+          if (!entries.some((entry) => entry.name === name && entry.config.enabled !== false))
+            throw new Error(`Selected MCP server is unavailable: ${safe(name)}`);
+        }
+      }
       for (const { name, config, workspaceDefined } of entries) {
+        if (selected && !selected.has(name)) continue;
         if (signal?.aborted) throw signal.reason ?? new Error("Cancelled.");
         if (config.enabled === false) continue;
         const fingerprint = createHash("sha256")
