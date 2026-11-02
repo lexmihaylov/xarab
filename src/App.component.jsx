@@ -1,6 +1,7 @@
 import React, { useCallback, useRef, useState } from "react";
 import { getTheme } from "./utils/theme-engine.js";
 import { AskQuestionsDialog } from "./components/AskQuestionsDialog.component.jsx";
+import { CommandApprovalDialog } from "./components/CommandApprovalDialog.component.jsx";
 import { useKeyboard, useSelectionHandler } from "@opentui/react";
 import { copyToClipboard } from "./utils/clipboard.js";
 import { Composer } from "./components/Composer.component.jsx";
@@ -289,9 +290,20 @@ export function App({
         />
       </box>
       <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
-      {state.questionDialog && (
-        <AskQuestionsDialog {...state.questionDialog} onAnswer={onAnswerQuestions} />
-      )}
+      {state.questionDialog &&
+        (state.questionDialog.commandApproval ? (
+          <CommandApprovalDialog
+            key={state.questionDialog.requestId}
+            {...state.questionDialog}
+            onAnswer={(answers) => onAnswerQuestions(answers, state.questionDialog.requestId)}
+          />
+        ) : (
+          <AskQuestionsDialog
+            key={state.questionDialog.requestId}
+            {...state.questionDialog}
+            onAnswer={(answers) => onAnswerQuestions(answers, state.questionDialog.requestId)}
+          />
+        ))}
       {state.sessionModal && (
         <SessionBrowser
           {...state.sessionModal}

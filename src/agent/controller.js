@@ -100,6 +100,7 @@ export function createAssistantController({
         instructionFiles,
         toolRuntime: {
           requestQuestions: questionRequest.request,
+          assessCommand: (request) => tasks.assessCommand(request),
           onToolEvent,
         },
       }),
@@ -216,6 +217,7 @@ export function createAssistantController({
     instructionFiles,
     toolRuntime: {
       taskTool: tasks.taskTool,
+      assessCommand: tasks.assessCommand,
       requestQuestions: questionRequest.request,
       onToolEvent,
       getMessages: () => messages,

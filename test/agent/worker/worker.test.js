@@ -20,11 +20,34 @@ test("worker selects an adapter and passes the configured model", async () => {
     localAdapterFactory: () => adapter,
   });
 
-  await worker.run({ tier: 1, input: "hello" });
+  let assignment;
+  await worker.run({ tier: 1, input: "hello", onAssignment: (value) => (assignment = value) });
+  assert.deepEqual(assignment, { tier: 1, provider: "local", model: "local.gguf" });
   assert.equal(calls.length, 1);
+  assert.equal(calls[0].onAssignment, undefined);
   assert.equal(calls[0].model, "local.gguf");
   assert.deepEqual(calls[0].input, [{ role: "user", content: "hello" }]);
   assert.equal(typeof calls[0].tools.read_file.handler, "function");
+});
+
+test("assignment reports the execution-time selection and survives adapter startup failure", async () => {
+  let model = "first";
+  const worker = createWorker({
+    configStore: { getTierWorker: () => ({ provider: "local", model }) },
+    openAIAdapterFactory: () => ({ run: async () => {} }),
+    localAdapterFactory: () => {
+      throw new Error("adapter failed");
+    },
+  });
+  assert.equal(worker.getTierInfo(2).model, "first");
+  model = "second";
+  let assignment;
+  await assert.rejects(
+    worker.complete({ tier: 2, onAssignment: (value) => (assignment = value) }),
+    /adapter failed/,
+  );
+  assert.deepEqual(assignment, { tier: 2, provider: "local", model: "second" });
+  await worker.dispose();
 });
 
 test("main and agentic preparation preserve shared tools and isolate profile instructions", async () => {

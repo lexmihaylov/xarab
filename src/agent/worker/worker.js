@@ -70,6 +70,7 @@ export function createWorker({
     workspace,
     configStore,
     taskTool: toolRuntime?.taskTool,
+    assessCommand: toolRuntime?.assessCommand,
     requestQuestions: toolRuntime?.requestQuestions,
     onToolEvent: toolRuntime?.onToolEvent ?? (() => {}),
     getMessages: toolRuntime?.getMessages ?? (() => []),
@@ -78,7 +79,7 @@ export function createWorker({
     notify: toolRuntime?.notify ?? (() => {}),
   };
 
-  async function execute({ tier, instructions, input, tools, ...request }) {
+  async function execute({ tier, instructions, input, tools, onAssignment, ...request }) {
     const assignment = getAssignment(tier);
     if (!validateAssignment(assignment)) {
       throw new Error(
@@ -87,6 +88,7 @@ export function createWorker({
           : `Tier ${tier} is not configured; choose a worker model in /route.`,
       );
     }
+    onAssignment?.({ tier, provider: assignment.provider, model: assignment.model });
     return (await getAdapter(assignment)).run({
       ...request,
       input,

@@ -22,6 +22,7 @@ export function createToolRegistry({
   skills = new Map(),
   externalTools = {},
   taskTool,
+  assessCommand,
   configStore,
   imageCredentials,
   requestQuestions,
@@ -72,6 +73,8 @@ export function createToolRegistry({
     }),
     run_command: createShellTool({
       workspace,
+      assessCommand,
+      requestQuestions,
       onEvent: (event) => onToolEvent("run_command", event),
     }),
     ...(skills.size ? { skill: createSkillTool(skills) } : {}),

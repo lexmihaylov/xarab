@@ -8,7 +8,10 @@ import { createShellTool } from "../../../../src/agent/worker/tools/shell-tool.j
 test("runs a command from the workspace", async () => {
   const workspace = await mkdtemp(path.join(os.tmpdir(), "xarab-agent-shell-"));
   try {
-    const tool = createShellTool({ workspace });
+    const tool = createShellTool({
+      workspace,
+      assessCommand: async () => ({ risk: "low", scope: "workspace", reason: "Test fixture" }),
+    });
     const result = await tool.handler({ command: "pwd" });
     assert.match(result, new RegExp(workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(result, /Exit code: 0/);
@@ -18,7 +21,9 @@ test("runs a command from the workspace", async () => {
 });
 
 test("compacts verbose command output while retaining relevant error lines", async () => {
-  const tool = createShellTool();
+  const tool = createShellTool({
+    assessCommand: async () => ({ risk: "low", scope: "workspace", reason: "Test fixture" }),
+  });
   const result = await tool.handler({
     command: `node -e "for(let i=0;i<500;i++) console.log(i===300?'ERROR important failure':'noise '.repeat(20))"`,
   });

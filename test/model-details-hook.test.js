@@ -19,8 +19,9 @@ test("model details abort stale requests, cache results, and abort on unmount", 
     latest = useModelDetails(id);
     return React.createElement("text", null, latest.id ?? "empty");
   }
-  const view = await testRender(React.createElement(Harness), { width: 80, height: 24 });
+  let view;
   try {
+    view = await testRender(React.createElement(Harness), { width: 80, height: 24 });
     await act(async () => {
       await wait(220);
     });
@@ -56,9 +57,14 @@ test("model details abort stale requests, cache results, and abort on unmount", 
       await wait(220);
     });
     assert.equal(requests.length, 6);
-    await view.dispose();
+    await act(async () => view.dispose());
+    view = undefined;
     assert.equal(requests[5].signal.aborted, true);
   } finally {
-    globalThis.fetch = originalFetch;
+    try {
+      if (view) await act(async () => view.dispose());
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   }
 });

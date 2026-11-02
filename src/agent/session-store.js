@@ -58,6 +58,7 @@ export function validateSession(value, expectedId = value?.id) {
                     !["running", "complete", "error"].includes(part.status))) ||
                 (part.callId !== undefined && (!text(part.callId) || !part.callId)) ||
                 (part.summary !== undefined && !text(part.summary)) ||
+                (part.taskExecution !== undefined && !text(part.taskExecution)) ||
                 (part.diffText !== undefined && !text(part.diffText)) ||
                 (part.result !== undefined &&
                   (!object(part.result) ||

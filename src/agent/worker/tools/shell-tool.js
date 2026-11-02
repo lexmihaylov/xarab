@@ -1,10 +1,16 @@
 import { runShellCommand } from "./shell-command-executor.js";
+import { authorizeCommand } from "../../command-risk.js";
 
 const MAX_AGENT_OUTPUT_BYTES = 64 * 1024;
 const MAX_MODEL_OUTPUT_BYTES = 8 * 1024;
 const COMMAND_TIMEOUT_MS = 30_000;
 
-export function createShellTool({ workspace = process.cwd(), onEvent = () => {} } = {}) {
+export function createShellTool({
+  workspace = process.cwd(),
+  onEvent = () => {},
+  assessCommand,
+  requestQuestions,
+} = {}) {
   const root = workspace;
 
   return {
@@ -24,6 +30,15 @@ export function createShellTool({ workspace = process.cwd(), onEvent = () => {} 
       if (typeof command !== "string" || !command.trim())
         return "Error: provide a non-empty shell command.";
 
+      const authorization = await authorizeCommand({
+        command,
+        workspace: root,
+        signal,
+        assess: assessCommand,
+        requestQuestions,
+      });
+      if (!authorization.approved) return authorization.reason;
+      if (signal?.aborted) return "Command cancelled.";
       onEvent({ type: "started", command });
       const result = await runShellCommand(command, {
         cwd: root,

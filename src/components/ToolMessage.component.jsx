@@ -40,6 +40,11 @@ export function ToolMessage({ part, syntaxStyle }) {
       summary={summary}
       error={isError}
     >
+      {part.toolName === "task" && typeof part.taskExecution === "string" && (
+        <text fg={colors.muted} selectable>
+          {part.taskExecution}
+        </text>
+      )}
       {diffText && (
         <box flexDirection="column" padding={1} marginTop={1} backgroundColor={colors.background}>
           {part.diffNotice && <text fg={colors.muted}>{part.diffNotice}</text>}

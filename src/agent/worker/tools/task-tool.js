@@ -16,7 +16,7 @@ export function createTaskTool({ runner, workspace, onProgress = () => {} }) {
       }
     },
     description:
-      "Delegate an isolated task to an agent with a clean context. Supply a complete brief including the user's constraints and only necessary selected context. The agent may edit files and run commands under existing application policy. MCP servers must be explicitly selected. Tasks cannot delegate further. Returns a bounded completion summary; cancellation does not undo side effects. Built-in agent: general-purpose. Project profiles: .agents/agents/<name>.md.",
+      "Do work directly by default. Delegate only clearly bounded, independent tasks that benefit from isolation. Delegated agents have no parent history, so include all relevant constraints and context in the brief or selected context. Keep delegated work efficient by combining related tool operations where practical, and give concise tool-call summaries rather than routine narration. The agent runs with a clean context. The agent may edit files and run commands under existing application policy. MCP servers must be explicitly selected. Tasks cannot delegate further. Returns a bounded completion summary; cancellation does not undo side effects. Built-in agent: general-purpose. Project profiles: .agents/agents/<name>.md.",
     params: {
       type: "object",
       properties: {

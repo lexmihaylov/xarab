@@ -68,9 +68,20 @@ test("parent task tool runs an isolated child, streams progress, and returns sum
   );
   const message = controller.getState().messages.find((message) => message.type === "agent");
   assert.equal(message.message, "Parent answer");
-  assert.equal(
-    message.parts.find((part) => part.toolName === "task").result.output,
-    "Child summary",
+  const task = message.parts.find((part) => part.toolName === "task");
+  assert.equal(task.result.output, "Child summary");
+  assert.equal(task.taskExecution, "Tier 1 · openai · test");
+  assert.ok(
+    states.some((state) =>
+      state.messages.some((item) =>
+        item.parts?.some(
+          (part) =>
+            part.toolName === "task" &&
+            part.status === "running" &&
+            part.taskExecution === task.taskExecution,
+        ),
+      ),
+    ),
   );
 });
 
