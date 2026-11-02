@@ -35,8 +35,12 @@ test("approval dialog defaults to denial and returns typed feedback", async () =
   );
   try {
     await view.flush();
-    assert.match(view.captureCharFrame(), /COMMAND APPROVAL/);
-    assert.match(view.captureCharFrame(), /rm \.\.\/outside/);
+    const frame = view.captureCharFrame();
+    assert.match(frame, /COMMAND APPROVAL/);
+    assert.match(frame, /rm \.\.\/outside/);
+    assert.match(frame, /OPTIONAL DENIAL FEEDBACK/);
+    assert.match(frame, /\[ Deny \]/);
+    assert.match(frame, /\[ Approve once \]/);
     await press(view, "tab");
     await act(async () => view.mockInput.typeText("Use a workspace path"));
     await view.flush();
@@ -70,6 +74,21 @@ test("approval requires action focus and explicit selection; Ctrl-C cancels", as
     await act(async () => view.mockInput.pressKey("c", { ctrl: true }));
     await view.flush();
     assert.equal(answers[1], null);
+  } finally {
+    await act(async () => view.dispose());
+  }
+});
+
+test("narrow terminals show a safe enlarge/cancel fallback", async () => {
+  const view = await testRender(
+    React.createElement(CommandApprovalDialog, { commandApproval, onAnswer() {} }),
+    { width: 40, height: 18 },
+  );
+  try {
+    await view.flush();
+    const frame = view.captureCharFrame();
+    assert.match(frame, /Enlarge the terminal/);
+    assert.match(frame.replace(/\s+/g, " "), /Approval is not granted/);
   } finally {
     await act(async () => view.dispose());
   }

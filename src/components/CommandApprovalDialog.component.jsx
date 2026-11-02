@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { useKeyboard } from "@opentui/react";
+import { useKeyboard, useOnResize, useRenderer } from "@opentui/react";
 import { Modal } from "./Modal.component.jsx";
 import { getTheme } from "../utils/theme-engine.js";
 
@@ -15,6 +15,9 @@ export function visibleCommand(text) {
 
 export function CommandApprovalDialog({ commandApproval, onAnswer }) {
   const colors = getTheme().colors;
+  const renderer = useRenderer();
+  const [size, setSize] = useState({ width: renderer.width, height: renderer.height });
+  useOnResize((width, height) => setSize({ width, height }));
   const editor = useRef(null);
   const [focus, setFocus] = useState("command");
   const [action, setAction] = useState(0);
@@ -48,51 +51,104 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
       finish();
     }
   });
-  return (
-    <Modal title="COMMAND APPROVAL" fullScreen>
-      <scrollbox
-        focused={focus === "command"}
-        flexGrow={1}
-        minHeight={0}
-        border
-        borderColor={focus === "command" ? colors.accent : colors.border}
+  const width = Math.min(84, Math.max(1, size.width - 4));
+  const height = Math.min(28, size.height - 4);
+  if (width < 44 || height < 17)
+    return (
+      <Modal
+        title="COMMAND APPROVAL"
+        boundedBackdrop
+        width={Math.max(1, width)}
+        height={Math.max(1, Math.min(8, size.height))}
       >
-        <text fg={colors.warning}>
+        <text fg={colors.warning}>Enlarge the terminal to review this command.</text>
+        <text fg={colors.muted}>Esc cancel · Approval is not granted</text>
+      </Modal>
+    );
+
+  return (
+    <Modal title="COMMAND APPROVAL" boundedBackdrop width={width} height={height}>
+      <text fg={colors.muted} flexShrink={0}>
+        Review this exact command before it runs
+      </text>
+      <box flexDirection="column" flexGrow={1} minHeight={0} marginY={1}>
+        <box
+          flexDirection="column"
+          border
+          borderStyle="rounded"
+          borderColor={focus === "command" ? colors.accent : colors.border}
+          paddingX={1}
+          flexGrow={1}
+          minHeight={0}
+        >
+          <text fg={colors.label} height={1} flexShrink={0}>
+            COMMAND · controls escaped visibly
+          </text>
+          <scrollbox focused={focus === "command"} flexGrow={1} minHeight={0}>
+            <text fg={colors.text}>{visibleCommand(commandApproval.command)}</text>
+          </scrollbox>
+        </box>
+        <text fg={colors.warning} flexShrink={0} marginTop={1}>
           {visibleCommand(
             `${commandApproval.risk} · ${commandApproval.scope}: ${commandApproval.reason}`,
           )}
         </text>
-        <text fg={colors.muted}>{visibleCommand(`Workspace: ${commandApproval.workspace}`)}</text>
-        <text fg={colors.label}>COMMAND (controls and backslashes escaped)</text>
-        <text fg={colors.text}>{visibleCommand(commandApproval.command)}</text>
-      </scrollbox>
-      <text fg={colors.label} height={1} flexShrink={0}>
-        Optional denial feedback
-      </text>
-      <textarea
-        ref={editor}
-        height={4}
-        flexShrink={0}
-        focused={focus === "feedback"}
-        showCursor={focus === "feedback"}
-        wrapMode="word"
-        placeholder="Explain why or suggest a safer approach…"
-        keyBindings={[{ name: "return", action: "newline" }]}
-      />
-      <box flexDirection="row" gap={3} height={1} flexShrink={0}>
-        {actions.map((label, index) => (
-          <text
-            key={label}
-            fg={focus === "actions" && action === index ? colors.accent : colors.text}
-          >
-            {action === index ? "› " : "  "}
-            {label}
+        <text fg={colors.muted} flexShrink={0}>
+          {visibleCommand(`Workspace: ${commandApproval.workspace}`)}
+        </text>
+        <box
+          flexDirection="column"
+          border
+          borderStyle="rounded"
+          borderColor={focus === "feedback" ? colors.accent : colors.border}
+          paddingX={1}
+          height={5}
+          minHeight={5}
+          marginTop={1}
+          flexShrink={0}
+        >
+          <text fg={colors.label} height={1} flexShrink={0}>
+            OPTIONAL DENIAL FEEDBACK
           </text>
+          <box height={4} minHeight={0} flexGrow={1} overflow="hidden">
+            <textarea
+              ref={editor}
+              focused={focus === "feedback"}
+              showCursor={focus === "feedback"}
+              wrapMode="word"
+              placeholder="Explain why or suggest a safer approach…"
+              keyBindings={[{ name: "return", action: "newline" }]}
+              flexGrow={1}
+            />
+          </box>
+        </box>
+      </box>
+      <box flexDirection="row" justifyContent="flex-end" gap={2} flexShrink={0}>
+        {actions.map((label, index) => (
+          <box
+            key={label}
+            paddingX={1}
+            backgroundColor={focus === "actions" && action === index ? colors.selected : undefined}
+          >
+            <text
+              fg={
+                focus === "actions" && action === index
+                  ? colors.selectedText
+                  : label === "Deny"
+                    ? colors.warning
+                    : colors.accent
+              }
+              bold
+            >{`[ ${label} ]`}</text>
+          </box>
         ))}
       </box>
-      <text fg={colors.muted} height={2} flexShrink={0}>
-        Tab: command / feedback / actions · Arrows: scroll or select · Enter: confirm action · Esc:
-        cancel
+      <text fg={colors.muted} flexShrink={0} marginTop={1}>
+        {focus === "feedback"
+          ? "Enter newline · Tab actions · Esc cancel"
+          : focus === "actions"
+            ? "←→ action · Enter select · Tab · Esc cancel"
+            : "↑↓ scroll · Tab feedback/actions · Esc cancel"}
       </text>
     </Modal>
   );
