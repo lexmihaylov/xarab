@@ -5,7 +5,7 @@
 
 ## Goal and scope
 
-Provide a reusable runner for bounded utility tasks and isolated agentic tasks. The first release should include both modes, automatic session titles, and a built-in general-purpose agent. A command-risk assessment and a dedicated read-only review agent are follow-up work; neither is an authorization mechanism or a prerequisite for the first release.
+Provide a reusable runner for bounded utility tasks and isolated agentic tasks. The first release should include both modes, automatic session titles, and a built-in general-purpose agent. Command-risk assessment and project-provided review-agent profiles have since been implemented as follow-up work. The risk assessment is currently connected to agent shell-command authorization; its model-produced classification is not a sandbox or a guarantee of command effects. Review profiles provide instructions only and do not enforce read-only tool permissions.
 
 This proposal is not an implementation specification. Resource limits, APIs, definition compatibility, and scheduling details require further design and verification.
 
@@ -21,7 +21,9 @@ Utility tasks run without tools or MCP access. Their task-specific instructions 
 
 Apply a generated title only when it still belongs to the intended existing session and has not been superseded by a manual rename or newer request. Validate and normalize it using session title constraints and persist through the normal session path. Failures leave the fallback in place and show a non-blocking warning associated with the correct session. Define cancellation and stale-result behavior for session switching, deletion, and shutdown.
 
-Command-risk assessment may later be another tool-free task. Its output is advisory: it cannot authorize execution or override user consent and application safety requirements. Design its enforcement, failure behavior, and handling of shell semantics separately before integrating it with command execution.
+Command-risk assessment is implemented as a tool-free task and integrated with the agent shell tool. The current policy automatically runs low-risk commands and medium-risk workspace commands; all other valid classifications and failed/invalid assessments require an approval dialog. A user's explicit approval is required in that dialog, and denial, cancellation, unavailable approval, or an aborted request prevents command execution. This policy is classification-based: it does not independently validate shell semantics, and the shell's workspace working directory, timeout, and output limits do not constitute a sandbox. Treat the assessment as fallible and review deterministic enforcement and the complete risk/scope matrix before relying on it as a security boundary.
+
+The command approval dialog displays an escaped command in a scrollable view, along with assessment details and approval actions. A review identified potential layout pressure from long assessment details; a bounded-details layout change was attempted but reverted after it did not work as expected. Long-detail behavior and the authorization policy's edge cases remain follow-up review items.
 
 ## Agentic tasks
 
