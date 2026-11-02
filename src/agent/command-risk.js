@@ -36,7 +36,7 @@ export async function authorizeCommand({ command, workspace, signal, assess, req
     });
     const answer = result?.answers?.find((a) => a.id === "command_approval");
     const approved =
-      !signal?.aborted && result?.cancelled === false && answer?.choices?.[0] === "Approve once";
+      !signal?.aborted && result?.cancelled === false && answer?.choices?.[0] === "Approve";
     return {
       approved,
       reason: approved ? "" : `Command denied. ${answer?.text || "No feedback supplied."}`,

@@ -25,7 +25,7 @@ test("workspace medium risk bypasses approval; other medium/high risks require i
         assert.equal(options.commandApproval.command, "echo test");
         return {
           cancelled: false,
-          answers: [{ id: "command_approval", choices: ["Approve once"] }],
+          answers: [{ id: "command_approval", choices: ["Approve"] }],
         };
       },
     });

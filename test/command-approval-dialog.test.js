@@ -43,9 +43,9 @@ test("approval dialog emphasizes risk details and initially selects approval", a
     assert.match(frame, /SCOPE: OUTSIDE WORKSPACE/);
     assert.match(frame, /Deletes outside workspace/);
     assert.match(frame, /\[ Deny \]/);
-    assert.match(frame, /\[ Approve once \]/);
+    assert.match(frame, /\[ Approve \]/);
     await press(view, "return");
-    assert.equal(answers[0][0].choices[0], "Approve once");
+    assert.equal(answers[0][0].choices[0], "Approve");
   } finally {
     await act(async () => view.dispose());
   }
@@ -63,7 +63,7 @@ test("approve is preselected; denial requires selecting it; Ctrl-C cancels", asy
   try {
     await view.flush();
     await press(view, "return");
-    assert.equal(answers[0][0].choices[0], "Approve once");
+    assert.equal(answers[0][0].choices[0], "Approve");
     await act(async () => view.mockInput.pressArrow("left"));
     await press(view, "return");
     assert.equal(answers[1][0].choices[0], "Deny");
@@ -105,7 +105,7 @@ test("long multiline commands remain scrollable with actions visible", async () 
     }
     await view.flush();
     assert.match(view.captureCharFrame(), /echo line-99/);
-    assert.match(view.captureCharFrame(), /Approve once/);
+    assert.match(view.captureCharFrame(), /\[ Approve \]/);
   } finally {
     await act(async () => view.dispose());
   }

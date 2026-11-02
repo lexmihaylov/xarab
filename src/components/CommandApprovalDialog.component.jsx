@@ -21,7 +21,7 @@ export function CommandApprovalDialog({ commandApproval, onAnswer }) {
   const editor = useRef(null);
   const [focus, setFocus] = useState("actions");
   const [action, setAction] = useState(1);
-  const actions = ["Deny", "Approve once"];
+  const actions = ["Deny", "Approve"];
   const risk = commandApproval.risk.toUpperCase();
   const scope =
     commandApproval.scope === "outside" ? "OUTSIDE WORKSPACE" : commandApproval.scope.toUpperCase();
