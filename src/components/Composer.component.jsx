@@ -24,6 +24,7 @@ export function Composer({
   flexShrink = 0,
   sessionId,
   draft,
+  messageSuggestion,
   disabled = false,
   onSubmit,
   onDraftChange,
@@ -98,6 +99,14 @@ export function Composer({
       completeCommand();
       return;
     }
+    if (key.name === "tab" && !value && messageSuggestion) {
+      key.preventDefault();
+      inputRef.current?.setText(messageSuggestion);
+      inputRef.current.cursorOffset = messageSuggestion.length;
+      setValue(messageSuggestion);
+      onDraftChange({ value: messageSuggestion, cursor: messageSuggestion.length });
+      return;
+    }
     if ((key.name === "up" || key.name === "down") && suggestions.length) {
       key.preventDefault();
       setSuggestionIndex(
@@ -160,7 +169,13 @@ export function Composer({
         <textarea
           ref={inputRef}
           initialValue={draft?.value ?? ""}
-          placeholder={disabled ? "Waiting for response…" : "Ask Xarab"}
+          placeholder={
+            disabled
+              ? "Waiting for response…"
+              : messageSuggestion && !value
+                ? messageSuggestion
+                : "Ask Xarab"
+          }
           focused={!disabled}
           showCursor={!disabled}
           wrapMode="word"

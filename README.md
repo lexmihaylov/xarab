@@ -71,6 +71,8 @@ The main worker can delegate work through the `task` tool. Each task is classifi
 One agentic task may run per session at a time. Local worker inference uses one shared adapter: utility and main-worker requests wait for capacity, while an agentic task fails explicitly if the local worker is already occupied (including a local parent waiting for its child). The classifier retains its independent runtime. These limits do not provide file isolation or a sandbox.
 
 Session titles are generated automatically from at most the first 4,096 characters of the first user message, with the existing first-message title as fallback. Both classification and title generation may use configured remote providers and consume usage. Manual titles are preserved. To disable automatic generation, set `"automaticTitles": false` in `~/.xarab/config.json` before starting Xarab.
+After a successful response, Xarab may generate a suggested next message from up to the last 4,096 characters of the response. Press Tab in an empty composer to insert it; edit it before sending if desired. This tool-free utility uses the tier 1 worker, which may send the excerpt to a remote provider and consume usage. Set `"automaticSuggestions": false` in `~/.xarab/config.json` to disable it.
+
 
 Project profiles use `.agents/agents/<name>.md`; this is a Xarab format, not a cross-tool standard. Malformed or oversized profiles are reported and skipped without blocking valid profiles or the built-in agent. Directory-level discovery errors still prevent task invocation. Profiles are rediscovered on invocation. See the [task-runner design and profile format](docs/general-purpose-task-runner.md).
 

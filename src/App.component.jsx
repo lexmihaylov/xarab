@@ -296,6 +296,7 @@ export function App({
           flexShrink={0}
           sessionId={state.currentSession?.id}
           draft={state.sessionDraft}
+          messageSuggestion={state.suggestion}
           contextTokens={state.currentSession?.contextTokens}
           disabled={
             state.generating ||

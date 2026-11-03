@@ -49,6 +49,7 @@ export function createAssistantController({
   openAIAdapterFactory = createOpenAIResponsesWorkerAdapter,
   localWorkerAdapterFactory = createLocalLlamaWorkerAdapter,
   automaticTitles,
+  automaticSuggestions,
   sessionsDir = path.join(path.dirname(configPath), "sessions"),
 }) {
   let status = "Ready";
@@ -59,6 +60,8 @@ export function createAssistantController({
   let lastInterruptAt = 0;
   let messages = [];
   let currentAgentMessage;
+  let suggestion = null;
+  let suggestionVersion = 0;
   let pendingShellContext = [];
   const sessionStore = createSessionStore(sessionsDir);
   let sessionPersisted = false;
@@ -140,6 +143,7 @@ export function createAssistantController({
       })),
       classifier: configStore.getClassifier(),
       status,
+      suggestion,
       generating: generating || isRouting,
       commandRunning,
       questionDialog: questionRequest.getState(),
@@ -171,7 +175,10 @@ export function createAssistantController({
   sessionController = createSessionController({
     workspace,
     sessionStore,
-    onSessionLeave: tasks.cancelTitle,
+    onSessionLeave: () => {
+      tasks.cancelTitle();
+      clearSuggestion();
+    },
     getMessages: () => messages,
     setMessages: (next) => {
       messages = next;
@@ -208,10 +215,24 @@ export function createAssistantController({
     restoreSession,
     renameSession,
     deleteSession,
-    updateDraft,
+    updateDraft: updateSessionDraft,
     isSessionOperation,
     setSessionError,
   } = sessionController;
+
+  function clearSuggestion() {
+    suggestionVersion++;
+    tasks.cancelSuggestion();
+    if (suggestion !== null) {
+      suggestion = null;
+      notify();
+    }
+  }
+
+  function updateDraft(draft) {
+    clearSuggestion();
+    updateSessionDraft(draft);
+  }
 
   worker = createWorker({
     configStore,
@@ -499,6 +520,9 @@ export function createAssistantController({
     });
     activeWorkDone = workDone;
     let approvedHandoff;
+    let succeeded = false;
+    const responseSession = getActiveSession();
+    const responseVersion = suggestionVersion;
     const usageResponses = new Set();
     const tracksUsage =
       configStore.getTierWorker(tier)?.provider === "openai" ||
@@ -561,6 +585,7 @@ export function createAssistantController({
         },
       });
       approvedHandoff = result?.handoff;
+      succeeded = !abortController.signal.aborted;
     } catch (error) {
       if (!abortController.signal.aborted)
         addMessage({ type: "system", message: error.message, severity: "error" });
@@ -580,7 +605,24 @@ export function createAssistantController({
       finishWork();
       if (activeWorkDone === workDone) activeWorkDone = undefined;
     }
-    if (!approvedHandoff) return;
+    if (!approvedHandoff) {
+      if (
+        succeeded &&
+        responseVersion === suggestionVersion &&
+        getActiveSession() === responseSession &&
+        !isShuttingDown &&
+        (automaticSuggestions ?? configStore.get().automaticSuggestions !== false) &&
+        assistantMessage.message.trim() &&
+        !sessionController.getState().sessionDraft?.value
+      ) {
+        void tasks.suggest(assistantMessage.message, responseSession, (value) => {
+          if (isShuttingDown || sessionController.getState().sessionDraft?.value) return;
+          suggestion = value;
+          notify();
+        });
+      }
+      return;
+    }
 
     const nextWorker = worker.getTierInfo(approvedHandoff.selectedTier);
     if (userMessage) {
@@ -689,6 +731,7 @@ export function createAssistantController({
     if (shutdownPromise) return shutdownPromise;
     isShuttingDown = true;
     tasks.cancelTitle();
+    clearSuggestion();
     questionRequest.respond(null);
     abortController?.abort();
     activeDownload?.controller.abort();

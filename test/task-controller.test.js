@@ -59,7 +59,7 @@ test("parent task tool runs an isolated child, streams progress, and returns sum
         request.onTextDelta("Child summary");
       }
     },
-    { automaticTitles: false },
+    { automaticTitles: false, automaticSuggestions: false },
   );
   await controller.submit("Parent secret context must not be inherited");
   assert.doesNotMatch(JSON.stringify(childRequest.input), /Parent secret/);
@@ -92,6 +92,54 @@ test("parent task tool runs an isolated child, streams progress, and returns sum
       ),
     ),
   );
+});
+
+test("suggestions use the last answer and are cleared by draft edits", async (t) => {
+  let utilityInput;
+  const { controller } = await setup(
+    t,
+    async (request) => {
+      if (request.tools?.task) request.onTextDelta("The completed answer");
+      else {
+        utilityInput = request.input;
+        request.onTextDelta("Please explain more");
+      }
+    },
+    { automaticTitles: false },
+  );
+  await controller.submit("Question");
+  for (let i = 0; i < 100 && !controller.getState().suggestion; i++)
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.match(JSON.stringify(utilityInput), /The completed answer/);
+  assert.equal(controller.getState().suggestion, "Please explain more");
+  controller.updateDraft({ value: "My draft", cursor: 8 });
+  assert.equal(controller.getState().suggestion, null);
+});
+
+test("suggestions are user-voiced and a draft edit clears subscribers immediately", async (t) => {
+  const states = [];
+  let suggestionRequest;
+  const { controller } = await setup(
+    t,
+    async (request) => {
+      if (request.tools?.task) request.onTextDelta("Answer details");
+      else {
+        suggestionRequest = request;
+        request.onTextDelta("Could you clarify the trade-offs?");
+      }
+    },
+    { automaticTitles: false, onStateChange: (state) => states.push(state) },
+  );
+  await controller.submit("Question");
+  for (let i = 0; i < 100 && !controller.getState().suggestion; i++)
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(controller.getState().suggestion, "Could you clarify the trade-offs?");
+  assert.match(JSON.stringify(suggestionRequest.input), /user's voice, addressed to the agent/);
+  assert.match(JSON.stringify(suggestionRequest.input), /never answer as the agent/);
+  assert.match(suggestionRequest.instructions, /user's voice as a message addressed to the agent/);
+  assert.match(suggestionRequest.instructions, /never answer as the agent/);
+  controller.updateDraft({ value: "Draft", cursor: 5 });
+  assert.equal(states.at(-1).suggestion, null);
 });
 
 test("stopping the parent cancels its active child and returns an explicit cancellation", async (t) => {
