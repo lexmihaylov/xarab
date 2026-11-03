@@ -39,6 +39,8 @@ export function ToolMessage({ part, syntaxStyle, activityExpanded = false, onTog
       title={title}
       summary={summary}
       error={isError}
+      summaryMarkdown={part.toolName === "task" && part.status === "complete"}
+      syntaxStyle={syntaxStyle}
     >
       {part.toolName === "task" && (part.taskAgent || part.taskExecution) && (
         <text fg={colors.muted} selectable>

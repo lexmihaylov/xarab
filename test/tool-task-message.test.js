@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { ToolMessage } from "../src/components/ToolMessage.component.jsx";
+import { ExecutionMessageCard } from "../src/components/ExecutionMessageCard.component.jsx";
+
+test("completed task summaries render as markdown while other summaries remain text", () => {
+  const syntaxStyle = {};
+  for (const [toolName, status, markdown] of [
+    ["task", "complete", true],
+    ["task", "running", false],
+    ["task", "error", false],
+    ["read_file", "complete", false],
+  ]) {
+    const tool = ToolMessage({ part: { toolName, status, summary: "**result**" }, syntaxStyle });
+    const card = ExecutionMessageCard(tool.props);
+    const body = card.props.children[1].props.children;
+    assert.equal(body.type, markdown ? "markdown" : "text");
+    if (markdown) {
+      assert.equal(body.props.content, "**result**");
+      assert.equal(body.props.syntaxStyle, syntaxStyle);
+    } else assert.equal(body.props.children, "**result**");
+  }
+});
+
 test("task activity is collapsed by default and exposes entries when expanded", () => {
   const part = {
     toolName: "task",

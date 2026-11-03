@@ -3,7 +3,16 @@ import { getTheme } from "../utils/theme-engine.js";
 
 const colors = getTheme().colors;
 
-export function ExecutionMessageCard({ color, prefix, title, summary, error, children }) {
+export function ExecutionMessageCard({
+  color,
+  prefix,
+  title,
+  summary,
+  error,
+  summaryMarkdown = false,
+  syntaxStyle,
+  children,
+}) {
   return (
     <box
       flexDirection="column"
@@ -28,9 +37,13 @@ export function ExecutionMessageCard({ color, prefix, title, summary, error, chi
       </box>
       {summary && (
         <box padding={1} marginTop={1} backgroundColor={colors.background}>
-          <text fg={error ? colors.error : colors.text} selectable>
-            {summary}
-          </text>
+          {summaryMarkdown ? (
+            <markdown content={summary} syntaxStyle={syntaxStyle} conceal concealCode selectable />
+          ) : (
+            <text fg={error ? colors.error : colors.text} selectable>
+              {summary}
+            </text>
+          )}
         </box>
       )}
       {children}
