@@ -9,16 +9,15 @@ import { AskQuestionsDialog } from "../src/components/AskQuestionsDialog.compone
 const questions = [
   { id: "color", question: "Which color?", type: "single", options: ["Red", "Blue"] },
 ];
-test("question requests resolve, reject overlap, and clean up on abort", async () => {
+test("question requests resolve, queue overlap, and clean up on abort", async () => {
   const bridge = createQuestionRequest();
   const controller = new AbortController();
   const result = bridge.request(questions, { signal: controller.signal });
   assert.equal(bridge.getState().questions, questions);
-  assert.throws(() => bridge.request(questions), /already open/);
+  const next = bridge.request(questions);
   controller.abort();
   assert.deepEqual(await result, { cancelled: true, answers: [] });
-  assert.equal(bridge.getState(), undefined);
-  const next = bridge.request(questions);
+  assert.equal(bridge.getState().questions, questions);
   bridge.respond([{ id: "color", choices: ["Blue"] }]);
   assert.equal((await next).cancelled, false);
 });

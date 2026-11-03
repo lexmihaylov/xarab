@@ -226,13 +226,13 @@ test("utility task routes a bounded brief, has no history/tools, and validates s
   await runner.shutdown();
 });
 
-test("agentic mode uses clean context, selected MCPs, and only one active task", async () => {
-  let release;
+test("agentic mode uses clean context, selected MCPs, and concurrent tasks", async () => {
+  const releases = [];
   const { runner, calls } = setup({
     run: async (request) => {
       calls.push(["run", request]);
       await new Promise((resolve) => {
-        release = resolve;
+        releases.push(resolve);
       });
       request.onTextDelta("Done");
     },
@@ -245,8 +245,11 @@ test("agentic mode uses clean context, selected MCPs, and only one active task",
     mcpServers: ["docs"],
   });
   await new Promise((resolve) => setImmediate(resolve));
-  await assert.rejects(runner.run({ mode: "agentic", brief: "Second" }), /already running/);
-  release();
+  const second = runner.run({ mode: "agentic", brief: "Second" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(releases.length, 2);
+  releases.forEach((release) => release());
+  assert.equal((await second).status, "completed");
   assert.equal((await first).status, "completed");
   const classification = calls.find(([name]) => name === "classify")[1];
   assert.deepEqual(classification.recentMessages, []);

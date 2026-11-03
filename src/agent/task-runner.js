@@ -103,7 +103,6 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
   const active = new Set();
   let utilityQueue = Promise.resolve();
   let queued = 0;
-  let agenticBusy = false;
   let closed = false;
 
   async function execute({
@@ -118,11 +117,8 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
   }) {
     if (closed) throw new Error("Task runner is closed.");
     validateTask({ mode, brief, input, instructions, mcpServers, parse, onProgress });
-    if (mode === "agentic" && agenticBusy)
-      throw new Error("An agentic task is already running for this session.");
     if (mode === "utility" && queued >= maxQueued) throw new Error("Task queue is full.");
-    if (mode === "agentic") agenticBusy = true;
-    else queued++;
+    if (mode === "utility") queued++;
     const controller = new AbortController();
     const relay = () => controller.abort(signal.reason);
     signal?.addEventListener("abort", relay, { once: true });
@@ -267,8 +263,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
       clearTimeout(timer);
       signal?.removeEventListener("abort", relay);
       active.delete(record);
-      if (mode === "agentic") agenticBusy = false;
-      else queued--;
+      if (mode === "utility") queued--;
     });
     if (mode === "utility") utilityQueue = record.done.catch(() => {});
     return record.done;

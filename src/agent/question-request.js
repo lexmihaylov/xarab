@@ -1,5 +1,10 @@
 export function createQuestionRequest({ notify = () => {} } = {}) {
   let pending;
+  const queue = [];
+  const advance = () => {
+    pending = queue.shift();
+    notify();
+  };
   let nextId = 0;
   return {
     getState: () => pending?.request,
@@ -8,17 +13,22 @@ export function createQuestionRequest({ notify = () => {} } = {}) {
       pending?.finish({ cancelled: answers == null, answers: answers ?? [] });
     },
     request(questions, { signal, commandApproval } = {}) {
-      if (pending) throw new Error("A question dialog is already open.");
       if (signal?.aborted) return Promise.resolve({ cancelled: true, answers: [] });
       return new Promise((resolve) => {
+        let settled = false;
         const abort = () => finish({ cancelled: true, answers: [] });
         const finish = (result) => {
+          if (settled) return;
+          settled = true;
           signal?.removeEventListener("abort", abort);
-          pending = undefined;
-          notify();
+          if (pending === entry) advance();
+          else {
+            const index = queue.indexOf(entry);
+            if (index >= 0) queue.splice(index, 1);
+          }
           resolve(result);
         };
-        pending = {
+        const entry = {
           request: {
             requestId: ++nextId,
             questions,
@@ -26,8 +36,10 @@ export function createQuestionRequest({ notify = () => {} } = {}) {
           },
           finish,
         };
+        queue.push(entry);
         signal?.addEventListener("abort", abort, { once: true });
-        notify();
+        if (signal?.aborted) abort();
+        else if (!pending) advance();
       });
     },
   };

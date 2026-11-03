@@ -159,7 +159,8 @@ export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) 
         .sort(([a], [b]) => a - b)
         .map(([, call]) => ({ ...call, type: "function" }));
       messages.push({ role: "assistant", content: text || null, tool_calls: toolCalls });
-      for (const call of toolCalls) {
+      const executeCall = async (call) => {
+        if (signal?.aborted) throw signal.reason ?? new Error("Request cancelled.");
         const tool = tools[call.function.name];
         let output;
         if (!tool?.handler) output = `Error: tool ${call.function.name} is unavailable.`;
@@ -173,6 +174,7 @@ export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) 
               arguments: args,
             });
             const result = await tool.handler(args, { callId: call.id, signal });
+            if (signal?.aborted) throw signal.reason ?? new Error("Request cancelled.");
             const normalized =
               result && typeof result === "object" && typeof result.ok === "boolean"
                 ? { ...result, output: String(result.output ?? "") }
@@ -190,10 +192,24 @@ export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) 
             if (normalized.handoff) return { handoff: normalized.handoff };
             output = normalized.output;
           } catch (error) {
+            if (signal?.aborted) throw signal.reason ?? error;
             output = `Error: ${error?.message ?? String(error)}`;
           }
         }
-        messages.push({ role: "tool", tool_call_id: call.id, content: String(output ?? "") });
+        return { role: "tool", tool_call_id: call.id, content: String(output ?? "") };
+      };
+      for (let index = 0; index < toolCalls.length;) {
+        const start = index++;
+        if (toolCalls[start].function.name === "task") {
+          while (index < toolCalls.length && toolCalls[index].function.name === "task") index++;
+        }
+        // Only adjacent tasks overlap; Promise.all retains model call order.
+        const results = await Promise.all(toolCalls.slice(start, index).map(executeCall));
+        if (signal?.aborted) throw signal.reason ?? new Error("Request cancelled.");
+        for (const result of results) {
+          if (result.handoff) return result;
+          messages.push(result);
+        }
       }
     }
   }

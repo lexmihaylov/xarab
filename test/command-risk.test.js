@@ -85,7 +85,7 @@ test("shell never starts denied commands", async () => {
   assert.deepEqual(events, []);
 });
 
-test("approval lifecycle rejects stale answers, concurrent dialogs and aborted approvals", async () => {
+test("approval lifecycle queues dialogs and rejects stale answers and aborted approvals", async () => {
   const bridge = createQuestionRequest();
   const controller = new AbortController();
   const first = bridge.request([], {
@@ -93,11 +93,10 @@ test("approval lifecycle rejects stale answers, concurrent dialogs and aborted a
     commandApproval: { command: "first" },
   });
   const oldId = bridge.getState().requestId;
-  assert.throws(() => bridge.request([]), /already open/);
+  const second = bridge.request([]);
+  assert.equal(bridge.getState().requestId, oldId);
   controller.abort();
   assert.equal((await first).cancelled, true);
-  assert.equal(bridge.getState(), undefined);
-  const second = bridge.request([]);
   const newId = bridge.getState().requestId;
   bridge.respond([], oldId);
   assert.equal(bridge.getState().requestId, newId);

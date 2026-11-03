@@ -152,27 +152,25 @@ export function createOpenAIResponsesWorkerAdapter({
         }
         const functionOutputs = [];
         sawToolCall = true;
-        for (const call of functionCalls) {
+        const executeCall = async (call) => {
           if (signal?.aborted) throw abortError();
           const tool = tools[call.name];
           if (!tool || typeof tool.handler !== "function") {
-            functionOutputs.push({
+            return {
               type: "function_call_output",
               call_id: call.call_id,
               output: `Error: tool ${String(call.name)} is unavailable.`,
-            });
-            continue;
+            };
           }
           let args;
           try {
             args = JSON.parse(call.arguments || "{}");
           } catch {
-            functionOutputs.push({
+            return {
               type: "function_call_output",
               call_id: call.call_id,
               output: "Error: tool arguments were invalid JSON.",
-            });
-            continue;
+            };
           }
           onEvent({ type: "tool_call", name: call.name, callId: call.call_id, arguments: args });
           let result;
@@ -181,12 +179,14 @@ export function createOpenAIResponsesWorkerAdapter({
               await tool.handler(args, { callId: call.call_id, signal }),
             );
           } catch (error) {
+            if (signal?.aborted) throw abortError();
             result = {
               ok: false,
               output: `Error: ${error?.message ?? String(error)}`,
               errorCode: error?.code,
             };
           }
+          if (signal?.aborted) throw abortError();
           onEvent({
             type: "tool_result",
             name: call.name,
@@ -195,11 +195,23 @@ export function createOpenAIResponsesWorkerAdapter({
             errorCode: result.errorCode,
           });
           if (result.handoff) return { handoff: result.handoff };
-          functionOutputs.push({
+          return {
             type: "function_call_output",
             call_id: call.call_id,
             output: result.output,
-          });
+          };
+        };
+        for (let index = 0; index < functionCalls.length;) {
+          const start = index++;
+          if (functionCalls[start].name === "task") {
+            while (index < functionCalls.length && functionCalls[index].name === "task") index++;
+          }
+          const results = await Promise.all(functionCalls.slice(start, index).map(executeCall));
+          if (signal?.aborted) throw abortError();
+          for (const result of results) {
+            if (result.handoff) return result;
+            functionOutputs.push(result);
+          }
         }
         requestInput = [
           ...(Array.isArray(requestInput)
