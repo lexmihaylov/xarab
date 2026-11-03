@@ -39,7 +39,7 @@ export function createAutoCompactor({
         for (const part of message.parts ?? []) {
           if (part.type !== "tool") continue;
           sections.push(
-            `Tool call: ${part.toolName ?? "unknown"}\nArguments: ${JSON.stringify(part.params ?? {})}\n${part.result ? `Result: ${part.result.output ?? ""}` : "Result unavailable"}`,
+            `Tool call: ${part.toolName ?? "unknown"}\nArguments: ${JSON.stringify(part.params ?? {})}\n${part.result ? `Result (${part.result.ok ? "ok" : "error"}): ${part.result.output ?? ""}` : "Result unavailable"}`,
           );
         }
         return sections.join("\n\n");

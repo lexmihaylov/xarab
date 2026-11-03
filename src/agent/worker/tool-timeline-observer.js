@@ -79,7 +79,7 @@ function safeToolDetail(value) {
     .slice(0, 100);
 }
 
-function toolProgressLabel(name, params = {}) {
+export function toolProgressLabel(name, params = {}) {
   if (name === "ask_questions") return "Asking user questions";
   if (name === "run_command") return `Executing ${safeToolDetail(params.command)}`;
   if (name === "read_file") return `Reading ${safeToolDetail(params.path)}`;

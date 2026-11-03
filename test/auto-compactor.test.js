@@ -5,6 +5,7 @@ import { createAutoCompactor } from "../src/agent/auto-compactor.js";
 function setup(initial) {
   let messages = initial;
   let requests = 0;
+  let lastRequest;
   const compactor = createAutoCompactor({
     getMessages: () => messages,
     setMessages: (next) => {
@@ -14,6 +15,7 @@ function setup(initial) {
     worker: {
       complete: async (request) => {
         requests++;
+        lastRequest = request;
         request.onTextDelta(`Summary ${requests}`);
       },
     },
@@ -33,6 +35,9 @@ function setup(initial) {
     },
     get requests() {
       return requests;
+    },
+    get lastRequest() {
+      return lastRequest;
     },
   };
 }
@@ -62,4 +67,19 @@ test("auto-compacts at 50 user turns, retaining ten complete turns", async () =>
   assert.equal(await state.compactor.compact(), true);
   assert.equal(state.messages[1].message, "User 90");
   assert.equal(state.requests, 2);
+});
+test("auto-compaction includes task final responses but not child activity", async () => {
+  const messages = Array.from({ length: 50 }, (_, i) => turn(i)).flat();
+  messages[1].parts.push({
+    type: "tool",
+    toolName: "task",
+    params: { brief: "review" },
+    result: { ok: true, output: "Final task findings" },
+    taskActivity: [{ label: "Secret child activity" }],
+  });
+  const state = setup(messages);
+  assert.equal(await state.compactor.compact(), true);
+  const transcript = state.lastRequest.input[0].content;
+  assert.match(transcript, /Result \(ok\): Final task findings/);
+  assert.doesNotMatch(transcript, /Secret child activity/);
 });

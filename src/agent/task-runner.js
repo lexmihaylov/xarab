@@ -168,16 +168,20 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
       let result;
       try {
         check();
-        phase = "classifying";
-        onProgress({ id, type: "status", status: "classifying" });
-        const classification = await classify({
-          prompt: brief.slice(0, 4096),
-          recentMessages: [],
-          signal: controller.signal,
-        });
-        check();
-        if (!classification?.valid || ![1, 2, 3].includes(classification.tier))
-          throw new Error(classification?.error || "Task classification failed.");
+        let tier = 1;
+        if (mode === "agentic") {
+          phase = "classifying";
+          onProgress({ id, type: "status", status: "classifying" });
+          const classification = await classify({
+            prompt: brief.slice(0, 4096),
+            recentMessages: [],
+            signal: controller.signal,
+          });
+          check();
+          if (!classification?.valid || ![1, 2, 3].includes(classification.tier))
+            throw new Error(classification?.error || "Task classification failed.");
+          tier = classification.tier;
+        }
         worker = createWorker({
           mode,
           onToolEvent: (name, event) => {
@@ -193,14 +197,14 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
             onProgress({ id, type: "tool", name, event });
           },
         });
-        if (!worker.getTierInfo(classification.tier).configured)
-          throw new Error(`Task worker tier ${classification.tier} is not configured.`);
+        if (!worker.getTierInfo(tier).configured)
+          throw new Error(`Task worker tier ${tier} is not configured.`);
         phase = "running";
         onProgress({ id, type: "status", status: "running" });
         await executeWorker({
           worker,
           mode,
-          tier: classification.tier,
+          tier,
           brief,
           input,
           instructions,

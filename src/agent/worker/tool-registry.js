@@ -1,4 +1,4 @@
-import { createToolTimelineObserver } from "./tool-timeline-observer.js";
+import { createToolTimelineObserver, toolProgressLabel } from "./tool-timeline-observer.js";
 import { loadApprovedPolicy } from "../policy-consent.js";
 import { authorizeNativeTool, isPolicyTool } from "../native-policy.js";
 import { createAskQuestionsTool } from "./tools/ask-questions-tool.js";
@@ -112,7 +112,11 @@ export function createToolRegistry({
         ...definition,
         async handler(params, { callId, signal } = {}) {
           const part = await observer.start(name, params, callId);
-          onDiagnosticEvent?.(name, { type: "invoked", callId });
+          onDiagnosticEvent?.(name, {
+            type: "invoked",
+            callId,
+            label: toolProgressLabel(name, params),
+          });
           try {
             if (signal?.aborted) throw signal.reason ?? new Error("Tool call cancelled.");
             if (isPolicyTool(name)) {

@@ -35,13 +35,28 @@ export function createTaskIntegration({
       if (!part) return;
       if (event.type === "text")
         part.summary = `${part.summary ?? ""}${event.text}`.slice(-16 * 1024);
+      else if (event.type === "profile") part.taskAgent = event.agent;
       else if (event.type === "status") part.title = `Task ${event.status}`;
-      else if (event.type === "tool")
+      else if (event.type === "tool") {
         part.title =
           event.name === "approval" && event.event?.type === "pending"
             ? "Task: awaiting response"
             : `Task: ${event.name}`;
-      else if (event.type === "assignment")
+        if (event.event?.type === "invoked") {
+          part.taskActivity ??= [];
+          part.taskActivity.push({
+            callId: event.event.callId ?? "",
+            label: String(event.event.label ?? `Running ${event.name}`).slice(0, 160),
+            status: "running",
+          });
+          if (part.taskActivity.length > 100) part.taskActivity.shift();
+        } else if (event.event?.type === "finished") {
+          const activity = part.taskActivity?.findLast(
+            (item) => item.callId === (event.event.callId ?? "") && item.status === "running",
+          );
+          if (activity) activity.status = event.event.ok ? "complete" : "error";
+        }
+      } else if (event.type === "assignment")
         part.taskExecution = `Tier ${event.tier} · ${event.provider} · ${event.model}`;
       sessionChanged();
       notify();

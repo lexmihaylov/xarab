@@ -51,6 +51,10 @@ test("parent task tool runs an isolated child, streams progress, and returns sum
         childRequest = request;
         assert.ok(request.tools.run_command);
         assert.equal(request.tools.task, undefined);
+        await request.tools.list_files.handler(
+          { path: "." },
+          { callId: "list-child", signal: request.signal },
+        );
         request.onTextDelta("Child summary");
       }
     },
@@ -70,7 +74,11 @@ test("parent task tool runs an isolated child, streams progress, and returns sum
   assert.equal(message.message, "Parent answer");
   const task = message.parts.find((part) => part.toolName === "task");
   assert.equal(task.result.output, "Child summary");
+  assert.equal(task.taskAgent, "general-purpose");
   assert.equal(task.taskExecution, "Tier 1 · openai · test");
+  assert.deepEqual(task.taskActivity, [
+    { callId: "list-child", label: "Listing .", status: "complete" },
+  ]);
   assert.ok(
     states.some((state) =>
       state.messages.some((item) =>

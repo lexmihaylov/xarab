@@ -48,6 +48,7 @@ export function createTaskTool({ runner, workspace, onProgress = () => {} }) {
         const diagnostic = diagnostics.find((item) => item.name === agent);
         throw new Error(diagnostic?.message ?? `Unknown task agent: ${agent}`);
       }
+      onProgress({ type: "profile", agent, callId });
       const result = await runner.run({
         mode: "agentic",
         brief,

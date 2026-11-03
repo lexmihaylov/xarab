@@ -146,7 +146,7 @@ test("agentic tasks have no deadline and remain cancellable", async () => {
   assert.equal(result.status, "cancelled");
   assert.equal(result.diagnostics.phase, "running");
 });
-test("timeout records classification phase", async () => {
+test("cancellation records agentic classification phase", async () => {
   const keepAlive = setInterval(() => {}, 100);
   try {
     const runner = createTaskRunner({
@@ -157,8 +157,12 @@ test("timeout records classification phase", async () => {
         throw new Error("unexpected worker");
       },
     });
-    const result = await runner.run({ brief: "review" });
-    assert.equal(result.status, "timed-out");
+    const controller = new AbortController();
+    const pending = runner.run({ mode: "agentic", brief: "review", signal: controller.signal });
+    await tick();
+    controller.abort();
+    const result = await pending;
+    assert.equal(result.status, "cancelled");
     assert.equal(result.diagnostics.phase, "classifying");
     assert.equal(result.diagnostics.approvalPending, false);
   } finally {
@@ -212,11 +216,13 @@ test("utility task routes a bounded brief, has no history/tools, and validates s
   });
   assert.equal(result.status, "completed");
   assert.deepEqual(result.value, { ok: true });
-  assert.deepEqual(calls[0][1].recentMessages, []);
-  assert.doesNotMatch(calls[0][1].prompt, /private/);
-  assert.equal(calls[1][0], "complete");
-  assert.equal(calls[1][1].tools, undefined);
-  assert.equal(calls[1][1].tier, 2);
+  assert.equal(
+    calls.some(([name]) => name === "classify"),
+    false,
+  );
+  assert.equal(calls[0][0], "complete");
+  assert.equal(calls[0][1].tools, undefined);
+  assert.equal(calls[0][1].tier, 1);
   await runner.shutdown();
 });
 
@@ -242,7 +248,11 @@ test("agentic mode uses clean context, selected MCPs, and only one active task",
   await assert.rejects(runner.run({ mode: "agentic", brief: "Second" }), /already running/);
   release();
   assert.equal((await first).status, "completed");
+  const classification = calls.find(([name]) => name === "classify")[1];
+  assert.deepEqual(classification.recentMessages, []);
+  assert.doesNotMatch(classification.prompt, /selected/);
   const request = calls.find(([name]) => name === "run")[1];
+  assert.equal(request.tier, 2);
   assert.deepEqual(request.history, []);
   assert.deepEqual(request.mcpServers, ["docs"]);
   assert.equal(request.taskInstructions, "Profile");
@@ -250,8 +260,13 @@ test("agentic mode uses clean context, selected MCPs, and only one active task",
 });
 
 test("classification errors, unconfigured tiers, and malformed results fail without fallback", async () => {
+  const invalidClassification = setup({ classify: async () => null });
+  const agentic = await invalidClassification.runner.run({ mode: "agentic", brief: "Task" });
+  assert.equal(agentic.status, "failed");
+  assert.match(agentic.error, /classification failed/i);
+  await invalidClassification.runner.shutdown();
+
   for (const options of [
-    { classify: async () => null },
     { configured: false },
     { complete: async ({ onTextDelta }) => onTextDelta("not json") },
   ]) {

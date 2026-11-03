@@ -17,6 +17,15 @@ test("compaction transcript includes structured tool calls and results", async (
           result: { ok: true, output: '{"mode":"safe"}' },
           status: "complete",
         },
+        {
+          type: "tool",
+          callId: "task-1",
+          toolName: "task",
+          params: { brief: "review" },
+          result: { ok: false, output: "Final task failure" },
+          taskActivity: [{ label: "Secret child activity" }],
+          status: "error",
+        },
       ],
     },
   ];
@@ -56,5 +65,7 @@ test("compaction transcript includes structured tool calls and results", async (
   assert.match(transcript, /Tool call: read_file \(call-read-1\)/);
   assert.match(transcript, /Arguments: \{"path":"config.json"\}/);
   assert.match(transcript, /Result \(ok\):\n\{"mode":"safe"\}/);
+  assert.match(transcript, /Result \(error\):\nFinal task failure/);
+  assert.doesNotMatch(transcript, /Secret child activity/);
   assert.equal(compactedMessages.at(-1).message, "Summary with the safe mode value.");
 });

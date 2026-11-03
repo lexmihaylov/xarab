@@ -12,7 +12,7 @@ const statusStyle = {
   error: { color: colors.error, prefix: "✕" },
 };
 
-export function ToolMessage({ part, syntaxStyle }) {
+export function ToolMessage({ part, syntaxStyle, activityExpanded = false, onToggleActivity }) {
   const status = statusStyle[part.status] ?? statusStyle.complete;
   const title = String(part.title ?? part.label ?? "Tool");
   const rawSummary = part.summary == null ? "" : String(part.summary);
@@ -40,10 +40,29 @@ export function ToolMessage({ part, syntaxStyle }) {
       summary={summary}
       error={isError}
     >
-      {part.toolName === "task" && typeof part.taskExecution === "string" && (
+      {part.toolName === "task" && (part.taskAgent || part.taskExecution) && (
         <text fg={colors.muted} selectable>
-          {part.taskExecution}
+          {[part.taskAgent && `Agent: ${part.taskAgent}`, part.taskExecution]
+            .filter(Boolean)
+            .join(" · ")}
         </text>
+      )}
+      {part.toolName === "task" && part.taskActivity?.length > 0 && (
+        <box flexDirection="column">
+          <text fg={colors.accent} onMouseUp={onToggleActivity}>
+            {`${activityExpanded ? "▾" : "▸"} Activity (${part.taskActivity.length}) · click to toggle · Ctrl+T all`}
+          </text>
+          {activityExpanded &&
+            part.taskActivity.map((item, index) => (
+              <text
+                key={index}
+                fg={item.status === "error" ? colors.error : colors.muted}
+                selectable
+              >
+                {`${item.status === "running" ? "…" : item.status === "error" ? "✕" : "✓"} ${item.label}`}
+              </text>
+            ))}
+        </box>
       )}
       {diffText && (
         <box flexDirection="column" padding={1} marginTop={1} backgroundColor={colors.background}>

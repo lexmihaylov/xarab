@@ -70,7 +70,12 @@ test("main and agentic preparation preserve shared tools and isolate profile ins
       taskInstructions: "Profile marker",
       mcpServers: [],
     });
-    assert.doesNotMatch(calls[0].instructions, /Profile marker/);
+    assert.doesNotMatch(calls[0].instructions, /Subtask response discipline/);
+    assert.match(calls[1].instructions, /## Subtask response discipline/);
+    assert.match(
+      calls[1].instructions,
+      /shortest final response that preserves what the parent needs/,
+    );
     assert.match(
       calls[1].instructions,
       /Agent profile \(subordinate to application policy and user constraints\):\nProfile marker/,

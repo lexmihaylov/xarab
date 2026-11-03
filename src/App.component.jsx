@@ -113,6 +113,14 @@ export function App({
   onRenameSession,
 }) {
   const [toasts, setToasts] = useState([]);
+  const [expandedTasks, setExpandedTasks] = useState(() => new Set());
+  const toggleTask = (id) =>
+    setExpandedTasks((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const chatRef = useRef(null);
   const selectedText = useRef("");
   const nextToastId = useRef(1);
@@ -152,6 +160,20 @@ export function App({
       state.sessionOperation
     )
       return;
+    if (key.ctrl && key.name === "t") {
+      const tasks = state.messages
+        .flatMap((message) => message.parts ?? [])
+        .filter((part) => part.toolName === "task" && part.callId && part.taskActivity?.length);
+      if (tasks.length) {
+        key.preventDefault();
+        setExpandedTasks((previous) =>
+          tasks.every((task) => previous.has(task.callId))
+            ? new Set()
+            : new Set(tasks.map((task) => task.callId)),
+        );
+      }
+      return;
+    }
     const pageDirection = pageScrollKeys.get(key.name);
     const stepDirection =
       key.ctrl && (key.name === "up" || key.name === "down")
@@ -212,7 +234,12 @@ export function App({
                   key: `${message.type}-${index}-${entry.key}`,
                   element:
                     entry.type === "tool" ? (
-                      <ToolMessage part={entry.part} syntaxStyle={syntaxStyle} />
+                      <ToolMessage
+                        part={entry.part}
+                        syntaxStyle={syntaxStyle}
+                        activityExpanded={expandedTasks.has(entry.part.callId)}
+                        onToggleActivity={() => toggleTask(entry.part.callId)}
+                      />
                     ) : (
                       <AssistantMessage
                         message={message}
