@@ -1,11 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { authorizeCommand, parseCommandRisk } from "../src/agent/command-risk.js";
+import {
+  authorizeCommand,
+  COMMAND_RISK_INSTRUCTIONS,
+  parseCommandRisk,
+} from "../src/agent/command-risk.js";
 import { createShellTool } from "../src/agent/worker/tools/shell-tool.js";
 import { createQuestionRequest } from "../src/agent/question-request.js";
 import { createTaskIntegration } from "../src/agent/task-integration.js";
 
 const assessment = (risk, scope = "workspace") => ({ risk, scope, reason: "Test assessment" });
+test("risk guidance does not treat routine temporary-file use as risky by itself", () => {
+  assert.match(COMMAND_RISK_INSTRUCTIONS, /temporary-file use.*does not by itself increase risk/s);
+  assert.match(COMMAND_RISK_INSTRUCTIONS, /unrelated or sensitive files/);
+  assert.match(COMMAND_RISK_INSTRUCTIONS, /full command's effects/);
+});
 test("workspace medium risk bypasses approval; other medium/high risks require it", async () => {
   for (const [risk, scope, requiresApproval] of [
     ["low", "workspace", false],
