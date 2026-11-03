@@ -33,6 +33,7 @@ export function createToolTimelineObserver({
       return part;
     },
     complete(part, name, params, result) {
+      settleTaskActivity(part);
       part.status = result.ok ? "complete" : "error";
       part.result = storedToolResult(result);
       const preservesEventSummary = name === "read_file" || name === "search_content";
@@ -45,6 +46,7 @@ export function createToolTimelineObserver({
       }
     },
     fail(part, result) {
+      settleTaskActivity(part);
       part.status = "error";
       part.result = storedToolResult(result);
       part.summary = result.output.slice(0, 240);
@@ -54,6 +56,12 @@ export function createToolTimelineObserver({
       notify();
     },
   };
+}
+function settleTaskActivity(part) {
+  if (part.toolName !== "task" || !Array.isArray(part.taskActivity)) return;
+  for (const item of part.taskActivity) {
+    if (item.status === "running") item.status = "unknown";
+  }
 }
 const MAX_STORED_TOOL_OUTPUT = 16 * 1024;
 

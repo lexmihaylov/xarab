@@ -17,6 +17,19 @@ test("task activity is collapsed by default and exposes entries when expanded", 
   );
 });
 
+test("unknown child outcomes are not displayed as successful", () => {
+  const part = {
+    toolName: "task",
+    title: "Task",
+    status: "error",
+    taskActivity: [{ label: "Executing command", status: "unknown" }],
+  };
+  const expanded = ToolMessage({ part, activityExpanded: true });
+  assert.equal(
+    expanded.props.children[1].props.children[1][0].props.children,
+    "? Executing command (outcome unknown)",
+  );
+});
 test("task execution metadata is present for running, completed and failed tasks, including old sessions", () => {
   for (const status of ["running", "complete", "error"]) {
     for (const taskExecution of [undefined, "Tier 2 · openrouter · vendor/model"]) {

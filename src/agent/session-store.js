@@ -144,6 +144,17 @@ export function newSession(workspace, title) {
   };
 }
 
+function stripTaskActivity(record) {
+  if (!Array.isArray(record?.messages)) return record;
+  for (const message of record.messages) {
+    if (!Array.isArray(message?.parts)) continue;
+    for (const part of message.parts) {
+      if (object(part)) delete part.taskActivity;
+    }
+  }
+  return record;
+}
+
 export function createSessionStore(directory) {
   let queue = Promise.resolve();
   const file = (id) => {
@@ -153,13 +164,13 @@ export function createSessionStore(directory) {
   async function load(id) {
     const filename = file(id);
     if ((await stat(filename)).size > MAX_BYTES) throw new Error("Session file is too large");
-    return validateSession(JSON.parse(await readFile(filename, "utf8")), id);
+    return validateSession(stripTaskActivity(JSON.parse(await readFile(filename, "utf8"))), id);
   }
   return {
     directory,
     load,
     save(record) {
-      const snapshot = JSON.parse(JSON.stringify(record));
+      const snapshot = stripTaskActivity(JSON.parse(JSON.stringify(record)));
       validateSession(snapshot);
       const data = `${JSON.stringify(snapshot)}\n`;
       if (Buffer.byteLength(data) > MAX_BYTES)

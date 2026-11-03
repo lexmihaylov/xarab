@@ -5,6 +5,7 @@ import path from "node:path";
 import os from "node:os";
 import { createAssistantController } from "../src/agent/controller.js";
 import { createSessionStore } from "../src/agent/session-store.js";
+import { createToolTimelineObserver } from "../src/agent/worker/tool-timeline-observer.js";
 
 async function setup(t, run, options = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), "xarab-task-controller-"));
@@ -125,6 +126,22 @@ test("stopping the parent cancels its active child and returns an explicit cance
   assert.equal(controller.getState().generating, false);
 });
 
+test("terminal task cards settle unfinished child activity without changing completed outcomes", () => {
+  const observer = createToolTimelineObserver({ sessionChanged() {}, notify() {} });
+  for (const outcome of ["success", "failure", "cancelled"]) {
+    const part = {
+      toolName: "task",
+      status: "running",
+      taskActivity: [{ status: "running" }, { status: "complete" }, { status: "error" }],
+    };
+    if (outcome === "cancelled") observer.fail(part, { ok: false, output: "cancelled" });
+    else observer.complete(part, "task", {}, { ok: outcome === "success", output: outcome });
+    assert.deepEqual(
+      part.taskActivity.map((item) => item.status),
+      ["unknown", "complete", "error"],
+    );
+  }
+});
 test("default background titles persist without adding their output to the parent answer", async (t) => {
   const { controller, root } = await setup(t, async (request) => {
     request.onTextDelta(request.tools?.task ? "Main response" : "Generated title");

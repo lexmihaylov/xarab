@@ -52,6 +52,32 @@ test("sessions round-trip model history, tool results, drafts and pending shell 
   assert.deepEqual(await readdir(store.directory), [`${record.id}.json`]);
 });
 
+test("task activity stays in memory and legacy activity is ignored on load", async (t) => {
+  const { root, store } = await setup(t);
+  const record = newSession(root);
+  const part = {
+    type: "tool",
+    title: "Task",
+    status: "complete",
+    toolName: "task",
+    taskActivity: [{ label: "secret command", status: "complete" }],
+    result: { ok: true, output: "final response" },
+  };
+  record.messages = [{ type: "agent", message: "Done", parts: [part] }];
+  await store.save(record);
+  assert.equal(part.taskActivity[0].label, "secret command");
+  const filename = path.join(store.directory, `${record.id}.json`);
+  const saved = JSON.parse(await readFile(filename, "utf8"));
+  assert.equal(saved.messages[0].parts[0].taskActivity, undefined);
+  assert.equal(saved.messages[0].parts[0].result.output, "final response");
+  for (const legacy of [[{ label: "old activity", status: "running" }], "invalid", [null]]) {
+    saved.messages[0].parts[0].taskActivity = legacy;
+    await writeFile(filename, JSON.stringify(saved));
+    const loaded = await store.load(record.id);
+    assert.equal(loaded.messages[0].parts[0].taskActivity, undefined);
+    assert.equal(loaded.messages[0].parts[0].result.output, "final response");
+  }
+});
 test("queued saves snapshot immediately and the latest completed save wins atomically", async (t) => {
   const { root, store } = await setup(t);
   const record = newSession(root);

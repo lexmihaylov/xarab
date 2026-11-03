@@ -59,7 +59,7 @@ export function ToolMessage({ part, syntaxStyle, activityExpanded = false, onTog
                 fg={item.status === "error" ? colors.error : colors.muted}
                 selectable
               >
-                {`${item.status === "running" ? "…" : item.status === "error" ? "✕" : "✓"} ${item.label}`}
+                {`${item.status === "running" ? "…" : item.status === "error" ? "✕" : item.status === "unknown" ? "?" : "✓"} ${item.label}${item.status === "unknown" ? " (outcome unknown)" : ""}`}
               </text>
             ))}
         </box>
