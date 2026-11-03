@@ -56,6 +56,10 @@ export function createAssistantController({
   let generating = false;
   let isRouting = false;
   let commandRunning = false;
+  let turnRunning = false;
+  let turnInterrupted = false;
+  let nextQueuedId = 0;
+  let queuedMessages = [];
   let abortController;
   let lastInterruptAt = 0;
   let messages = [];
@@ -144,8 +148,11 @@ export function createAssistantController({
       classifier: configStore.getClassifier(),
       status,
       suggestion,
-      generating: generating || isRouting,
+      generating: generating || isRouting || turnRunning,
       commandRunning,
+      queuedMessages: queuedMessages.filter(
+        (item) => item.sessionId === sessionController.getActiveSession().id,
+      ),
       questionDialog: questionRequest.getState(),
       modelModal,
       providerModal,
@@ -195,7 +202,7 @@ export function createAssistantController({
           ? "Use /route to configure the classifier and tier workers"
           : nextStatus,
       ),
-    isGenerating: () => generating,
+    isGenerating: () => generating || turnRunning,
     isRouting: () => isRouting,
     getActiveDownload: () => activeDownload,
     isShuttingDown: () => isShuttingDown,
@@ -587,6 +594,7 @@ export function createAssistantController({
       approvedHandoff = result?.handoff;
       succeeded = !abortController.signal.aborted;
     } catch (error) {
+      turnInterrupted = true;
       if (!abortController.signal.aborted)
         addMessage({ type: "system", message: error.message, severity: "error" });
     } finally {
@@ -686,17 +694,63 @@ export function createAssistantController({
     if (isShuttingDown) return;
     const text = raw.trim();
     if (!text) return;
-    if ((generating || isRouting || isSessionOperation()) && text !== "/exit") {
+    if (text === "/exit") return onQuit();
+    if (
+      isSessionOperation() ||
+      commandRunning ||
+      ((turnRunning || generating || isRouting) && (text.startsWith("/") || text.startsWith("!")))
+    ) {
       return addMessage({
         type: "system",
-        message: "Wait for the current response to finish before sending another prompt.",
+        message: "Wait for the current work to finish before running a command.",
         severity: "warning",
       });
     }
     updateDraft({ value: "", cursor: 0 });
     sessionChanged();
-    if (text === "/exit") return onQuit();
-    return commandHandler.handle(text);
+    if (text.startsWith("/") || text.startsWith("!")) return commandHandler.handle(text);
+    const sessionId = getActiveSession().id;
+    if (
+      turnRunning ||
+      generating ||
+      isRouting ||
+      queuedMessages.some((item) => item.sessionId === sessionId)
+    ) {
+      queuedMessages.push({ id: ++nextQueuedId, text, sessionId });
+      notify();
+      if (turnRunning || generating || isRouting) return;
+      return drainQueue(sessionId);
+    }
+    return runTurn(text, sessionId);
+  }
+
+  async function runTurn(text, sessionId) {
+    turnRunning = true;
+    turnInterrupted = false;
+    notify();
+    let completed = false;
+    try {
+      await commandHandler.handle(text);
+      completed = true;
+    } finally {
+      turnRunning = false;
+      notify();
+      if (completed && !turnInterrupted && !isShuttingDown) await drainQueue(sessionId);
+    }
+  }
+
+  async function drainQueue(sessionId) {
+    if (turnRunning || isShuttingDown || getActiveSession().id !== sessionId) return;
+    const index = queuedMessages.findIndex((item) => item.sessionId === sessionId);
+    if (index < 0) return;
+    const [item] = queuedMessages.splice(index, 1);
+    notify();
+    await runTurn(item.text, sessionId);
+  }
+
+  function removeQueuedMessage(id) {
+    queuedMessages = queuedMessages.filter((item) => item.id !== id);
+    notify();
   }
 
   function handleInterrupt() {
@@ -704,7 +758,8 @@ export function createAssistantController({
     const now = Date.now();
     if (now - lastInterruptAt <= 2000) return onQuit();
     lastInterruptAt = now;
-    if (generating || isRouting) {
+    if (generating || isRouting || turnRunning) {
+      turnInterrupted = true;
       abortController?.abort();
       updateStatus("Stopping…");
       addMessage({
@@ -722,7 +777,8 @@ export function createAssistantController({
   }
 
   function stopGeneration() {
-    if (!generating && !isRouting) return;
+    if (!generating && !isRouting && !turnRunning) return;
+    turnInterrupted = true;
     abortController?.abort();
     updateStatus("Stopping…");
   }
@@ -936,6 +992,7 @@ export function createAssistantController({
       );
     },
     answerQuestions: questionRequest.respond,
+    removeQueuedMessage,
     stopGeneration,
     handleInterrupt,
     shutdown,

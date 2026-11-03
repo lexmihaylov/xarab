@@ -26,6 +26,9 @@ export function Composer({
   draft,
   messageSuggestion,
   disabled = false,
+  generating = false,
+  queuedMessages = [],
+  onRemoveQueuedMessage,
   onSubmit,
   onDraftChange,
   onStopGeneration,
@@ -94,6 +97,11 @@ export function Composer({
       return;
     }
     if (disabled) return;
+    if (key.ctrl && key.name === "x" && queuedMessages.length) {
+      key.preventDefault();
+      onRemoveQueuedMessage?.(queuedMessages[queuedMessages.length - 1].id);
+      return;
+    }
     if (key.name === "tab" && suggestions.length) {
       key.preventDefault();
       completeCommand();
@@ -124,6 +132,16 @@ export function Composer({
 
   return (
     <box flexDirection="column" flexShrink={flexShrink}>
+      {queuedMessages.length > 0 && (
+        <box flexDirection="column" maxHeight={4} overflow="hidden">
+          <text
+            fg={colors.hint}
+          >{`Queued (${queuedMessages.length}) · Ctrl+X removes newest${generating ? "" : " · send a message to resume"}`}</text>
+          {queuedMessages.slice(0, 3).map((item) => (
+            <text key={item.id} fg={colors.hint}>{`  ${item.text.replace(/\s+/g, " ")}`}</text>
+          ))}
+        </box>
+      )}
       {suggestions.length > 0 && (
         <box flexDirection="column" marginBottom={1}>
           {suggestions.map((suggestion, index) => (
@@ -154,7 +172,9 @@ export function Composer({
           <text fg={colors.hint}>
             {suggestions.length
               ? "↑↓ choose · Tab complete · Enter select/run"
-              : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}
+              : generating
+                ? "Enter queue · Ctrl+J newline · Esc stop"
+                : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}
           </text>
         </box>
       )}

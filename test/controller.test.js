@@ -71,6 +71,68 @@ test("controller owns command handling and publishes updated UI state", async (t
   await controller.shutdown();
 });
 
+test("follow-ups run in FIFO order and remain pending after interruption", async (t) => {
+  const temporary = await mkdtemp("/tmp/opencode/xarab-queue-");
+  t.after(() => rm(temporary, { recursive: true, force: true }));
+  let release;
+  let started;
+  let gate = new Promise((resolve) => (release = resolve));
+  let ready = new Promise((resolve) => (started = resolve));
+  const prompts = [];
+  const controller = createAssistantController({
+    automaticTitles: false,
+    automaticSuggestions: false,
+    root: temporary,
+    workspace: temporary,
+    instructionFiles: [],
+    configPath: path.join(temporary, "config.json"),
+    classifierFactory: () => ({
+      load: async () => {},
+      dispose: async () => {},
+      classify: async ({ prompt }) => {
+        prompts.push(prompt);
+        if (prompts.length === 1 || prompts.length === 4) {
+          started();
+          await gate;
+        }
+        return { valid: true, tier: 1, rationale: "Routine" };
+      },
+    }),
+    localWorkerAdapterFactory: () => ({ dispose: async () => {}, run: async () => ({}) }),
+  });
+  await controller.initialize();
+  t.after(() => controller.shutdown());
+  await controller.setRouterClassifier(path.join(temporary, "router.gguf"));
+  await controller.setRouterTierWorker(1, { provider: "local", model: "small.gguf" });
+  const first = controller.submit("first");
+  await ready;
+  await controller.submit("second");
+  await controller.submit("third");
+  assert.deepEqual(
+    controller.getState().queuedMessages.map((item) => item.text),
+    ["second", "third"],
+  );
+  release();
+  await first;
+  assert.deepEqual(prompts, ["first", "second", "third"]);
+  assert.equal(controller.getState().queuedMessages.length, 0);
+
+  gate = new Promise((resolve) => (release = resolve));
+  ready = new Promise((resolve) => (started = resolve));
+  const interrupted = controller.submit("fourth");
+  await ready;
+  await controller.submit("fifth");
+  controller.stopGeneration();
+  release();
+  await interrupted;
+  assert.deepEqual(
+    controller.getState().queuedMessages.map((item) => item.text),
+    ["fifth"],
+  );
+  await controller.submit("sixth");
+  assert.deepEqual(prompts, ["first", "second", "third", "fourth", "fifth", "sixth"]);
+});
+
 test("manual shell commands persist command, output, and severity", async (t) => {
   const temporary = await mkdtemp("/tmp/opencode/xarab-shell-test-");
   t.after(() => rm(temporary, { recursive: true, force: true }));

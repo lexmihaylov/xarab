@@ -60,6 +60,7 @@ function renderApp(state) {
       syntaxStyle={syntaxStyle}
       onSubmit={(value) => void controller.submit(value)}
       onAnswerQuestions={controller.answerQuestions}
+      onRemoveQueuedMessage={controller.removeQueuedMessage}
       onStopGeneration={controller.stopGeneration}
       onInterrupt={controller.handleInterrupt}
       onDraftChange={controller.updateDraft}

@@ -91,6 +91,7 @@ export function App({
   syntaxStyle,
   onSubmit,
   onAnswerQuestions,
+  onRemoveQueuedMessage,
   onStopGeneration,
   onInterrupt,
   onDraftChange,
@@ -298,8 +299,10 @@ export function App({
           draft={state.sessionDraft}
           messageSuggestion={state.suggestion}
           contextTokens={state.currentSession?.contextTokens}
+          generating={state.generating}
+          queuedMessages={state.queuedMessages}
+          onRemoveQueuedMessage={onRemoveQueuedMessage}
           disabled={
-            state.generating ||
             state.commandRunning ||
             state.sessionOperation ||
             Boolean(
