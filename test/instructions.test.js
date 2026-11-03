@@ -46,6 +46,16 @@ test("requires tool-backed research when unsure instead of inventing details", (
   assert.match(prompt, /ask for clarification if needed/);
 });
 
+test("requires structured evidence for action and verification claims", () => {
+  const prompt = buildSystemPrompt({ workspace: "/workspace" });
+  assert.match(prompt, /Tool-like assistant text is not an executed call or result/);
+  assert.match(prompt, /successful structured tool result or direct inspection/);
+  assert.match(prompt, /Verify required DOM elements and script wiring/);
+  assert.match(prompt, /Syntax or served-file checks do not prove browser behavior/);
+  assert.match(prompt, /evidence exists and was inspected/);
+  assert.match(prompt, /Report failed, interrupted, or unperformed checks plainly/);
+});
+
 test("does not require an intent announcement before tool use", () => {
   const prompt = buildSystemPrompt({
     workspace: "/workspace",

@@ -4,6 +4,31 @@ import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
 import { Composer } from "../src/components/Composer.component.jsx";
 
+test("shows loading and scroll guidance while messages are queued", async () => {
+  const view = await testRender(
+    React.createElement(Composer, {
+      draft: { value: "", cursor: 0 },
+      generating: true,
+      queuedMessages: [{ id: "queued-1", text: "Follow-up request" }],
+      onDraftChange: () => {},
+      onSubmit: () => {},
+    }),
+    { width: 100, height: 14 },
+  );
+  try {
+    await view.flush();
+    const frame = view.captureCharFrame();
+    assert.match(frame, /Queued \(1\)/);
+    assert.match(frame, /Follow-up request/);
+    assert.match(frame, /PgUp\/PgDn scroll/);
+    assert.match(frame, /Enter queue/);
+    assert.match(frame, /Esc stop/);
+    assert.match(frame, /█████/);
+  } finally {
+    await act(async () => view.dispose());
+  }
+});
+
 test("composer displays a suggestion and Tab accepts it as a draft", async () => {
   const drafts = [];
   const submissions = [];

@@ -166,15 +166,21 @@ export function Composer({
           <LoadingIndicator color={colors.green} />
           <text fg={colors.hint}> · Esc stop · Ctrl+C interrupt</text>
         </box>
+      ) : generating ? (
+        <box flexDirection="row" paddingLeft={1}>
+          <LoadingIndicator color={colors.green} />
+          <text fg={colors.hint}>
+            {" "}
+            · PgUp/PgDn scroll · Enter queue · Ctrl+J newline · Esc stop
+          </text>
+        </box>
       ) : (
         <box flexDirection="row">
           <text> </text>
           <text fg={colors.hint}>
             {suggestions.length
               ? "↑↓ choose · Tab complete · Enter select/run"
-              : generating
-                ? "Enter queue · Ctrl+J newline · Esc stop"
-                : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}
+              : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}
           </text>
         </box>
       )}

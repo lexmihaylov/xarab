@@ -15,6 +15,7 @@ Each document starts with a **Type** tag describing what it records and a **Stat
 | --- | --- | --- | --- |
 | [`openai-response-timeout-recovery.md`](./openai-response-timeout-recovery.md) | `issue` | `deferred` | Timeout and retry recovery for stalled OpenAI responses |
 | [`responses-websocket-fallback.md`](./responses-websocket-fallback.md) | `issue` | `deferred` | HTTP fallback when a Responses WebSocket continuation is rejected |
+| [`tier-adjustment-rejection.md`](./tier-adjustment-rejection.md) | `issue` | `deferred` | Upward tier adjustment may be rejected with a misleading no-suitable-tier message |
 | [`cross-prompt-responses-continuation.md`](./cross-prompt-responses-continuation.md) | `proposal` | `deferred` | Reuse incremental Responses continuation across user prompts |
 | [`parallel-session-orchestration.md`](./parallel-session-orchestration.md) | `proposal` | `deferred` | Parallel sessions in one Xarab instance and general-purpose task agent prerequisite |
 | [`general-purpose-task-runner.md`](./general-purpose-task-runner.md) | `proposal` | `in-progress` | Utility and isolated agentic tasks, routing, and automatic session titles |
