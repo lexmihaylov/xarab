@@ -20,19 +20,16 @@ export function AssistantMessage({ message, responseText: providedText, generati
     <box flexDirection="column" width="100%" minWidth={0} flexGrow={0} flexShrink={0}>
       {responseText.length > 0 && (
         <MessageCard bordered={false}>
-          {generating ? (
-            <text fg={colors.text} selectable>
-              {responseText}
-            </text>
-          ) : (
-            <markdown
-              content={responseText}
-              syntaxStyle={syntaxStyle}
-              conceal
-              concealCode
-              selectable
-            />
-          )}
+          <markdown
+            content={responseText}
+            syntaxStyle={syntaxStyle}
+            streaming={generating}
+            internalBlockMode="top-level"
+            tableOptions={{ style: "grid" }}
+            conceal
+            concealCode
+            selectable
+          />
         </MessageCard>
       )}
       {!responseText && generating && (

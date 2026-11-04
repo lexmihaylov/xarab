@@ -33,13 +33,19 @@ test("task brief remains visible and provided context expands independently of o
   assert.ok(!empty.props.headerChildren.props.children[1]);
 });
 
-test("completed task summaries render as markdown while other summaries remain text", () => {
+test("running and completed task summaries render as streaming and finalized markdown", () => {
   const syntaxStyle = {};
-  for (const [toolName, status, markdown] of [
-    ["task", "complete", true],
-    ["task", "running", false],
-    ["task", "error", false],
-    ["read_file", "complete", false],
+  for (const [toolName, status, markdown, streaming] of [
+    ["task", "complete", true, false],
+    ["task", "running", true, true],
+    ["task", "error", false, false],
+    ["analyze_image", "complete", true, false],
+    ["analyze_image", "running", false, false],
+    ["analyze_image", "error", false, false],
+    ["websearch", "complete", true, false],
+    ["websearch", "running", false, false],
+    ["websearch", "error", false, false],
+    ["read_file", "complete", false, false],
   ]) {
     const tool = ToolMessage({ part: { toolName, status, summary: "**result**" }, syntaxStyle });
     const card = ExecutionMessageCard(tool.props);
@@ -48,8 +54,21 @@ test("completed task summaries render as markdown while other summaries remain t
     if (markdown) {
       assert.equal(body.props.content, "**result**");
       assert.equal(body.props.syntaxStyle, syntaxStyle);
+      assert.equal(body.props.streaming, streaming);
+      assert.equal(body.props.internalBlockMode, "top-level");
+      assert.equal(body.props.tableOptions.style, "grid");
     } else assert.equal(body.props.children, "**result**");
   }
+});
+
+test("web search result text is passed unchanged to the markdown renderer", () => {
+  const summary =
+    "Web search results for: example\n\n1. Example title\nURL: https://example.com\nExcerpt: An **example** result.";
+  const tool = ToolMessage({ part: { toolName: "websearch", status: "complete", summary } });
+  const body = ExecutionMessageCard(tool.props).props.children[2].props.children;
+  assert.equal(body.type, "markdown");
+  assert.equal(body.props.content, summary);
+  assert.equal(body.props.streaming, false);
 });
 
 test("task activity is collapsed by default and exposes entries when expanded", () => {

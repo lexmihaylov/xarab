@@ -108,17 +108,11 @@ test("renders multiple fenced code blocks without exposing markdown markers", as
   }
 });
 
-test("keeps all blocks literal through updates and renders markdown on completion", async () => {
+test("renders assistant markdown incrementally and finalizes the completed segment", async () => {
   let updateState;
-  const initialText = "# Example\n\n```js";
-  const streamedText = [
-    "# Example",
-    "",
-    "```js",
-    "function greet(name) {",
-    "  return `Hello, ${name}!`;",
-  ].join("\n");
-  const completedText = [...streamedText.split("\n"), "}", "```"].join("\n");
+  const initialText = "# Example\n\nFirst **bold** paragraph.\n\n";
+  const streamedText = `${initialText}A second *unfinished`;
+  const completedText = `${initialText}A second *unfinished* paragraph.`;
 
   function Harness() {
     const [state, setState] = useState({
@@ -158,27 +152,50 @@ test("keeps all blocks literal through updates and renders markdown on completio
   const view = await testRender(React.createElement(Harness), { width: 80, height: 24 });
   await view.flush();
   try {
-    assert.match(view.captureCharFrame(), /# Example/);
-    assert.match(view.captureCharFrame(), /```js/);
+    assert.match(view.captureCharFrame(), /Example/);
+    assert.doesNotMatch(view.captureCharFrame(), /# Example/);
+    assert.match(view.captureCharFrame(), /First bold paragraph\./);
 
     updateResponse(streamedText, true);
     await view.flush();
     let frame = view.captureCharFrame();
-    assert.match(frame, /```js/);
-
-    updateResponse(completedText + "\n\n**Next block**", true);
-    await view.flush();
-    frame = view.captureCharFrame();
-    assert.match(frame, /# Example/);
-    assert.match(frame, /```js/);
-    assert.match(frame, /\*\*Next block\*\*/);
+    assert.match(frame, /A second \*unfinished/);
 
     updateResponse(completedText, false);
     await view.flush();
     frame = view.captureCharFrame();
-    assert.match(frame, /function greet\(name\)/);
-    assert.match(frame, /return `Hello, \$\{name\}!`;/);
-    assert.doesNotMatch(frame, /```js|```/);
+    assert.match(frame, /A second unfinished paragraph\./);
+    assert.doesNotMatch(frame, /\*unfinished\*/);
+  } finally {
+    await view.dispose();
+  }
+});
+
+test("top-level streaming markdown conceals a heading while the following paragraph grows", async () => {
+  let update;
+  function Harness() {
+    const [content, setContent] = useState("# Heading\n\n");
+    update = setContent;
+    return React.createElement("markdown", {
+      content,
+      streaming: true,
+      conceal: true,
+      internalBlockMode: "top-level",
+    });
+  }
+  const view = await testRender(React.createElement(Harness), { width: 80, height: 12 });
+  try {
+    for (const content of ["# Heading\n\n", "# Heading\n\nA", "# Heading\n\nA paragraph grows."]) {
+      act(() => update(content));
+      await view.renderOnce();
+      const immediate = view.captureCharFrame();
+      await view.flush();
+      const settled = view.captureCharFrame();
+      for (const frame of [immediate, settled]) {
+        assert.match(frame, /Heading/);
+        assert.doesNotMatch(frame, /# Heading/);
+      }
+    }
   } finally {
     await view.dispose();
   }

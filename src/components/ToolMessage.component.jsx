@@ -46,7 +46,11 @@ export function ToolMessage({
       title={title}
       summary={summary}
       error={isError}
-      summaryMarkdown={part.toolName === "task" && part.status === "complete"}
+      summaryMarkdown={
+        (part.toolName === "task" && (part.status === "running" || part.status === "complete")) ||
+        (["analyze_image", "websearch"].includes(part.toolName) && part.status === "complete")
+      }
+      summaryStreaming={part.toolName === "task" && part.status === "running"}
       syntaxStyle={syntaxStyle}
       headerChildren={
         part.toolName === "task" && (

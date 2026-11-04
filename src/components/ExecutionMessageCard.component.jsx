@@ -10,6 +10,7 @@ export function ExecutionMessageCard({
   summary,
   error,
   summaryMarkdown = false,
+  summaryStreaming = false,
   syntaxStyle,
   headerChildren,
   children,
@@ -40,7 +41,16 @@ export function ExecutionMessageCard({
       {summary && (
         <box padding={1} marginTop={1} backgroundColor={colors.background}>
           {summaryMarkdown ? (
-            <markdown content={summary} syntaxStyle={syntaxStyle} conceal concealCode selectable />
+            <markdown
+              content={summary}
+              syntaxStyle={syntaxStyle}
+              streaming={summaryStreaming}
+              internalBlockMode="top-level"
+              tableOptions={{ style: "grid" }}
+              conceal
+              concealCode
+              selectable
+            />
           ) : (
             <text fg={error ? colors.error : colors.text} selectable>
               {summary}
