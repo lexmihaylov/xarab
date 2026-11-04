@@ -68,6 +68,12 @@ export function Composer({
   function updateDraft() {
     const nextValue = inputRef.current?.plainText ?? "";
     const cursor = inputRef.current?.cursorOffset ?? nextValue.length;
+    if (
+      nextValue === value &&
+      nextValue === (draft?.value ?? "") &&
+      cursor === (draft?.cursor ?? 0)
+    )
+      return;
     setValue(nextValue);
     onDraftChange({ value: nextValue, cursor });
   }

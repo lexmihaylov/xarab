@@ -61,6 +61,37 @@ test("a suggestion arriving after mount wraps at the composer width", async () =
   }
 });
 
+test("a suggestion survives draft callbacks when the textarea remounts", async () => {
+  let setSuggestion;
+  function Wrapper() {
+    const [messageSuggestion, updateSuggestion] = useState(null);
+    const [draft, setDraft] = useState({ value: "", cursor: 0 });
+    setSuggestion = updateSuggestion;
+    return React.createElement(Composer, {
+      sessionId: "one",
+      draft,
+      messageSuggestion,
+      onDraftChange: (nextDraft) => {
+        updateSuggestion(null);
+        setDraft(nextDraft);
+      },
+      onSubmit: () => {},
+    });
+  }
+  const view = await testRender(React.createElement(Wrapper), { width: 80, height: 14 });
+  try {
+    await view.flush();
+    await act(async () => setSuggestion("Explain the result"));
+    await view.flush();
+    assert.match(view.captureCharFrame(), /Explain the result/);
+    await act(async () => view.mockInput.pressTab());
+    await view.flush();
+    assert.match(view.captureCharFrame(), /Explain the result/);
+  } finally {
+    await act(async () => view.dispose());
+  }
+});
+
 test("composer displays a suggestion and Tab accepts it as a draft", async () => {
   const drafts = [];
   const submissions = [];
