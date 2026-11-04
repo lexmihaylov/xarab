@@ -71,6 +71,11 @@ test("main and agentic preparation preserve shared tools and isolate profile ins
       mcpServers: [],
     });
     assert.doesNotMatch(calls[0].instructions, /Subtask response discipline/);
+    assert.match(calls[0].instructions, /## Research-first workflow/);
+    assert.doesNotMatch(calls[0].instructions, /You are Xarab's delegated agent/);
+    assert.match(calls[1].instructions, /You are Xarab's delegated agent/);
+    assert.doesNotMatch(calls[1].instructions, /## Research-first workflow/);
+    assert.match(calls[1].instructions, /consequential workspace changes or other side effects/);
     assert.match(calls[1].instructions, /## Subtask response discipline/);
     assert.match(
       calls[1].instructions,

@@ -38,6 +38,10 @@ test("delegated prompt uses a distinct workflow while retaining project instruct
   assert.doesNotMatch(prompt, /## Research-first workflow/);
   assert.doesNotMatch(prompt, /wait for an explicit actionable user instruction/);
   assert.match(prompt, /approved scope/);
+  assert.match(
+    prompt,
+    /consequential workspace changes or other side effects only when that approval is clear/,
+  );
   assert.match(prompt, /Tool-specific authorization and approval requirements still apply/);
   assert.match(prompt, /Project rule/);
   assert.match(prompt, /read_file: Read a file/);
