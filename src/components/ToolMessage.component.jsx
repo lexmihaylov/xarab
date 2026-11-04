@@ -12,7 +12,14 @@ const statusStyle = {
   error: { color: colors.error, prefix: "✕" },
 };
 
-export function ToolMessage({ part, syntaxStyle, activityExpanded = false, onToggleActivity }) {
+export function ToolMessage({
+  part,
+  syntaxStyle,
+  activityExpanded = false,
+  onToggleActivity,
+  contextExpanded = false,
+  onToggleContext,
+}) {
   const status = statusStyle[part.status] ?? statusStyle.complete;
   const title = String(part.title ?? part.label ?? "Tool");
   const rawSummary = part.summary == null ? "" : String(part.summary);
@@ -41,6 +48,30 @@ export function ToolMessage({ part, syntaxStyle, activityExpanded = false, onTog
       error={isError}
       summaryMarkdown={part.toolName === "task" && part.status === "complete"}
       syntaxStyle={syntaxStyle}
+      headerChildren={
+        part.toolName === "task" && (
+          <box flexDirection="column">
+            {typeof part.params?.brief === "string" && part.params.brief && (
+              <text fg={colors.text} selectable>{`Task: ${part.params.brief}`}</text>
+            )}
+            {typeof part.params?.context === "string" && part.params.context && (
+              <box flexDirection="column">
+                <text fg={colors.accent} onMouseUp={onToggleContext}>
+                  {`${contextExpanded ? "▾" : "▸"} Provided context · click to toggle · Ctrl+Y all`}
+                </text>
+                {contextExpanded && (
+                  <text fg={colors.text} selectable>
+                    {part.params.context}
+                  </text>
+                )}
+              </box>
+            )}
+            {summary && (
+              <text fg={colors.muted}>{part.status === "running" ? "Progress" : "Result"}</text>
+            )}
+          </box>
+        )
+      }
     >
       {part.toolName === "task" && (part.taskAgent || part.taskExecution) && (
         <text fg={colors.muted} selectable>

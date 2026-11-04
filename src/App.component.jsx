@@ -115,6 +115,14 @@ export function App({
 }) {
   const [toasts, setToasts] = useState([]);
   const [expandedTasks, setExpandedTasks] = useState(() => new Set());
+  const [expandedContexts, setExpandedContexts] = useState(() => new Set());
+  const toggleContext = (id) =>
+    setExpandedContexts((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const toggleTask = (id) =>
     setExpandedTasks((previous) => {
       const next = new Set(previous);
@@ -161,6 +169,20 @@ export function App({
       state.sessionOperation
     )
       return;
+    if (key.ctrl && key.name === "y") {
+      const tasks = state.messages
+        .flatMap((message) => message.parts ?? [])
+        .filter((part) => part.toolName === "task" && part.callId && part.params?.context);
+      if (tasks.length) {
+        key.preventDefault();
+        setExpandedContexts((previous) =>
+          tasks.every((task) => previous.has(task.callId))
+            ? new Set()
+            : new Set(tasks.map((task) => task.callId)),
+        );
+      }
+      return;
+    }
     if (key.ctrl && key.name === "t") {
       const tasks = state.messages
         .flatMap((message) => message.parts ?? [])
@@ -240,6 +262,8 @@ export function App({
                         syntaxStyle={syntaxStyle}
                         activityExpanded={expandedTasks.has(entry.part.callId)}
                         onToggleActivity={() => toggleTask(entry.part.callId)}
+                        contextExpanded={expandedContexts.has(entry.part.callId)}
+                        onToggleContext={() => toggleContext(entry.part.callId)}
                       />
                     ) : (
                       <AssistantMessage

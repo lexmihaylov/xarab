@@ -11,6 +11,7 @@ export function ExecutionMessageCard({
   error,
   summaryMarkdown = false,
   syntaxStyle,
+  headerChildren,
   children,
 }) {
   return (
@@ -35,6 +36,7 @@ export function ExecutionMessageCard({
           {title}
         </text>
       </box>
+      {headerChildren}
       {summary && (
         <box padding={1} marginTop={1} backgroundColor={colors.background}>
           {summaryMarkdown ? (

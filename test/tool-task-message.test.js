@@ -2,6 +2,36 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ToolMessage } from "../src/components/ToolMessage.component.jsx";
 import { ExecutionMessageCard } from "../src/components/ExecutionMessageCard.component.jsx";
+test("task brief remains visible and provided context expands independently of output", () => {
+  for (const status of ["running", "complete", "error"]) {
+    const part = {
+      toolName: "task",
+      status,
+      params: { brief: "Investigate the issue\nwithout edits", context: "First line\nSecond line" },
+      summary: "Agent output",
+    };
+    const collapsed = ToolMessage({ part });
+    const header = collapsed.props.headerChildren;
+    assert.equal(
+      header.props.children[0].props.children,
+      "Task: Investigate the issue\nwithout edits",
+    );
+    assert.equal(header.props.children[1].props.children[1], false);
+    assert.equal(
+      header.props.children[2].props.children,
+      status === "running" ? "Progress" : "Result",
+    );
+    const expanded = ToolMessage({ part, contextExpanded: true });
+    assert.equal(
+      expanded.props.headerChildren.props.children[1].props.children[1].props.children,
+      part.params.context,
+    );
+  }
+  const empty = ToolMessage({
+    part: { toolName: "task", status: "running", params: { brief: "Check" } },
+  });
+  assert.ok(!empty.props.headerChildren.props.children[1]);
+});
 
 test("completed task summaries render as markdown while other summaries remain text", () => {
   const syntaxStyle = {};
@@ -13,7 +43,7 @@ test("completed task summaries render as markdown while other summaries remain t
   ]) {
     const tool = ToolMessage({ part: { toolName, status, summary: "**result**" }, syntaxStyle });
     const card = ExecutionMessageCard(tool.props);
-    const body = card.props.children[1].props.children;
+    const body = card.props.children[2].props.children;
     assert.equal(body.type, markdown ? "markdown" : "text");
     if (markdown) {
       assert.equal(body.props.content, "**result**");
