@@ -1,10 +1,30 @@
-import { readFile, realpath, stat } from "node:fs/promises";
+import { open, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
 const DEFAULT_TOKEN_BUDGET = 4_096;
 const DEFAULT_LINES_PER_READ = 200;
 const MAX_LINES_PER_READ = 2_000;
 const MAX_READ_BYTES = 50 * 1024;
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+async function readBoundedFile(target) {
+  const file = await open(target, "r");
+  try {
+    const chunks = [];
+    let total = 0;
+    while (total <= MAX_FILE_BYTES) {
+      const buffer = Buffer.allocUnsafe(Math.min(64 * 1024, MAX_FILE_BYTES + 1 - total));
+      const { bytesRead } = await file.read(buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+      chunks.push(buffer.subarray(0, bytesRead));
+      total += bytesRead;
+    }
+    return total > MAX_FILE_BYTES ? null : Buffer.concat(chunks, total).toString("utf8");
+  } finally {
+    await file.close();
+  }
+}
+
 function isWithinDirectory(directory, target) {
   const relative = path.relative(directory, target);
   return (
@@ -30,7 +50,7 @@ export function createReadFileTool({
   const rootPath = path.resolve(workspace);
 
   return {
-    description: `Read a UTF-8 workspace file as an exact, unnumbered source excerpt. Provide path; optionally set offset (1-based line number, default 1) and limit (maximum lines, default ${DEFAULT_LINES_PER_READ}). Each call returns at most ${MAX_LINES_PER_READ} lines and 50 KiB. If more content remains, the result gives the next offset to continue. Results are capped to a safe response size.`,
+    description: `Read a UTF-8 workspace file as an exact, unnumbered source excerpt. Provide path; optionally set offset (1-based line number, default 1) and limit (maximum lines, default ${DEFAULT_LINES_PER_READ}). Files must not exceed 10 MiB. Each call returns at most ${MAX_LINES_PER_READ} lines and 50 KiB. If more content remains, the result gives the next offset to continue. Results are capped to a safe response size.`,
     params: {
       type: "object",
       properties: {
@@ -90,7 +110,12 @@ export function createReadFileTool({
           return "Error: response-size limit is too small to read this file safely. Try a smaller limit.";
         }
 
-        const content = await readFile(target, "utf8");
+        const content = metadata.size > MAX_FILE_BYTES ? null : await readBoundedFile(target);
+        if (content === null) {
+          const message = "File exceeds the 10 MiB size limit for read_file.";
+          onEvent({ type: "error", path: requestedPath, message });
+          return `Error: ${message}`;
+        }
         if (content.includes("\0")) {
           onEvent({ type: "error", path: requestedPath, message: "File appears to be binary." });
           return "Error: binary files are not supported by read_file.";

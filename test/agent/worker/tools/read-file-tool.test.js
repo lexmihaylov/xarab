@@ -202,6 +202,22 @@ test("rejects reads when the response-size limit cannot fit an excerpt", async (
   });
 });
 
+test("enforces the 10 MiB file-size limit before returning an excerpt", async () => {
+  await withWorkspace(async (workspace) => {
+    const maxBytes = 10 * 1024 * 1024;
+    const filePath = path.join(workspace, "boundary.txt");
+    const events = [];
+    const tool = createReadFileTool({ workspace, onEvent: (event) => events.push(event) });
+    await writeFile(filePath, Buffer.alloc(maxBytes, 0x0a));
+    assert.match(await tool.handler({ path: "boundary.txt", limit: 1 }), /Lines 1-1/);
+    await writeFile(filePath, Buffer.alloc(maxBytes + 1, 0x0a));
+    assert.match(await tool.handler({ path: "boundary.txt", limit: 1 }), /10 MiB size limit/);
+    assert.equal(events.at(-1).type, "error");
+    assert.match(events.at(-1).message, /10 MiB/);
+    assert.match(tool.description, /10 MiB/);
+  });
+});
+
 test("reports an oversized first line rather than returning a non-advancing offset", async () => {
   await withWorkspace(async (workspace) => {
     await writeFile(
