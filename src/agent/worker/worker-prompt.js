@@ -6,6 +6,7 @@ export function systemPromptFor({
   tier,
   tierAdjustmentTool,
   definitions,
+  delegated = false,
 }) {
   const toolDescriptions = Object.entries(definitions).map(([name, definition]) => ({
     name,
@@ -14,6 +15,7 @@ export function systemPromptFor({
   const prompt = buildSystemPrompt({
     workspace,
     instructionFiles,
+    delegated,
     availableTools: [
       ...toolDescriptions,
       ...(tierAdjustmentTool

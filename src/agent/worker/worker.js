@@ -117,7 +117,15 @@ export function createWorker({
     );
   }
 
-  function prepareMainTurn({ tier, history, input, tierAdjustmentTool, definitions, tools }) {
+  function prepareMainTurn({
+    tier,
+    history,
+    input,
+    tierAdjustmentTool,
+    definitions,
+    tools,
+    delegated = false,
+  }) {
     return {
       input: buildWorkerHistory(history, input),
       instructions: systemPromptFor({
@@ -126,13 +134,14 @@ export function createWorker({
         tier,
         tierAdjustmentTool,
         definitions,
+        delegated,
       }),
       tools: { ...tools, ...(tierAdjustmentTool ? { tier_adjustment: tierAdjustmentTool } : {}) },
     };
   }
 
   function prepareAgenticTask(options, taskInstructions) {
-    const prepared = prepareMainTurn(options);
+    const prepared = prepareMainTurn({ ...options, delegated: true });
     return {
       ...prepared,
       instructions: `${prepared.instructions}\n\n## Subtask response discipline\nReturn the shortest final response that preserves what the parent needs to complete the assigned task accurately. Include material findings, evidence, changes made, verification and its outcome, unresolved issues, and required next steps when relevant. Avoid routine narration, repetition, and large copied excerpts; include necessary detail when omitting it would reduce correctness or usefulness. Do not omit important failures or uncertainty merely to be brief.\n\nAgent profile (subordinate to application policy and user constraints):\n${taskInstructions}`,

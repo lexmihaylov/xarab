@@ -20,7 +20,11 @@ export function createTaskTool({ runner, workspace, onProgress = () => {} }) {
     params: {
       type: "object",
       properties: {
-        brief: { type: "string", description: "Task and applicable user constraints." },
+        brief: {
+          type: "string",
+          description:
+            "Task, applicable user constraints, approved plan scope, and whether the user explicitly approved implementation. Do not imply approval when absent.",
+        },
         context: {
           type: "string",
           description: "Explicitly selected context; no automatic parent history.",

@@ -28,6 +28,21 @@ test("requires research and explicit approval before consequential implementatio
   );
 });
 
+test("delegated prompt uses a distinct workflow while retaining project instructions and tools", () => {
+  const prompt = buildSystemPrompt({
+    workspace: "/workspace",
+    delegated: true,
+    instructionFiles: [{ path: "AGENTS.md", content: "Project rule" }],
+    availableTools: [{ name: "read_file", description: "Read a file" }],
+  });
+  assert.doesNotMatch(prompt, /## Research-first workflow/);
+  assert.doesNotMatch(prompt, /wait for an explicit actionable user instruction/);
+  assert.match(prompt, /approved scope/);
+  assert.match(prompt, /Tool-specific authorization and approval requirements still apply/);
+  assert.match(prompt, /Project rule/);
+  assert.match(prompt, /read_file: Read a file/);
+});
+
 test("requires tool-backed research when unsure instead of inventing details", () => {
   const prompt = buildSystemPrompt({ workspace: "/workspace" });
   assert.match(
