@@ -165,6 +165,38 @@
   },
 
   {
+    "id": "t1-parser-local-fix",
+    "tier": 1,
+    "category": "debugging",
+    "difficulty": "boundary",
+    "labelRationale": "The defect, expected behavior, correction, and focused verification are supplied.",
+    "prompt": "The parser test for an empty field fails because parseField in src/parser.js uses value || 'default', but the documented rule preserves empty strings and defaults only null or undefined. Inspect the function, use nullish coalescing, and run the named parser test."
+  },
+  {
+    "id": "t1-known-pattern-code-change",
+    "tier": 1,
+    "category": "feature",
+    "difficulty": "boundary",
+    "labelRationale": "The request identifies the existing implementation pattern and focused check.",
+    "prompt": "Add a reset button to Settings using the existing Cancel button's handler and styling pattern in src/settings.jsx; call the existing resetSettings function and run the settings component test."
+  },
+  {
+    "id": "t2-parser-unclear-fix",
+    "tier": 2,
+    "category": "debugging",
+    "difficulty": "boundary",
+    "labelRationale": "The cause and intended behavior must be established before selecting a fix.",
+    "prompt": "The parser test for an empty field fails after a schema change. Investigate the parser, schema, and relevant expectations to determine the intended behavior and cause, fix the appropriate code or test, and run the parser tests."
+  },
+  {
+    "id": "t2-unknown-pattern-code-change",
+    "tier": 2,
+    "category": "feature",
+    "difficulty": "boundary",
+    "labelRationale": "The appropriate state and implementation approach require repository discovery.",
+    "prompt": "Add a reset button to Settings. Investigate how settings are stored and restored, decide how reset should interact with unsaved changes, implement it, and add tests."
+  },
+  {
     "id": "t2-auth-debug",
     "tier": 2,
     "category": "debugging",

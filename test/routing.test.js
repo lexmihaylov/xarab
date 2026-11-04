@@ -88,6 +88,13 @@ test("classifier instructions distinguish routine execution, investigation, and 
   );
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /Route the current phase/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /Do not assume an unseen repository/);
+  assert.match(
+    TIER_CLASSIFIER_INSTRUCTIONS,
+    /diagnose and fix a straightforward reproducible defect/,
+  );
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /touching multiple files do not alone require Tier 2/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /localized parser defect.* -> 1/);
+  assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /parser fixtures.*unclear.* -> 2/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /intermittent duplicate commits.* -> 3/);
   assert.match(TIER_CLASSIFIER_INSTRUCTIONS, /reviewed migration plan.* -> 2/);
   assert.doesNotMatch(TIER_CLASSIFIER_INSTRUCTIONS, /Astra|Sol|Luna/);
