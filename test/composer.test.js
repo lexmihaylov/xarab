@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import React, { act } from "react";
+import React, { act, useState } from "react";
 import { testRender } from "@opentui/react/test-utils";
 import { Composer } from "../src/components/Composer.component.jsx";
 
@@ -24,6 +24,38 @@ test("shows loading and scroll guidance while messages are queued", async () => 
     assert.match(frame, /Enter queue/);
     assert.match(frame, /Esc stop/);
     assert.match(frame, /█████/);
+  } finally {
+    await act(async () => view.dispose());
+  }
+});
+
+test("a suggestion arriving after mount wraps at the composer width", async () => {
+  const suggestion =
+    "I’ll send a screenshot and the exact suggestion, terminal width, and whether it happens before or after pressing Tab.";
+  let setSuggestion;
+  const drafts = [];
+  function Wrapper() {
+    const [messageSuggestion, updateSuggestion] = useState(null);
+    setSuggestion = updateSuggestion;
+    return React.createElement(Composer, {
+      sessionId: "one",
+      draft: { value: "", cursor: 0 },
+      messageSuggestion,
+      contextTokens: 15428,
+      onDraftChange: (draft) => drafts.push(draft),
+      onSubmit: () => {},
+    });
+  }
+  const view = await testRender(React.createElement(Wrapper), { width: 80, height: 14 });
+  try {
+    await view.flush();
+    await act(async () => setSuggestion(suggestion));
+    await view.flush();
+    assert.match(view.captureCharFrame(), /I’ll send a screenshot and the exact suggestion/);
+    await act(async () => view.mockInput.pressTab());
+    await view.flush();
+    assert.match(view.captureCharFrame(), /I’ll send a screenshot and the exact suggestion/);
+    assert.equal(drafts.at(-1).value, suggestion);
   } finally {
     await act(async () => view.dispose());
   }

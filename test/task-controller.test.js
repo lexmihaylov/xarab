@@ -134,9 +134,12 @@ test("suggestions are user-voiced and a draft edit clears subscribers immediatel
   for (let i = 0; i < 100 && !controller.getState().suggestion; i++)
     await new Promise((resolve) => setTimeout(resolve, 5));
   assert.equal(controller.getState().suggestion, "Could you clarify the trade-offs?");
-  assert.match(JSON.stringify(suggestionRequest.input), /user's voice, addressed to the agent/);
+  assert.match(JSON.stringify(suggestionRequest.input), /shortest useful next message/);
+  assert.match(JSON.stringify(suggestionRequest.input), /direct and confident/);
   assert.match(JSON.stringify(suggestionRequest.input), /never answer as the agent/);
-  assert.match(suggestionRequest.instructions, /user's voice as a message addressed to the agent/);
+  assert.match(suggestionRequest.instructions, /shortest useful message/);
+  assert.match(suggestionRequest.instructions, /preferably under 80 characters/);
+  assert.match(suggestionRequest.instructions, /direct, confident message/);
   assert.match(suggestionRequest.instructions, /never answer as the agent/);
   controller.updateDraft({ value: "Draft", cursor: 5 });
   assert.equal(states.at(-1).suggestion, null);

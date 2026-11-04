@@ -38,6 +38,14 @@ export function Composer({
   const inputRef = useRef(null);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [value, setValue] = useState(draft?.value ?? "");
+  // OpenTUI can wrap a dynamically updated placeholder using stale layout information.
+  // Remount only when the draft is empty, so editing and cursor position are preserved.
+  const placeholderKey = useRef(0);
+  const previousSuggestion = useRef(messageSuggestion);
+  if (!value && previousSuggestion.current !== messageSuggestion) {
+    previousSuggestion.current = messageSuggestion;
+    placeholderKey.current += 1;
+  }
   const sessionRef = useRef(sessionId);
   const suggestions =
     !disabled && value.startsWith("/") && !value.includes("\n")
@@ -193,6 +201,7 @@ export function Composer({
         maxHeight={8}
       >
         <textarea
+          key={placeholderKey.current}
           ref={inputRef}
           initialValue={draft?.value ?? ""}
           placeholder={
