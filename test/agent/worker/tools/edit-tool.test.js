@@ -4,6 +4,27 @@ import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createEditTool } from "../../../../src/agent/worker/tools/edit-tool.js";
+import { findText } from "../../../../src/utils/workspace-file-utils.js";
+
+test("normalized ranges count supplementary characters as UTF-16 units", () => {
+  assert.deepEqual(findText("😀\r\nEND", "😀\n"), { index: 0, length: 4 });
+  assert.deepEqual(findText("😀\r\nA😀\r\nEND", "A😀\n"), { index: 4, length: 5 });
+});
+
+test("normalized emoji edits preserve unrelated bytes for unique and replace-all edits", async () => {
+  await withWorkspace(async (workspace) => {
+    const target = path.join(workspace, "emoji.txt");
+    const tool = createEditTool({ workspace });
+    for (const replaceAll of [false, true]) {
+      await writeFile(target, replaceAll ? "😀\r\n😀\r\nEND" : "😀\r\nEND");
+      assert.match(
+        await tool.handler({ path: "emoji.txt", oldString: "😀\n", newString: "X", replaceAll }),
+        /Edited/,
+      );
+      assert.equal(await readFile(target, "utf8"), replaceAll ? "XXEND" : "XEND");
+    }
+  });
+});
 
 async function withWorkspace(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-edit-tool-"));

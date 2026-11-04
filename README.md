@@ -23,7 +23,7 @@ npm install
 npm start
 ```
 
-By default, installation downloads and configures the [Google Gemma 4 E2B Q4_0 GGUF classifier](https://huggingface.co/google/gemma-4-E2B-it-qat-q4_0-gguf) (about 3.35 GB) under `~/.xarab/models`. To skip the automatic download, set `XARAB_SKIP_POSTINSTALL=1`; you can configure a classifier later in `/route` or browse for local models with `/download`.
+Installation does not download or configure a classifier. Choose a classifier in `/route`, or browse and download local models explicitly with `/download`. Local models are stored under `~/.xarab/models` by default.
 
 **First run:** open `/connect` to connect OpenAI or add an OpenRouter API key, then open `/route` to choose a classifier and assign workers to tiers. Or choose local GGUF models in `/route` and try Xarab without connecting a provider. Send a request to see the selected tier and its rationale. Type `/help` for the command list.
 

@@ -1,3 +1,6 @@
+import { isIP } from "node:net";
+import { isPublicAddress, publicFetch } from "./public-http-fetch.js";
+
 const REQUEST_TIMEOUT_MS = 20_000;
 const MAX_RESPONSE_BYTES = 512 * 1024;
 const MAX_OUTPUT_CHARS = 16 * 1024;
@@ -5,7 +8,7 @@ const DEFAULT_OUTPUT_CHARS = 8 * 1024;
 const MAX_REDIRECTS = 5;
 
 export function createWebfetchTool({
-  fetchImpl = globalThis.fetch,
+  fetchImpl = publicFetch,
   onEvent = () => {},
   timeoutMs = REQUEST_TIMEOUT_MS,
   maxResponseBytes = MAX_RESPONSE_BYTES,
@@ -66,15 +69,20 @@ export function createWebfetchTool({
             signal: controller.signal,
           });
           if (![301, 302, 303, 307, 308].includes(response.status)) break;
+          await response.body?.cancel();
           if (redirects >= MAX_REDIRECTS)
             throw new Error(`Too many redirects (maximum ${MAX_REDIRECTS}).`);
           const location = response.headers.get("location");
           if (!location) throw new Error("The server returned a redirect without a destination.");
           target = validateUrl(new URL(location, target).href);
         }
-        if (!response.ok) throw new Error(`The server returned HTTP ${response.status}.`);
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new Error(`The server returned HTTP ${response.status}.`);
+        }
         const contentType = response.headers.get("content-type") ?? "application/octet-stream";
         if (!/^(text\/|application\/(json|xml|xhtml\+xml))/i.test(contentType)) {
+          await response.body?.cancel();
           throw new Error(`Unsupported content type: ${contentType.split(";")[0]}.`);
         }
         const { text: body, truncated } = await readBoundedBody(response, maxResponseBytes);
@@ -172,34 +180,7 @@ function validateUrl(value) {
 }
 
 function isPrivateIp(host) {
-  const octets = host.split(".").map(Number);
-  if (octets.length === 4 && octets.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)) {
-    const [a, b] = octets;
-    return (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      a >= 224
-    );
-  }
-  if (host.includes(":")) {
-    const ip = host.toLowerCase();
-    return (
-      ip === "::" ||
-      ip === "::1" ||
-      ip.startsWith("fc") ||
-      ip.startsWith("fd") ||
-      /^fe[89ab]/.test(ip) ||
-      ip.startsWith("::ffff:127.") ||
-      ip.startsWith("::ffff:10.") ||
-      ip.startsWith("::ffff:192.168.")
-    );
-  }
-  return false;
+  return isIP(host) !== 0 && !isPublicAddress(host);
 }
 
 async function readBoundedBody(response, maxBytes) {

@@ -4,6 +4,29 @@ import { mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createInsertTool } from "../../../../src/agent/worker/tools/insert-tool.js";
+test("emoji CRLF anchors preserve exact insertion boundaries", async () => {
+  await withWorkspace(async (workspace) => {
+    const target = path.join(workspace, "emoji.txt");
+    for (const position of ["before", "after"]) {
+      await writeFile(target, "start\r\n😀\r\nEND\r\ntail");
+      const tool = createInsertTool({ workspace, position });
+      assert.match(
+        await tool.handler({
+          path: "emoji.txt",
+          anchor: "😀\nEND",
+          content: "X",
+        }),
+        /Inserted/,
+      );
+      assert.equal(
+        await readFile(target, "utf8"),
+        position === "before"
+          ? "start\r\nX\r\n😀\r\nEND\r\ntail"
+          : "start\r\n😀\r\nEND\r\nX\r\ntail",
+      );
+    }
+  });
+});
 
 async function withWorkspace(run) {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-insert-tool-"));
