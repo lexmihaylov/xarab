@@ -1,12 +1,40 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
+import https from "node:https";
 import { Readable } from "node:stream";
-import {
-  createPublicFetch,
-  isPublicAddress,
-} from "../../../../src/agent/worker/tools/public-http-fetch.js";
+import { createPublicFetch } from "../../../../src/agent/worker/tools/public-http-fetch.js";
 import { createWebfetchTool } from "../../../../src/agent/worker/tools/web-fetch-tool.js";
+test("real TLS validates the trusted certificate and original hostname", async (t) => {
+  const cert = readFileSync(new URL("./fixtures/webfetch-cert.pem", import.meta.url));
+  const key = readFileSync(new URL("./fixtures/webfetch-key.pem", import.meta.url));
+  const server = https.createServer({ key, cert }, (_req, res) => res.end("secure content"));
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  t.after(
+    () => new Promise((resolve, reject) => server.close((err) => (err ? reject(err) : resolve()))),
+  );
+  const port = server.address().port;
+  const resolve = async () => [{ address: "127.0.0.1", family: 4 }];
+  const trustedFetch = createPublicFetch({
+    resolve,
+    requestImpl: (url, options, respond) => https.request(url, { ...options, ca: cert }, respond),
+  });
+  assert.equal(
+    await (await trustedFetch(`https://webfetch.test:${port}/`)).text(),
+    "secure content",
+  );
+  await assert.rejects(trustedFetch(`https://wrong.test:${port}/`), {
+    code: "ERR_TLS_CERT_ALTNAME_INVALID",
+  });
+  await assert.rejects(createPublicFetch({ resolve })(`https://webfetch.test:${port}/`), {
+    code: "DEPTH_ZERO_SELF_SIGNED_CERT",
+  });
+});
+
 test("invalid response statuses reject asynchronously and close the stream", async () => {
   let incoming;
   const fetch = createPublicFetch({
@@ -74,39 +102,22 @@ function transport(onRequest = () => {}, status = 200, headers = ["content-type"
   };
 }
 
-test("rejects nonpublic addresses, including mapped and special-use forms", () => {
-  for (const ip of [
-    "127.0.0.1",
-    "10.0.0.1",
-    "172.16.0.1",
-    "192.168.1.1",
-    "169.254.169.254",
-    "100.64.0.1",
-    "0.0.0.0",
-    "224.0.0.1",
-    "192.0.0.1",
-    "192.0.2.1",
-    "::",
-    "::1",
-    "fc00::1",
-    "fe80::1",
-    "ff02::1",
-    "::ffff:7f00:1",
-    "::ffff:a00:1",
-    "2001:db8::1",
-  ])
-    assert.equal(isPublicAddress(ip), false, ip);
-  for (const ip of ["8.8.8.8", "2606:4700:4700::1111", "::ffff:808:808"])
-    assert.equal(isPublicAddress(ip), true, ip);
-});
-
-test("private and mixed DNS answers never reach the transport", async () => {
-  for (const addresses of [["127.0.0.1"], ["8.8.8.8", "10.0.0.1"]]) {
+test("private and local IPv4/IPv6 DNS answers are accepted and pinned", async () => {
+  for (const address of ["127.0.0.1", "10.0.0.1", "::1", "fc00::1", "fe80::1"]) {
+    const family = address.includes(":") ? 6 : 4;
+    let connectedAddress;
     const fetch = createPublicFetch({
-      resolve: async () => addresses.map((address) => ({ address, family: 4 })),
-      requestImpl: () => assert.fail("transport must not run"),
+      resolve: async () => [{ address, family }],
+      requestImpl: transport((_url, options) => {
+        options.lookup("example.com", {}, (error, pinned, pinnedFamily) => {
+          assert.equal(error, null);
+          connectedAddress = pinned;
+          assert.equal(pinnedFamily, family);
+        });
+      }),
     });
-    await assert.rejects(fetch("https://example.com"), /private/);
+    assert.equal(await (await fetch("https://example.com")).text(), "public content");
+    assert.equal(connectedAddress, address);
   }
 });
 
@@ -131,29 +142,33 @@ test("approved DNS answers are pinned without re-resolution, retaining TLS hostn
   assert.equal(resolutions, 1);
 });
 
-test("mapped loopback URLs are rejected before fetching", async () => {
-  const tool = createWebfetchTool({ fetchImpl: () => assert.fail("must not fetch") });
-  assert.match(await tool.handler({ url: "http://[::ffff:127.0.0.1]/" }), /private/);
-});
-
-test("redirect host DNS is revalidated and private destinations never connect", async () => {
-  let requests = 0;
+test("mapped loopback URLs can be fetched", async () => {
   const tool = createWebfetchTool({
     fetchImpl: createPublicFetch({
-      resolve: async (host) => [
-        { address: host === "example.com" ? "8.8.8.8" : "127.0.0.1", family: 4 },
-      ],
-      requestImpl: transport(
-        () => {
-          requests++;
-        },
-        302,
-        ["location", "https://private.example/"],
-      ),
+      resolve: async () => [{ address: "::ffff:127.0.0.1", family: 6 }],
+      requestImpl: transport(),
     }),
   });
-  assert.match(await tool.handler({ url: "https://example.com" }), /private/);
-  assert.equal(requests, 1);
+  assert.match(await tool.handler({ url: "https://[::ffff:127.0.0.1]/" }), /public content/);
+});
+
+test("redirects to private destinations succeed with fresh DNS checks", async () => {
+  const hosts = [];
+  let count = 0;
+  const tool = createWebfetchTool({
+    fetchImpl: createPublicFetch({
+      resolve: async (host) => {
+        hosts.push(host);
+        return [{ address: host === "example.com" ? "8.8.8.8" : "127.0.0.1", family: 4 }];
+      },
+      requestImpl: (...args) =>
+        (++count === 1
+          ? transport(() => {}, 302, ["location", "https://private.example/"])
+          : transport())(...args),
+    }),
+  });
+  assert.match(await tool.handler({ url: "https://example.com" }), /public content/);
+  assert.deepEqual(hosts, ["example.com", "private.example"]);
 });
 
 test("DNS waiting respects cancellation", async () => {

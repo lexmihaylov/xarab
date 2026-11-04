@@ -38,23 +38,24 @@ test("fetches public URLs and converts HTML to bounded readable text", async () 
   assert.equal(events.at(-1).type, "fetched");
 });
 
-test("rejects unsafe URLs before requesting", async () => {
-  let calls = 0;
+test("rejects unsupported URL schemes and credentials but accepts local hosts", async () => {
+  const requested = [];
   const tool = createWebfetchTool({
-    fetchImpl: async () => {
-      calls += 1;
+    fetchImpl: async (url) => {
+      requested.push(url.href);
+      return response("Local response", { contentType: "text/plain" });
     },
   });
-  for (const url of [
-    "file:///etc/passwd",
-    "http://localhost/",
-    "http://127.0.0.1/",
-    "http://192.168.1.1/",
-    "https://user:pass@example.com",
-  ]) {
+  for (const url of ["file:///etc/passwd", "http://localhost/", "https://user:pass@example.com"])
     assert.match(await tool.handler({ url }), /Error:/);
-  }
-  assert.equal(calls, 0);
+  for (const url of [
+    "https://localhost/",
+    "https://127.0.0.1/",
+    "https://192.168.1.1/",
+    "https://[::1]/",
+  ])
+    assert.match(await tool.handler({ url }), /Local response/);
+  assert.equal(requested.length, 4);
 });
 
 test("checks redirect destinations and follows safe redirects", async () => {
@@ -72,11 +73,17 @@ test("checks redirect destinations and follows safe redirects", async () => {
   assert.deepEqual(urls, ["https://example.com/start", "https://example.com/final"]);
   assert.match(result, /Plain content/);
 
-  const unsafe = createWebfetchTool({
-    requestApproval: async () => true,
-    fetchImpl: async () => response("", { status: 302, location: "http://127.0.0.1/admin" }),
+  const localRedirects = [];
+  const local = createWebfetchTool({
+    fetchImpl: async (url) => {
+      localRedirects.push(url.href);
+      return localRedirects.length === 1
+        ? response("", { status: 302, location: "http://[::1]/admin" })
+        : response("Local redirect content", { contentType: "text/plain" });
+    },
   });
-  assert.match(await unsafe.handler({ url: "https://example.com" }), /local and private network/);
+  assert.match(await local.handler({ url: "https://example.com" }), /only HTTPS URLs are allowed/);
+  assert.deepEqual(localRedirects, ["https://example.com/"]);
 });
 
 test("bounds body and rejects unsupported or failed responses", async () => {
