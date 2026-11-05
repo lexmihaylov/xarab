@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { useKeyboard } from "@opentui/react";
+import { useKeyboard, useTerminalDimensions } from "@opentui/react";
 import { LoadingIndicator } from "./LoadingIndicator.component.jsx";
 import { getTheme } from "../utils/theme-engine.js";
 
@@ -35,6 +35,8 @@ export function Composer({
   onSessions,
   contextTokens,
 }) {
+  const { height: terminalHeight } = useTerminalDimensions();
+  const roomyQueue = terminalHeight >= 10;
   const inputRef = useRef(null);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [value, setValue] = useState(draft?.value ?? "");
@@ -153,10 +155,16 @@ export function Composer({
       {queuedMessages.length > 0 && (
         <box
           flexDirection="column"
-          maxHeight={4}
+          maxHeight={7}
           overflow="hidden"
-          backgroundColor={colors.overlay}
+          backgroundColor="#263b2f"
+          borderStyle="single"
+          border={["left"]}
+          borderColor={colors.green}
           paddingX={1}
+          paddingTop={roomyQueue ? 1 : 0}
+          paddingBottom={1}
+          marginTop={roomyQueue ? 1 : 0}
           marginBottom={1}
         >
           <box flexDirection="row" justifyContent="space-between" width="100%" overflow="hidden">
@@ -165,10 +173,9 @@ export function Composer({
           </box>
           {queuePaused ? <text fg={colors.warning}>Paused · send a message to resume</text> : null}
           {queuePreviews.map((item, index) => (
-            <text
-              key={item.id}
-              fg={colors.hint}
-            >{` ${index + 1}  ${item.text.replace(/\s+/g, " ")}`}</text>
+            <text key={item.id} fg={colors.text}>
+              {` ${index + 1}  ${item.text.replace(/\s+/g, " ")}`}
+            </text>
           ))}
           {hiddenQueueCount > 0 ? (
             <text fg={colors.hint}>{` +${hiddenQueueCount} more`}</text>

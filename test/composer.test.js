@@ -36,44 +36,47 @@ test("queue previews stay compact, explain paused queues, and summarize overflow
     id: `queued-${index + 1}`,
     text: `Task ${index + 1} with\n multiple lines`,
   }));
-  for (const state of [{ generating: true }, { generating: false }, { disabled: true }]) {
-    const view = await testRender(
-      React.createElement(Composer, {
-        ...state,
-        queuedMessages,
-        onStopGeneration: () => {},
-        onDraftChange: () => {},
-        onSubmit: () => {},
-      }),
-      { width: 36, height: 7 },
-    );
-    try {
-      await view.flush();
-      const lines = view.captureCharFrame().split("\n");
-      const frame = lines.join("\n");
-      assert.match(frame, /QUEUED · 5/);
-      assert.match(frame, /1  Task 1 with multiple lines/);
-      assert.match(frame, state.generating || state.disabled ? /\+3 more/ : /\+4 more/);
-      const queueStart = lines.findIndex((line) => line.includes("QUEUED · 5"));
-      const indicatorStart = lines.findIndex((line) => line.includes("[█████]"));
-      assert.equal(indicatorStart - queueStart, 5, frame);
-      const queueSpan = view
-        .captureSpans()
-        .lines.flatMap((line) => line.spans)
-        .find((span) => span.text.includes("QUEUED · 5"));
-      assert.deepEqual(Array.from(queueSpan.bg.buffer), [32, 45, 56, 255]);
-      if (state.disabled) {
-        assert.doesNotMatch(frame, /Ctrl\+X remove newest/);
-      } else {
-        assert.match(frame, /Ctrl\+X remove newest/);
+  for (const height of [14]) {
+    for (const state of [{ generating: true }, { generating: false }, { disabled: true }]) {
+      const view = await testRender(
+        React.createElement(Composer, {
+          ...state,
+          queuedMessages,
+          onStopGeneration: () => {},
+          onDraftChange: () => {},
+          onSubmit: () => {},
+        }),
+        { width: 36, height },
+      );
+      try {
+        await view.flush();
+        const lines = view.captureCharFrame().split("\n");
+        const frame = lines.join("\n");
+        assert.match(frame, /QUEUED · 5/);
+        assert.match(frame, /1  Task 1 with multiple lines/);
+        assert.match(frame, state.generating || state.disabled ? /\+3 more/ : /\+4 more/);
+        const queueStart = lines.findIndex((line) => line.includes("QUEUED · 5"));
+        const indicatorStart = lines.findIndex((line) => line.includes("[█████]"));
+        assert.equal(indicatorStart - queueStart, 6, frame);
+        const queueSpan = view
+          .captureSpans()
+          .lines.flatMap((line) => line.spans)
+          .find((span) => span.text.includes("QUEUED · 5"));
+        assert.deepEqual(Array.from(queueSpan.bg.buffer), [38, 59, 47, 255]);
+        assert.deepEqual(Array.from(queueSpan.fg.buffer), [168, 213, 162, 255]);
+        if (state.disabled) {
+          assert.doesNotMatch(frame, /Ctrl\+X remove newest/);
+        } else {
+          assert.match(frame, /Ctrl\+X remove newest/);
+        }
+        if (!state.generating && !state.disabled) {
+          assert.match(frame, /Paused · send a message to resume/);
+        } else {
+          assert.doesNotMatch(frame, /Paused ·/);
+        }
+      } finally {
+        await act(async () => view.dispose());
       }
-      if (!state.generating && !state.disabled) {
-        assert.match(frame, /Paused · send a message to resume/);
-      } else {
-        assert.doesNotMatch(frame, /Paused ·/);
-      }
-    } finally {
-      await act(async () => view.dispose());
     }
   }
 });
