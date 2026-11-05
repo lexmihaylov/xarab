@@ -214,7 +214,9 @@ export function createWorker({
 }
 
 const EDITING_TOOLS = new Set(["edit", "insert_before", "insert_after", "write"]);
-const OMITTED_EDIT_ARGUMENT = "[intentionally omitted from history; provide a fresh value]";
+function omittedEditArgument(name) {
+  return `[provided ${name} intentionally omitted from history; provide a fresh value]`;
+}
 const EDITING_TOOL_ARGUMENTS = {
   edit: ["path", "oldString", "newString"],
   insert_before: ["path", "anchor", "content"],
@@ -224,7 +226,7 @@ const EDITING_TOOL_ARGUMENTS = {
 
 function historicalEditArguments(toolName) {
   return Object.fromEntries(
-    (EDITING_TOOL_ARGUMENTS[toolName] ?? []).map((name) => [name, OMITTED_EDIT_ARGUMENT]),
+    (EDITING_TOOL_ARGUMENTS[toolName] ?? []).map((name) => [name, omittedEditArgument(name)]),
   );
 }
 

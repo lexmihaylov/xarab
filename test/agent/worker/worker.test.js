@@ -350,12 +350,13 @@ test("editing history preserves failures and supports older or interrupted sessi
   assert.equal(history[0].content, "Before");
   assert.equal(
     history[1].arguments.path,
-    "[intentionally omitted from history; provide a fresh value]",
+    "[provided path intentionally omitted from history; provide a fresh value]",
   );
   assert.equal(
     history[1].arguments.oldString,
-    "[intentionally omitted from history; provide a fresh value]",
+    "[provided oldString intentionally omitted from history; provide a fresh value]",
   );
+  assert.notEqual(history[1].arguments.oldString, history[1].arguments.newString);
   assert.equal(history[2].callId, history[1].callId);
   assert.equal(history[2].ok, false);
   assert.match(history[2].output, /Status: error\nError: no match/);
