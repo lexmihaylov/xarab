@@ -17,19 +17,35 @@ const defaultDurations = {
   error: 8000,
 };
 
-export function ToastNotifications({ toasts, onDismiss }) {
+function Toast({ toast, onDismiss }) {
   useEffect(() => {
-    const timers = toasts
-      .filter((toast) => toast.duration !== 0)
-      .map((toast) => {
-        const duration =
-          toast.duration ?? defaultDurations[toast.severity] ?? defaultDurations.info;
-        return setTimeout(() => onDismiss(toast.id), duration);
-      });
+    if (toast.duration === 0) return;
+    const duration = toast.duration ?? defaultDurations[toast.severity] ?? defaultDurations.info;
+    const timer = setTimeout(() => onDismiss(toast.id), duration);
+    return () => clearTimeout(timer);
+  }, [toast.id, toast.duration, toast.severity, onDismiss]);
 
-    return () => timers.forEach(clearTimeout);
-  }, [toasts, onDismiss]);
+  const style = severityStyles[toast.severity] ?? severityStyles.info;
+  return (
+    <box
+      flexDirection="row"
+      padding={1}
+      backgroundColor={colors.overlay}
+      border={["left"]}
+      borderStyle="single"
+      borderColor={style.color}
+      overflow="hidden"
+    >
+      <text fg={style.color} bold>
+        {style.marker}
+      </text>
+      <text> </text>
+      <text fg="#e5e7eb">{toast.message}</text>
+    </box>
+  );
+}
 
+export function ToastNotifications({ toasts, onDismiss }) {
   if (!toasts.length) return null;
 
   return (
@@ -43,27 +59,9 @@ export function ToastNotifications({ toasts, onDismiss }) {
       alignItems="stretch"
       gap={1}
     >
-      {toasts.slice(-3).map((toast) => {
-        const style = severityStyles[toast.severity] ?? severityStyles.info;
-        return (
-          <box
-            key={toast.id}
-            flexDirection="row"
-            padding={1}
-            backgroundColor={colors.overlay}
-            border={["left"]}
-            borderStyle="single"
-            borderColor={style.color}
-            overflow="hidden"
-          >
-            <text fg={style.color} bold>
-              {style.marker}
-            </text>
-            <text> </text>
-            <text fg="#e5e7eb">{toast.message}</text>
-          </box>
-        );
-      })}
+      {toasts.slice(-3).map((toast) => (
+        <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
+      ))}
     </box>
   );
 }

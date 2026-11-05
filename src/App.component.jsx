@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { getTheme } from "./utils/theme-engine.js";
 import { AskQuestionsDialog } from "./components/AskQuestionsDialog.component.jsx";
 import { CommandApprovalDialog } from "./components/CommandApprovalDialog.component.jsx";
@@ -20,6 +20,7 @@ import { ModelDownloader } from "./components/ModelDownloader.component.jsx";
 import { SessionBrowser } from "./components/SessionBrowser.component.jsx";
 import { Welcome } from "./components/Welcome.component.jsx";
 import { ToastNotifications } from "./components/ToastNotifications.component.jsx";
+import { replaceStatusToast } from "./utils/status-toasts.js";
 
 const colors = getTheme().colors;
 
@@ -141,8 +142,25 @@ export function App({
 
   const showToast = useCallback((message, severity) => {
     const toast = { id: nextToastId.current++, message, severity };
-    setToasts((current) => [...current, toast].slice(-3));
+    setToasts((current) => [
+      ...current.filter((item) => item.duration === 0),
+      ...current.filter((item) => item.duration !== 0).slice(-2),
+      toast,
+    ]);
   }, []);
+
+  useEffect(() => {
+    const id = nextToastId.current++;
+    setToasts((current) => replaceStatusToast(current, state.status, id));
+  }, [state.status]);
+
+  useEffect(() => {
+    if (state.notice) showToast(state.notice, "info");
+  }, [state.notice, showToast]);
+
+  useEffect(() => {
+    if (state.sessionError) showToast(state.sessionError, "error");
+  }, [state.sessionError, showToast]);
 
   const copySelection = (text) => {
     if (!text.trim()) return false;
@@ -339,12 +357,7 @@ export function App({
           onStopGeneration={state.questionDialog ? undefined : onStopGeneration}
           onSessions={onOpenSessions}
         />
-        <StatusBar
-          status={state.status}
-          workspace={workspace}
-          sessionTitle={state.currentSession?.title}
-          sessionError={state.sessionError}
-        />
+        <StatusBar workspace={workspace} sessionTitle={state.currentSession?.title} />
       </box>
       <ToastNotifications toasts={toasts} onDismiss={dismissToast} />
       {state.questionDialog &&

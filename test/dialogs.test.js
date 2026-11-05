@@ -124,7 +124,7 @@ test("OpenRouter panel directs users to refresh routing models", async () => {
   }
 });
 
-test("status bar prioritizes session persistence errors", async () => {
+test("status bar keeps session title when persistence errors occur", async () => {
   const view = await render(
     React.createElement(StatusBar, {
       status: "Ready",
@@ -135,8 +135,8 @@ test("status bar prioritizes session persistence errors", async () => {
   );
   try {
     const frame = view.captureCharFrame();
-    assert.match(frame, /Session save failed/);
-    assert.doesNotMatch(frame, /A saved conversation|Ready/);
+    assert.match(frame, /A saved conversation/);
+    assert.doesNotMatch(frame, /Session save failed|Ready/);
   } finally {
     await view.dispose();
   }
