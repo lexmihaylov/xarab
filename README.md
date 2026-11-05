@@ -63,7 +63,7 @@ Models are stored in `~/.xarab/models` by default; set `XARAB_MODELS_DIR` to use
 
 Follow-up messages sent while Xarab is responding are queued in FIFO order and run after the current turn. Press `Ctrl+X` to remove the newest queued message. The queue is in memory, so queued messages remain pending if a turn is interrupted.
 
-Workers can use project `AGENTS.md` instructions and discover reusable skills from `.agents/skills` in the project or home directory. Available tools include file reading, listing and searching, focused edits, writing files, shell commands, and web search/fetch; web search requires a Tavily API key.
+Workers can use project `AGENTS.md` instructions and discover reusable skills from `.agents/skills` in the project or home directory. Available tools include file reading, listing and searching, focused edits, writing files, shell commands, and web search/fetch. Web search requires a Tavily API key: set `TAVILY_API_KEY` in the environment, or add a `tavily` key under `apiKeys` in `~/.xarab/config.json`. The environment variable takes precedence when set.
 Xarab also supports local and remote MCP tools with global and workspace configuration. See [MCP server setup and approval](docs/mcp.md).
 
 ## Isolated tasks and automatic titles

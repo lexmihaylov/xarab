@@ -1,6 +1,6 @@
 # Documentation inventory
 
-Each document starts with a **Type** tag describing what it records and a **Status** tag describing its lifecycle.
+Lifecycle records start with a **Type** tag describing what they record and a **Status** tag describing their lifecycle. User guides are listed separately and are exempt from these tags.
 
 ## Type tags
 
@@ -20,5 +20,12 @@ Each document starts with a **Type** tag describing what it records and a **Stat
 | [`parallel-session-orchestration.md`](./parallel-session-orchestration.md) | `proposal` | `deferred` | Parallel sessions in one Xarab instance and general-purpose task agent prerequisite |
 | [`general-purpose-task-runner.md`](./general-purpose-task-runner.md) | `proposal` | `in-progress` | Utility and isolated agentic tasks, routing, and automatic session titles |
 | [`command-policy.md`](./command-policy.md) | `decision` | `in-progress` | Workspace command and native file-tool authorization rules |
+
+### User guides
+
+| Document | Subject |
+| --- | --- |
+| [`agent-skills.md`](./agent-skills.md) | Agent skill discovery and format |
+| [`mcp.md`](./mcp.md) | MCP server setup, approval, and security |
 
 Use `planned`, `deferred`, `in-progress`, and `done` for status values. Add a `fix`-type document when a completed fix needs a durable implementation record; ordinary implementation details belong in code, tests, or release notes.
