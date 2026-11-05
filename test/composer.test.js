@@ -56,7 +56,12 @@ test("queue previews stay compact, explain paused queues, and summarize overflow
       assert.match(frame, state.generating || state.disabled ? /\+3 more/ : /\+4 more/);
       const queueStart = lines.findIndex((line) => line.includes("QUEUED · 5"));
       const indicatorStart = lines.findIndex((line) => line.includes("[█████]"));
-      assert.ok(indicatorStart - queueStart <= 4, frame);
+      assert.equal(indicatorStart - queueStart, 5, frame);
+      const queueSpan = view
+        .captureSpans()
+        .lines.flatMap((line) => line.spans)
+        .find((span) => span.text.includes("QUEUED · 5"));
+      assert.deepEqual(Array.from(queueSpan.bg.buffer), [32, 45, 56, 255]);
       if (state.disabled) {
         assert.doesNotMatch(frame, /Ctrl\+X remove newest/);
       } else {

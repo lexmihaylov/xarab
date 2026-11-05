@@ -151,7 +151,14 @@ export function Composer({
   return (
     <box flexDirection="column" flexShrink={flexShrink}>
       {queuedMessages.length > 0 && (
-        <box flexDirection="column" maxHeight={4} overflow="hidden">
+        <box
+          flexDirection="column"
+          maxHeight={4}
+          overflow="hidden"
+          backgroundColor={colors.overlay}
+          paddingX={1}
+          marginBottom={1}
+        >
           <box flexDirection="row" justifyContent="space-between" width="100%" overflow="hidden">
             <text fg={colors.label}>{`QUEUED · ${queuedMessages.length}`}</text>
             {!disabled ? <text fg={colors.hint}>Ctrl+X remove newest</text> : null}
