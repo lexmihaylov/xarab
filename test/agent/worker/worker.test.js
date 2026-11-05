@@ -296,11 +296,24 @@ test("worker history replays editing results and diff previews without arguments
     const result = history[2 + index * 2];
     assert.equal(call.type, "tool_call");
     assert.equal(call.name, name);
-    assert.deepEqual(call.arguments, {});
+    assert.deepEqual(
+      Object.keys(call.arguments),
+      name === "edit"
+        ? ["path", "oldString", "newString"]
+        : name === "write"
+          ? ["path", "content"]
+          : ["path", "anchor", "content"],
+    );
+    assert.ok(
+      Object.values(call.arguments).every((value) =>
+        /intentionally omitted from history/.test(value),
+      ),
+    );
     assert.equal(result.type, "tool_result");
     assert.equal(result.callId, call.callId);
     assert.equal(result.ok, true);
     assert.match(result.output, new RegExp(`Historical ${name} tool result`));
+    assert.match(result.output, /Arguments intentionally omitted from history/);
     assert.match(result.output, /Status: success/);
     assert.match(result.output, /\+new/);
     assert.doesNotMatch(JSON.stringify([call, result]), /large-secret-argument/);
@@ -335,10 +348,18 @@ test("editing history preserves failures and supports older or interrupted sessi
   ]);
   assert.equal(history.length, 6);
   assert.equal(history[0].content, "Before");
-  assert.deepEqual(history[1].arguments, {});
+  assert.equal(
+    history[1].arguments.path,
+    "[intentionally omitted from history; provide a fresh value]",
+  );
+  assert.equal(
+    history[1].arguments.oldString,
+    "[intentionally omitted from history; provide a fresh value]",
+  );
   assert.equal(history[2].callId, history[1].callId);
   assert.equal(history[2].ok, false);
   assert.match(history[2].output, /Status: error\nError: no match/);
+  assert.match(history[2].output, /make a fresh call with complete arguments/);
   assert.match(history[4].output, /Wrote file\.js/);
   assert.doesNotMatch(history[4].output, /Diff preview/);
   assert.equal(history[5].content, "After");

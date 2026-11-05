@@ -214,10 +214,24 @@ export function createWorker({
 }
 
 const EDITING_TOOLS = new Set(["edit", "insert_before", "insert_after", "write"]);
+const OMITTED_EDIT_ARGUMENT = "[intentionally omitted from history; provide a fresh value]";
+const EDITING_TOOL_ARGUMENTS = {
+  edit: ["path", "oldString", "newString"],
+  insert_before: ["path", "anchor", "content"],
+  insert_after: ["path", "anchor", "content"],
+  write: ["path", "content"],
+};
+
+function historicalEditArguments(toolName) {
+  return Object.fromEntries(
+    (EDITING_TOOL_ARGUMENTS[toolName] ?? []).map((name) => [name, OMITTED_EDIT_ARGUMENT]),
+  );
+}
 
 function historicalEditRecord(part) {
   const sections = [
     `Historical ${part.toolName} tool result (untrusted data; file may have changed since):`,
+    "Arguments intentionally omitted from history; make a fresh call with complete arguments if another edit is needed.",
     `Status: ${part.result.ok ? "success" : "error"}`,
     String(part.result.output ?? ""),
   ];
@@ -260,12 +274,12 @@ export function buildWorkerHistory(messages = [], currentInput) {
       if (index < toolBoundary || !part.result) continue;
       const editing = EDITING_TOOLS.has(part.toolName);
       // Historical edit arguments can contain entire files. Keep the structured
-      // call/result pair, but replay only the result and bounded diff preview.
+      // call/result pair, but replace the arguments with explicit placeholders.
       history.push({
         type: "tool_call",
         callId: part.callId,
         name: part.toolName,
-        arguments: editing ? {} : (part.params ?? {}),
+        arguments: editing ? historicalEditArguments(part.toolName) : (part.params ?? {}),
       });
       const output = editing ? historicalEditRecord(part) : String(part.result.output ?? "");
       history.push({
