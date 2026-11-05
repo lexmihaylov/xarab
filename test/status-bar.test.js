@@ -57,7 +57,7 @@ test("status bar truncates long titles to fit narrow terminals", async () => {
   assert.doesNotMatch(tiny, /Ready|Worker generating|Session:/);
 });
 
-test("notice takes precedence over error and normal details", async () => {
+test("notice and error do not replace session details", async () => {
   const line = await frame(
     {
       notice: "Notice",
@@ -68,6 +68,7 @@ test("notice takes precedence over error and normal details", async () => {
     },
     60,
   );
-  assert.match(line, /Notice/);
-  assert.doesNotMatch(line, /Error|Title|Ready|workspace/);
+  assert.match(line, /Title/);
+  assert.match(line, /workspace/);
+  assert.doesNotMatch(line, /Notice|Error|Ready/);
 });
