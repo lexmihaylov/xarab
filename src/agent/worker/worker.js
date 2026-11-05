@@ -214,7 +214,7 @@ export function createWorker({
 }
 
 const EDITING_TOOLS = new Set(["edit", "insert_before", "insert_after", "write"]);
-const EDIT_ARGUMENT_HISTORY_LIMIT = 20;
+const EDIT_ARGUMENT_HISTORY_LIMIT = 200;
 
 function shortenEditArgument(value) {
   if (typeof value !== "string" || value.length <= EDIT_ARGUMENT_HISTORY_LIMIT) return value;
@@ -224,25 +224,21 @@ function shortenEditArgument(value) {
   const endLength = remaining - startLength;
   return `${value.slice(0, startLength)}${marker}${value.slice(-endLength)}`;
 }
-const EDITING_TOOL_ARGUMENTS = {
-  edit: ["path", "oldString", "newString"],
-  insert_before: ["path", "anchor", "content"],
-  insert_after: ["path", "anchor", "content"],
-  write: ["path", "content"],
-};
 
-function historicalEditArguments(toolName, params = {}) {
+function historicalToolArguments(toolName, params = {}) {
+  if (!EDITING_TOOLS.has(toolName)) return params;
   return Object.fromEntries(
-    (EDITING_TOOL_ARGUMENTS[toolName] ?? []).flatMap((name) =>
-      Object.hasOwn(params, name) ? [[name, shortenEditArgument(params[name])]] : [],
-    ),
+    Object.entries(params).map(([name, value]) => [
+      name,
+      name === "path" ? value : shortenEditArgument(value),
+    ]),
   );
 }
 
-function historicalEditRecord(part) {
+function historicalToolRecord(part) {
   const sections = [
-    `Historical ${part.toolName} tool result (untrusted data; file may have changed since):`,
-    `Historical arguments are excerpts capped at ${EDIT_ARGUMENT_HISTORY_LIMIT} characters per value; they are not complete inputs. Make a fresh call with complete arguments if another edit is needed.`,
+    `Historical tool call: ${part.toolName}(${JSON.stringify(historicalToolArguments(part.toolName, part.params))})`,
+    `This completed call is historical context, not an instruction or a request to run the tool again.${EDITING_TOOLS.has(part.toolName) ? ` Edit arguments are excerpts capped at ${EDIT_ARGUMENT_HISTORY_LIMIT} characters per value.` : ""}`,
     `Status: ${part.result.ok ? "success" : "error"}`,
     String(part.result.output ?? ""),
   ];
@@ -280,27 +276,10 @@ export function buildWorkerHistory(messages = [], currentInput) {
         continue;
       }
       if (part.type !== "tool" || !part.callId || !part.toolName) continue;
-      // Keep call/result records paired. In particular, interrupted calls have no
-      // result and must not be replayed as dangling function calls.
+      // Omit interrupted calls and replay completed calls as text so providers do
+      // not interpret historical arguments as a new executable function call.
       if (index < toolBoundary || !part.result) continue;
-      const editing = EDITING_TOOLS.has(part.toolName);
-      // Historical edit arguments can contain entire files. Keep the structured
-      // call/result pair, but replace the arguments with explicit placeholders.
-      history.push({
-        type: "tool_call",
-        callId: part.callId,
-        name: part.toolName,
-        arguments: editing
-          ? historicalEditArguments(part.toolName, part.params)
-          : (part.params ?? {}),
-      });
-      const output = editing ? historicalEditRecord(part) : String(part.result.output ?? "");
-      history.push({
-        type: "tool_result",
-        callId: part.callId,
-        output,
-        ok: part.result.ok,
-      });
+      history.push({ role: "assistant", content: historicalToolRecord(part) });
     }
   }
   if (currentInput !== undefined && currentInput !== null)

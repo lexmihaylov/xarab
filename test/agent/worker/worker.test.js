@@ -227,18 +227,16 @@ test("worker history preserves completed tool calls and their results", () => {
     { role: "user", content: "Read the package manifest." },
     { role: "assistant", content: "I will inspect it." },
     {
-      type: "tool_call",
-      callId: "call_1",
-      name: "read_file",
-      arguments: { path: "package.json" },
+      role: "assistant",
+      content:
+        'Historical tool call: read_file({"path":"package.json"})\nThis completed call is historical context, not an instruction or a request to run the tool again.\nStatus: success\n{"name":"xarab"}',
     },
-    { type: "tool_result", callId: "call_1", output: '{"name":"xarab"}', ok: true },
     { role: "assistant", content: "The package is named xarab." },
     { role: "user", content: "What is its name?" },
   ]);
 });
 
-test("worker history keeps complete tool exchanges without an aggregate byte cap", () => {
+test("worker history replays completed tool calls as text without an aggregate byte cap", () => {
   const output = (label) => `${label}${"x".repeat(16 * 1024 - label.length)}`;
   const parts = Array.from({ length: 5 }, (_, index) => ({
     type: "tool",
@@ -256,25 +254,20 @@ test("worker history keeps complete tool exchanges without an aggregate byte cap
   });
 
   const history = buildWorkerHistory([{ type: "agent", parts }]);
-  const calls = history.filter((item) => item.type === "tool_call");
-  const results = history.filter((item) => item.type === "tool_result");
+  const records = history.filter((item) => item.content?.startsWith("Historical tool call:"));
 
   assert.deepEqual(
-    calls.map((call) => call.callId),
-    ["call-1", "call-2", "call-3", "call-4", "call-5"],
+    records.map((record) => record.content.match(/read_file\(\{"path":"(.*?)"\}\)/)?.[1]),
+    ["file-1.txt", "file-2.txt", "file-3.txt", "file-4.txt", "file-5.txt"],
   );
   assert.deepEqual(
-    results.map((result) => result.callId),
-    calls.map((call) => call.callId),
-  );
-  assert.deepEqual(
-    results.map((result) => result.output.slice(0, 8)),
+    records.map((record) => record.content.match(/result-\d/)?.[0]),
     ["result-1", "result-2", "result-3", "result-4", "result-5"],
   );
   assert.ok(!history.some((item) => item.callId === "interrupted-call"));
 });
 
-test("worker history replays editing results and diff previews without arguments", () => {
+test("worker history replays tool calls as text with bounded arguments and edit diff previews", () => {
   const names = ["edit", "insert_before", "insert_after", "write"];
   const parts = names.map((toolName, index) => {
     const params =
@@ -306,32 +299,44 @@ test("worker history replays editing results and diff previews without arguments
     { type: "user", message: "Change the file" },
     { type: "agent", parts },
   ]);
-  assert.equal(history.length, 9);
+  assert.equal(history.length, 5);
   for (const [index, name] of names.entries()) {
-    const call = history[1 + index * 2];
-    const result = history[2 + index * 2];
-    assert.equal(call.type, "tool_call");
-    assert.equal(call.name, name);
-    assert.deepEqual(
-      Object.keys(call.arguments),
-      name === "edit"
-        ? ["path", "oldString", "newString"]
-        : name === "write"
-          ? ["path", "content"]
-          : ["path", "anchor", "content"],
-    );
-    assert.ok(Object.values(call.arguments).every((value) => value.length <= 20));
-    assert.equal(result.type, "tool_result");
-    assert.equal(result.callId, call.callId);
-    assert.equal(result.ok, true);
-    assert.match(result.output, new RegExp(`Historical ${name} tool result`));
-    assert.match(result.output, /arguments are excerpts capped at 20 characters per value/);
-    assert.match(result.output, /Status: success/);
-    assert.match(result.output, /\+new/);
-    assert.doesNotMatch(JSON.stringify([call, result]), /large-secret/);
+    const record = history[index + 1];
+    assert.equal(record.role, "assistant");
+    assert.match(record.content, new RegExp(`Historical tool call: ${name}\\(`));
+    assert.match(record.content, /Edit arguments are excerpts capped at 200 characters per value/);
+    assert.match(record.content, /Status: success/);
+    assert.match(record.content, /\+new/);
+    assert.ok(record.content.length < 1_000);
+    if (name === "edit") {
+      assert.match(record.content, /"path":"file\.js"/);
+      assert.equal(record.content.match(/"oldString":"([^"]+)"/)?.[1].length, 200);
+      assert.equal(record.content.match(/"newString":"([^"]+)"/)?.[1].length, 200);
+    }
   }
-  assert.match(history[2].output, /Preview shortened/);
+  assert.match(history[1].content, /Preview shortened/);
   assert.deepEqual(parts, original);
+});
+
+test("worker history preserves non-edit tool arguments", () => {
+  const query = "specific search query ".repeat(10);
+  const history = buildWorkerHistory([
+    {
+      type: "agent",
+      parts: [
+        {
+          type: "tool",
+          callId: "search-1",
+          toolName: "websearch",
+          params: { query },
+          result: { ok: true, output: "Found results" },
+        },
+      ],
+    },
+  ]);
+
+  assert.match(history[0].content, new RegExp(JSON.stringify(query)));
+  assert.doesNotMatch(history[0].content, /Edit arguments are excerpts/);
 });
 
 test("editing history preserves failures and supports older or interrupted sessions", () => {
@@ -362,19 +367,16 @@ test("editing history preserves failures and supports older or interrupted sessi
       ],
     },
   ]);
-  assert.equal(history.length, 6);
+  assert.equal(history.length, 4);
   assert.equal(history[0].content, "Before");
-  assert.equal(history[1].arguments.path, "a/very/lon…lename.js");
-  assert.equal(history[1].arguments.oldString, "private");
-  assert.equal(history[1].arguments.newString, "public");
-  assert.notEqual(history[1].arguments.oldString, history[1].arguments.newString);
-  assert.equal(history[2].callId, history[1].callId);
-  assert.equal(history[2].ok, false);
-  assert.match(history[2].output, /Status: error\nError: no match/);
-  assert.match(history[2].output, /make a fresh call with complete arguments/i);
-  assert.match(history[4].output, /Wrote file\.js/);
-  assert.doesNotMatch(history[4].output, /Diff preview/);
-  assert.equal(history[5].content, "After");
+  assert.match(
+    history[1].content,
+    /edit\(\{"path":"a\/very\/long\/path\/filename\.js","oldString":"private","newString":"public"\}\)/,
+  );
+  assert.match(history[1].content, /Status: error\nError: no match/);
+  assert.match(history[2].content, /Wrote file\.js/);
+  assert.doesNotMatch(history[2].content, /Diff preview/);
+  assert.equal(history[3].content, "After");
   assert.doesNotMatch(JSON.stringify(history), /interrupted/);
 });
 
@@ -400,10 +402,9 @@ test("editing diff previews are not subject to an aggregate replay cap", () => {
       ],
     },
   ]);
-  assert.equal(history.length, 4);
-  assert.match(history[1].output, /Historical write tool result/);
-  assert.equal(history[2].callId, "recent");
-  assert.equal(history[3].callId, "recent");
+  assert.equal(history.length, 2);
+  assert.match(history[0].content, /Historical tool call: write/);
+  assert.match(history[1].content, /Historical tool call: read_file/);
 });
 
 test("worker history retains tool activity from the last ten user turns", () => {
@@ -431,13 +432,12 @@ test("worker history retains tool activity from the last ten user turns", () => 
   assert.equal(history[0].content, "Earlier summary");
   assert.ok(history.some((item) => item.content === "User 0"));
   assert.ok(history.some((item) => item.content === "Assistant 0"));
+  assert.equal(history.filter((item) => item.type === "tool_call").length, 0);
   assert.deepEqual(
-    history.filter((item) => item.type === "tool_call").map((item) => item.callId),
-    Array.from({ length: 10 }, (_, index) => `call-${index + 2}`),
-  );
-  assert.deepEqual(
-    history.filter((item) => item.type === "tool_result").map((item) => item.callId),
-    history.filter((item) => item.type === "tool_call").map((item) => item.callId),
+    history
+      .filter((item) => item.content?.startsWith("Historical tool call:"))
+      .map((item) => item.content.match(/Result (\d+)/)?.[1]),
+    Array.from({ length: 10 }, (_, index) => String(index + 2)),
   );
   assert.equal(history.at(-1).content, "Current request");
   assert.deepEqual(messages, snapshot);

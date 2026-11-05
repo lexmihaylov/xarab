@@ -29,9 +29,8 @@ test("historical task results retain the final response without child activity",
     },
   ];
   const history = buildWorkerHistory(messages, "next turn");
-  const task = history.find((item) => item.type === "tool_result" && item.callId === "task-1");
-  assert.equal(task.ok, false);
-  assert.equal(task.output, "task final response");
+  const task = history.find((item) => item.content?.startsWith("Historical tool call: task("));
+  assert.match(task.content, /Status: error\ntask final response/);
   assert.doesNotMatch(JSON.stringify(history), /secret child command|child-1/);
   assert.match(JSON.stringify(history), /ordinary result/);
 });
