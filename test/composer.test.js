@@ -21,14 +21,16 @@ test("shows loading and queue guidance while messages are queued", async () => {
     const frame = view.captureCharFrame();
     assert.match(frame, /Queued \(1\)/);
     assert.match(frame, /Follow-up request/);
-    assert.doesNotMatch(frame, /PgUp|PgDn|Enter queue|Esc stop/);
+    assert.match(frame, /Enter queue/);
+    assert.match(frame, /Esc stop/);
+    assert.doesNotMatch(frame, /PgUp|PgDn/);
     assert.match(frame, /█████/);
   } finally {
     await act(async () => view.dispose());
   }
 });
 
-test("ready state has no redundant composer guidance row", async () => {
+test("ready hotkey guidance appears on the right at narrow and standard widths", async () => {
   for (const width of [80, 40]) {
     const view = await testRender(
       React.createElement(Composer, {
@@ -41,16 +43,19 @@ test("ready state has no redundant composer guidance row", async () => {
     try {
       await view.flush();
       const frame = view.captureCharFrame();
-      assert.doesNotMatch(frame, /Ctrl\+J newline|Enter send|PgUp|PgDn|Esc stop/);
-      assert.equal(frame.split("\n").filter((line) => line.includes("╭")).length, 1);
-      assert.ok(width > 0);
+      assert.match(frame, /Ctrl\+J newline/);
+      assert.match(frame, /Enter send/);
+      assert.doesNotMatch(frame, /PgUp|PgDn|Esc stop/);
+      const hintLine = frame.split("\n").find((line) => line.includes("Enter send"));
+      assert.ok(hintLine);
+      assert.ok(hintLine.indexOf("Ctrl+J newline") > 2, hintLine);
     } finally {
       await act(async () => view.dispose());
     }
   }
 });
 
-test("generating state keeps the loading indicator without a redundant guidance row", async () => {
+test("generating hotkey guidance appears beside the loading indicator at narrow widths", async () => {
   const view = await testRender(
     React.createElement(Composer, {
       generating: true,
@@ -63,14 +68,18 @@ test("generating state keeps the loading indicator without a redundant guidance 
   try {
     await view.flush();
     const frame = view.captureCharFrame();
-    assert.doesNotMatch(frame, /Enter queue|Ctrl\+J newline|Esc stop/);
+    assert.match(frame, /Enter queue/);
+    assert.match(frame, /Ctrl\+J newline/);
+    assert.match(frame, /Esc stop/);
     assert.match(frame, /█████/);
+    const hintLine = frame.split("\n").find((line) => line.includes("Enter queue"));
+    assert.ok(hintLine.indexOf("Enter queue") > 5, hintLine);
   } finally {
     await act(async () => view.dispose());
   }
 });
 
-test("disabled queue does not advertise unavailable shortcuts", async () => {
+test("disabled state omits the redundant interrupt guidance row", async () => {
   const view = await testRender(
     React.createElement(Composer, {
       disabled: true,
@@ -84,8 +93,100 @@ test("disabled queue does not advertise unavailable shortcuts", async () => {
     await view.flush();
     const frame = view.captureCharFrame();
     assert.match(frame, /Queued \(1\)/);
-    assert.match(frame, /Ctrl\+C interrupt/);
-    assert.doesNotMatch(frame, /Ctrl\+X|Esc stop|Enter send|Enter queue/);
+    assert.doesNotMatch(frame, /Ctrl\+C interrupt|Ctrl\+X|Esc stop|Enter send|Enter queue/);
+  } finally {
+    await act(async () => view.dispose());
+  }
+});
+
+test("indicator stays visible and animates only while generating across transitions", async () => {
+  for (const width of [40, 80]) {
+    let setStatus;
+    function Wrapper() {
+      const [status, updateStatus] = useState({ generating: false, disabled: false });
+      setStatus = updateStatus;
+      return React.createElement(Composer, {
+        ...status,
+        onStopGeneration: () => {},
+        onDraftChange: () => {},
+        onSubmit: () => {},
+      });
+    }
+    const view = await testRender(React.createElement(Wrapper), { width, height: 14 });
+    const colors = () =>
+      JSON.stringify(
+        view
+          .captureSpans()
+          .lines.flatMap((line) =>
+            line.spans.filter((span) => span.text.includes("█")).map((span) => span.fg),
+          ),
+      );
+    const wait = () => act(async () => new Promise((resolve) => setTimeout(resolve, 160)));
+    try {
+      await view.flush();
+      assert.match(view.captureCharFrame(), /\[█████\]/);
+      assert.match(view.captureCharFrame(), /Enter send/);
+      const idle = colors();
+      await wait();
+      await view.flush();
+      assert.equal(colors(), idle);
+
+      await act(async () => setStatus({ generating: true, disabled: false }));
+      await view.flush();
+      assert.match(view.captureCharFrame(), /\[█████\]/);
+      assert.match(view.captureCharFrame(), /Enter queue/);
+      const generating = colors();
+      await wait();
+      await view.flush();
+      assert.notEqual(colors(), generating);
+
+      await act(async () => setStatus({ generating: false, disabled: true }));
+      await view.flush();
+      assert.match(view.captureCharFrame(), /\[█████\]/);
+      assert.doesNotMatch(view.captureCharFrame(), /Enter send|Enter queue|Ctrl\+C interrupt/);
+      const disabled = colors();
+      await wait();
+      await view.flush();
+      assert.equal(colors(), disabled);
+      assert.equal(disabled, idle);
+
+      await act(async () => setStatus({ generating: false, disabled: false }));
+      await view.flush();
+      assert.match(view.captureCharFrame(), /\[█████\]/);
+      assert.match(view.captureCharFrame(), /Enter send/);
+    } finally {
+      await act(async () => view.dispose());
+    }
+  }
+});
+test("Shift+Enter and Ctrl+J insert newlines while Enter submits", async () => {
+  const submitted = [];
+  const drafts = [];
+  const view = await testRender(
+    React.createElement(Composer, {
+      draft: { value: "", cursor: 0 },
+      onDraftChange: (draft) => drafts.push(draft),
+      onSubmit: (value) => submitted.push(value),
+    }),
+    { width: 80, height: 14 },
+  );
+  try {
+    await view.flush();
+    await act(async () => view.mockInput.pasteBracketedText("first"));
+    await view.flush();
+    await act(async () => view.mockInput.pressKeys(["\u001b[13;2u"]));
+    await view.flush();
+    assert.equal(drafts.at(-1).value, "first\n");
+    assert.deepEqual(submitted, []);
+
+    await act(async () => view.mockInput.pressKey("j", { ctrl: true }));
+    await view.flush();
+    assert.equal(drafts.at(-1).value, "first\n\n");
+    assert.deepEqual(submitted, []);
+
+    await act(async () => view.mockInput.pressEnter());
+    await view.flush();
+    assert.deepEqual(submitted, ["first\n\n"]);
   } finally {
     await act(async () => view.dispose());
   }

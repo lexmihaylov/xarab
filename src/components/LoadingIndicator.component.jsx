@@ -15,17 +15,23 @@ function shadeColor(color, factor) {
   return `#${channels.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
-export function LoadingIndicator({ color = "#263b2f", interval = 120, frames = defaultFrames }) {
+export function LoadingIndicator({
+  color = "#263b2f",
+  interval = 120,
+  frames = defaultFrames,
+  active = true,
+}) {
   const [frame, setFrame] = useState(0);
 
   useEffect(() => {
+    if (!active) return;
     const timer = setInterval(() => {
       setFrame((current) => (current + 1) % frames.length);
     }, interval);
     return () => clearInterval(timer);
-  }, [frames, interval]);
+  }, [active, frames, interval]);
 
-  const activeBar = frames[frame];
+  const activeBar = frames[active ? frame : 0];
 
   return (
     <text>

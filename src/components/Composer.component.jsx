@@ -175,20 +175,26 @@ export function Composer({
           ))}
         </box>
       )}
-      {(disabled || generating || suggestions.length > 0) && (
-        <box flexDirection="row" width="100%" paddingLeft={1} paddingRight={1}>
-          {(disabled || generating) && <LoadingIndicator color={colors.green} />}
-          <box flexGrow={1} flexShrink={1} minWidth={0} alignItems="flex-end">
-            {(disabled || suggestions.length > 0) && (
-              <text fg={colors.hint}>
-                {disabled
-                  ? `${onStopGeneration ? "Esc stop · " : ""}Ctrl+C interrupt`
-                  : `↑↓ choose · Tab complete · Enter select/run${generating && onStopGeneration ? " · Esc stop" : ""}`}
-              </text>
-            )}
-          </box>
+      <box flexDirection="row" width="100%" paddingLeft={1} paddingRight={1}>
+        <box flexDirection="row" flexShrink={0}>
+          <text fg={colors.green}>[</text>
+          <LoadingIndicator color={colors.green} active={generating} />
+          <text fg={colors.green}>]</text>
         </box>
-      )}
+        <box flexGrow={1} flexShrink={1} minWidth={0} alignItems="flex-end">
+          <text fg={colors.hint}>
+            {disabled
+              ? generating
+                ? `${onStopGeneration ? "Esc stop · " : ""}Ctrl+C interrupt`
+                : ""
+              : suggestions.length
+                ? `↑↓ choose · Tab complete · Enter select/run${generating && onStopGeneration ? " · Esc stop" : ""}`
+                : generating
+                  ? `Enter queue · Ctrl+J newline${onStopGeneration ? " · Esc stop" : ""}`
+                  : `${messageSuggestion && !value ? "Tab accept · " : ""}Ctrl+J newline · Enter send`}
+          </text>
+        </box>
+      </box>
       <box
         flexDirection="column"
         border
@@ -213,6 +219,7 @@ export function Composer({
           showCursor={!disabled}
           wrapMode="word"
           keyBindings={[
+            { name: "return", shift: true, action: "newline" },
             { name: "return", action: "submit" },
             { name: "kpenter", action: "submit" },
             { name: "linefeed", action: "newline" },

@@ -31,8 +31,8 @@ export function StatusBar({ status, sessionTitle, sessionError, notice, workspac
   }
 
   const available = Math.max(0, width - 2);
-  const statusText = truncate(status || "Ready", available);
-  // Reserve room for status first, then share the remaining space with the workspace.
+  const routineStatus = !status || status === "Ready" || status === "Worker generating…";
+  const statusText = routineStatus ? "" : truncate(status, available);
   const workspaceLimit =
     workspace && available > stringWidth(statusText) + 1
       ? Math.min(stringWidth(workspace), Math.floor((available - stringWidth(statusText) - 1) / 2))
@@ -40,9 +40,12 @@ export function StatusBar({ status, sessionTitle, sessionError, notice, workspac
   const visibleWorkspace = truncate(workspace || "", workspaceLimit);
   const leftLimit = available - (visibleWorkspace ? stringWidth(visibleWorkspace) + 1 : 0);
   const separator = "  ·  ";
-  const titleLimit = Math.min(32, leftLimit - stringWidth(statusText) - stringWidth(separator));
+  const titleLimit =
+    leftLimit - stringWidth(statusText) - (statusText ? stringWidth(separator) : 0);
   const visibleTitle = sessionTitle ? truncate(sessionTitle, titleLimit) : "";
-  const details = visibleTitle ? `${visibleTitle}${separator}${statusText}` : statusText;
+  const details = visibleTitle
+    ? `${visibleTitle}${statusText ? `${separator}${statusText}` : ""}`
+    : statusText;
 
   return (
     <box
