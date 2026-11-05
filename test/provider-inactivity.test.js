@@ -191,7 +191,11 @@ test("OpenAI retries a stalled WebSocket without HTTP fallback", async () => {
                 Buffer.from(
                   JSON.stringify({
                     type: "response.completed",
-                    response: { output: [{ type: "message" }] },
+                    response: {
+                      output: [
+                        { type: "message", content: [{ type: "output_text", text: "done" }] },
+                      ],
+                    },
                   }),
                 ),
               ),

@@ -10,6 +10,7 @@ export function createOpenAIResponsesWorkerAdapter({
   webSocketFactory = (url, options) => new WebSocket(url, options),
   inactivityTimeoutMs = 60_000,
   maxInactivityRetries = 2,
+  maxEmptyResponseRetries = 2,
 }) {
   async function run({
     model,
@@ -22,6 +23,7 @@ export function createOpenAIResponsesWorkerAdapter({
     onTextDelta,
     onEvent = () => {},
     inactivityRetries = maxInactivityRetries,
+    allowEmptyResponse = false,
   }) {
     if (!model) throw new Error("Choose an OpenAI model first.");
     const credentials = await getCredentials();
@@ -39,6 +41,7 @@ export function createOpenAIResponsesWorkerAdapter({
     let previousResponseId;
     let pendingToolOutputs = [];
     let useWebSocket = Boolean(sessionID);
+    let emptyResponseRetries = 0;
 
     if (useWebSocket) {
       try {
@@ -190,19 +193,34 @@ export function createOpenAIResponsesWorkerAdapter({
             throw new Error(
               "OpenAI returned a textual tool call instead of a structured function call.",
             );
+          const hasText = Boolean((streamedText || streamedChunks.join("") || outputText).trim());
+          if (!hasText && !allowEmptyResponse) {
+            if (sawToolCall)
+              throw new Error(
+                "OpenAI completed the turn after a tool call without a text response.",
+              );
+            if (emptyResponseRetries >= maxEmptyResponseRetries)
+              throw new Error(
+                `OpenAI returned an empty response after retries (${responseDiagnostic(completedResponse)}). Please try again.`,
+              );
+            if (signal?.aborted) throw abortError();
+            emptyResponseRetries++;
+            onEvent({
+              type: "provider_retry",
+              provider: "OpenAI",
+              reason: "empty_response",
+              attempt: emptyResponseRetries,
+              maxRetries: maxEmptyResponseRetries,
+            });
+            continue;
+          }
           // When deltas were supplied, text has already been forwarded during
           // streaming. Some Responses API completions still include the final
           // text only in `response.output`, so forward it only if no delta arrived.
           if (onTextDelta) {
             if (!streamedText && outputText) onTextDelta(outputText);
-            else if (!streamedText && !outputText && sawToolCall)
-              throw new Error(
-                "OpenAI completed the turn after a tool call without a text response.",
-              );
           } else if (streamedChunks.length) streamedChunks.forEach(onText);
           else if (outputText) onText(outputText);
-          else if (sawToolCall)
-            throw new Error("OpenAI completed the turn after a tool call without a text response.");
           return completedResponse;
         }
         const functionOutputs = [];
@@ -305,6 +323,7 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
   const decoder = new TextDecoder();
   let buffer = "";
   let completed;
+  const items = new Map();
 
   const handleEventBlock = (block) => {
     const data = block
@@ -319,6 +338,7 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
     } catch {
       throw new Error("OpenAI returned a malformed streaming event.");
     }
+    collectOutputItem(items, event);
     if (event.type === "response.output_text.delta") {
       const delta = event.delta ?? "";
       onTextDelta?.(delta);
@@ -363,7 +383,7 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
     reader.releaseLock?.();
   }
   if (!completed) throw new Error("OpenAI stream ended without response.completed.");
-  return completed;
+  return mergeCompletedItems(completed, items);
 }
 
 async function openResponsesWebSocket({ webSocketFactory, credentials, sessionID, signal }) {
@@ -413,6 +433,7 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
     let streamedText = "";
     let outputStarted = false;
     const streamedChunks = [];
+    const items = new Map();
     const cleanup = () => {
       socket.removeListener("message", onMessage);
       socket.removeListener("error", onError);
@@ -433,6 +454,7 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
     const onMessage = (data) => {
       try {
         const event = JSON.parse(data.toString());
+        collectOutputItem(items, event);
         if (event.type === "response.output_text.delta") {
           outputStarted = true;
           const text = event.delta ?? "";
@@ -450,7 +472,7 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
           );
         onEvent(event);
         if (event.type === "response.completed" || event.type === "response.done") {
-          completed = event.response;
+          completed = mergeCompletedItems(event.response, items);
           cleanup();
           resolve({ response: completed, streamedChunks, streamedText });
         }
@@ -470,6 +492,39 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
       fail(webSocketError(error));
     }
   });
+}
+
+function collectOutputItem(items, event) {
+  if (
+    event.type !== "response.output_item.done" ||
+    !event.item ||
+    !Number.isInteger(event.output_index) ||
+    event.output_index < 0
+  )
+    return;
+  items.set(event.output_index, event.item);
+}
+
+function mergeCompletedItems(response, items) {
+  if (!response || !Array.isArray(response.output) || !items.size) return response;
+  const output = [...response.output];
+  for (const [index, item] of items) {
+    if (!output[index]) output[index] = item;
+  }
+  return { ...response, output: output.filter(Boolean) };
+}
+
+function responseDiagnostic(response) {
+  const knownTypes = new Set(["message", "reasoning", "function_call", "custom_tool_call"]);
+  const types = [
+    ...new Set(
+      (response?.output ?? []).map((item) => (knownTypes.has(item?.type) ? item.type : "other")),
+    ),
+  ];
+  const status = ["completed", "incomplete", "failed", "cancelled"].includes(response?.status)
+    ? response.status
+    : "unknown";
+  return `status: ${status}; output types: ${types.join(", ") || "none"}`;
 }
 
 function webSocketError(cause) {

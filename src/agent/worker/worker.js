@@ -185,7 +185,15 @@ export function createWorker({
   }
 
   function complete({ tier, instructions, input, ...request }) {
-    return execute({ ...request, tier, instructions, input, tools: {}, inactivityRetries: 0 });
+    return execute({
+      ...request,
+      tier,
+      instructions,
+      input,
+      tools: {},
+      inactivityRetries: 0,
+      allowEmptyResponse: true,
+    });
   }
 
   function getTierInfo(tier) {

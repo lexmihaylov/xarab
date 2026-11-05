@@ -545,11 +545,12 @@ export function createAssistantController({
         onEvent(event) {
           if (event.type === "provider_retry") {
             updateStatus(
-              `${event.provider} response stalled; retrying (${event.attempt}/${event.maxRetries})…`,
+              `${event.provider} response ${event.reason === "empty_response" ? "was empty" : "stalled"}; retrying (${event.attempt}/${event.maxRetries})…`,
             );
             return;
           }
-          if (status.includes("response stalled; retrying")) updateStatus("Worker generating…");
+          if (/response (?:stalled|was empty); retrying/.test(status))
+            updateStatus("Worker generating…");
           if (!tracksUsage || !["response.completed", "response.done"].includes(event.type)) return;
           const response = event.response;
           if (!response || (response.id && usageResponses.has(response.id))) return;

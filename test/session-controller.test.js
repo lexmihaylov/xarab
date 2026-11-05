@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import { createAssistantController } from "../src/agent/controller.js";
 import { createSessionStore, newSession } from "../src/agent/session-store.js";
+import { createOpenAIResponsesWorkerAdapter } from "../src/agent/worker/openai-responses-worker-adapter.js";
 
 async function setup(t, behavior = async ({ onText }) => onText("Reply")) {
   const root = await mkdtemp("/tmp/opencode/xarab-session-controller-");
@@ -68,6 +69,29 @@ test("routes chat through the local classifier to an OpenAI worker and autosaves
     provider: "local",
     model: path.join(root, "classifier.gguf"),
   });
+});
+
+test("controller reports an empty OpenAI response rather than silently returning ready", async (t) => {
+  let calls = 0;
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    fetchImpl: async () => {
+      calls++;
+      return new Response(
+        `data: ${JSON.stringify({ type: "response.completed", response: { output: [] } })}\n\n`,
+      );
+    },
+    webSocketFactory: () => {
+      throw new Error("unavailable");
+    },
+  });
+  const { create, configure } = await setup(t, (options) => adapter.run(options));
+  const controller = await create();
+  await configure(controller);
+  await controller.submit("Hello");
+  assert.equal(calls, 3);
+  assert.equal(controller.getState().status, "Ready");
+  assert.match(controller.getState().messages.at(-1).message, /empty response after retries/);
 });
 
 test("worker usage accumulates once per response and survives session restore", async (t) => {

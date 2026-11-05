@@ -40,6 +40,171 @@ class TestWebSocket extends EventEmitter {
   terminate() {}
 }
 
+test("retries empty responses before any tools or text", async () => {
+  let calls = 0;
+  const events = [];
+  const chunks = [];
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    fetchImpl: async () =>
+      streamedResponse([
+        {
+          type: "response.completed",
+          response: {
+            output:
+              ++calls === 1
+                ? []
+                : [{ type: "message", content: [{ type: "output_text", text: "Recovered" }] }],
+          },
+        },
+      ]),
+  });
+  await adapter.run({
+    model: "model",
+    input: "hi",
+    onTextDelta: (text) => chunks.push(text),
+    onEvent: (event) => events.push(event),
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(chunks, ["Recovered"]);
+  assert.equal(events.find((event) => event.type === "provider_retry").reason, "empty_response");
+});
+
+test("reports repeated empty responses and permits empty utility results", async () => {
+  let calls = 0;
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    fetchImpl: async () => {
+      calls++;
+      return streamedResponse([{ type: "response.completed", response: { output: [] } }]);
+    },
+  });
+  await assert.rejects(
+    adapter.run({ model: "model", input: "hi" }),
+    /empty response after retries/,
+  );
+  assert.equal(calls, 3);
+  await adapter.run({ model: "model", input: "hi", allowEmptyResponse: true });
+  assert.equal(calls, 4);
+});
+
+test("cancellation during an empty-response retry stops subsequent requests", async () => {
+  let calls = 0;
+  const controller = new AbortController();
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    fetchImpl: async () => {
+      calls++;
+      return streamedResponse([{ type: "response.completed", response: { output: [] } }]);
+    },
+  });
+  await assert.rejects(
+    adapter.run({
+      model: "model",
+      input: "hi",
+      signal: controller.signal,
+      onEvent: (event) => {
+        if (event.type === "provider_retry") controller.abort();
+      },
+    }),
+    /cancel/i,
+  );
+  assert.equal(calls, 1);
+});
+
+test("HTTP recovers a completed output item omitted from the final response", async () => {
+  let calls = 0;
+  const chunks = [];
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    fetchImpl: async () => {
+      calls++;
+      return streamedResponse([
+        {
+          type: "response.output_item.done",
+          output_index: 0,
+          item: { type: "message", content: [{ type: "output_text", text: "Recovered item" }] },
+        },
+        { type: "response.completed", response: { output: [] } },
+      ]);
+    },
+  });
+  await adapter.run({ model: "model", input: "hi", onTextDelta: (text) => chunks.push(text) });
+  assert.equal(calls, 1);
+  assert.deepEqual(chunks, ["Recovered item"]);
+});
+
+test("WebSocket recovers a completed tool item omitted from the final response", async () => {
+  let calls = 0;
+  let tools = 0;
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    webSocketFactory: () =>
+      new TestWebSocket(() =>
+        ++calls === 1
+          ? [
+              {
+                type: "response.output_item.done",
+                output_index: 0,
+                item: { type: "function_call", name: "inspect", call_id: "1", arguments: "{}" },
+              },
+              { type: "response.completed", response: { id: "first", output: [] } },
+            ]
+          : [
+              {
+                type: "response.completed",
+                response: {
+                  output: [{ type: "message", content: [{ type: "output_text", text: "done" }] }],
+                },
+              },
+            ],
+      ),
+  });
+  await adapter.run({
+    model: "model",
+    input: "hi",
+    sessionID: "session",
+    tools: {
+      inspect: {
+        handler: async () => {
+          tools++;
+          return "result";
+        },
+      },
+    },
+  });
+  assert.equal(calls, 2);
+  assert.equal(tools, 1);
+});
+
+test("empty WebSocket responses retry without replaying tools", async () => {
+  let requests = 0;
+  let tools = 0;
+  const adapter = createOpenAIResponsesWorkerAdapter({
+    getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+    webSocketFactory: () =>
+      new TestWebSocket(() => [
+        {
+          type: "response.completed",
+          response: {
+            output:
+              ++requests === 1
+                ? []
+                : [{ type: "message", content: [{ type: "output_text", text: "Done" }] }],
+          },
+        },
+      ]),
+  });
+  await adapter.run({
+    model: "model",
+    input: "hi",
+    sessionID: "session",
+    tools: { test: { handler: async () => tools++ } },
+  });
+  assert.equal(requests, 2);
+  assert.equal(tools, 0);
+});
+
 test("lists account models plus known Codex models", async () => {
   const requests = [];
   const adapter = createOpenAIModelManager({
