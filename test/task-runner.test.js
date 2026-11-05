@@ -31,6 +31,30 @@ test("failed local context creation releases model allocations", async () => {
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
+test("utility timeout returns even when worker ignores cancellation and ignores late output", async () => {
+  let finish;
+  let output;
+  const { runner } = setup({
+    timeoutMs: 10,
+    complete: ({ onText }) => {
+      output = onText;
+      return new Promise((resolve) => {
+        finish = resolve;
+      });
+    },
+  });
+  const keepAlive = setInterval(() => {}, 100);
+  try {
+    const result = await runner.run({ brief: "stalled" });
+    assert.equal(result.status, "timed-out");
+    assert.throws(() => output("late"));
+    finish();
+    await runner.shutdown();
+  } finally {
+    clearInterval(keepAlive);
+  }
+});
+
 test("shared local runtime reuses one adapter, queues utility work, and rejects nested local runs", async () => {
   let created = 0;
   let release;

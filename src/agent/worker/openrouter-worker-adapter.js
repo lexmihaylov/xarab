@@ -1,6 +1,13 @@
+import { withProviderInactivity } from "./provider-inactivity.js";
+
 const URL = "https://openrouter.ai/api/v1/chat/completions";
 
-export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) {
+export function createOpenRouterWorkerAdapter({
+  getApiKey,
+  fetchImpl = fetch,
+  inactivityTimeoutMs = 60_000,
+  maxInactivityRetries = 2,
+}) {
   async function run({
     model,
     instructions,
@@ -10,6 +17,7 @@ export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) 
     onText = () => {},
     onTextDelta,
     onEvent = () => {},
+    inactivityRetries = maxInactivityRetries,
   }) {
     const key = getApiKey();
     if (!key) throw new Error("Connect OpenRouter in /connect first.");
@@ -56,93 +64,120 @@ export function createOpenRouterWorkerAdapter({ getApiKey, fetchImpl = fetch }) 
     let usedTool = false;
     while (true) {
       if (signal?.aborted) throw signal.reason ?? new Error("Request cancelled.");
-      const response = await fetchImpl(URL, {
-        method: "POST",
-        headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          model,
-          messages,
-          stream: true,
-          ...(definitions.length ? { tools: definitions } : {}),
-        }),
+      const { text, calls } = await withProviderInactivity({
         signal,
-      });
-      if (!response.ok) {
-        let detail = "";
-        try {
-          const body = await response.text();
-          const message = JSON.parse(body)?.error?.message;
-          if (typeof message === "string")
-            detail = message.replace(/[\r\n\x00-\x1f\x7f]/g, " ").slice(0, 300);
-        } catch {
-          // A non-JSON error body is not safe to display in the conversation.
-        }
-        const retryAfter = response.headers.get("retry-after");
-        const retry = /^\d{1,6}$/.test(retryAfter ?? "")
-          ? ` Retry after ${retryAfter} seconds.`
-          : "";
-        throw new Error(
-          `OpenRouter request failed (${response.status}).${detail ? ` ${detail}` : ""}${retry}`,
-        );
-      }
-      if (!response.body?.getReader) throw new Error("OpenRouter did not return a stream.");
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let text = "";
-      const calls = new Map();
-      let finished = false;
-      const consume = (block) => {
-        const data = block
-          .split(/\r?\n/)
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n");
-        if (!data) return;
-        if (data === "[DONE]") {
-          finished = true;
-          return;
-        }
-        let event;
-        try {
-          event = JSON.parse(data);
-        } catch {
-          throw new Error("OpenRouter returned malformed stream data.");
-        }
-        if (event.error)
-          throw new Error(`OpenRouter stream failed (${event.error.code ?? "unknown_error"}).`);
-        const delta = event.choices?.[0]?.delta;
-        if (typeof delta?.content === "string") {
-          text += delta.content;
-          if (onTextDelta) onTextDelta(delta.content);
-          else onText(delta.content);
-        }
-        for (const call of delta?.tool_calls ?? []) {
-          const current = calls.get(call.index) ?? {
-            id: "",
-            function: { name: "", arguments: "" },
+        timeoutMs: inactivityTimeoutMs,
+        maxRetries: inactivityRetries,
+        provider: "OpenRouter",
+        onRetry: (retry) => onEvent({ type: "provider_retry", provider: "OpenRouter", ...retry }),
+        operation: async ({ signal: requestSignal, activity, attempt }) => {
+          let retryActivityReported = false;
+          const response = await fetchImpl(URL, {
+            method: "POST",
+            headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+            body: JSON.stringify({
+              model,
+              messages,
+              stream: true,
+              ...(definitions.length ? { tools: definitions } : {}),
+            }),
+            signal: requestSignal,
+          });
+          requestSignal.throwIfAborted();
+          if (!response.ok) {
+            let detail = "";
+            try {
+              const body = await response.text();
+              const message = JSON.parse(body)?.error?.message;
+              if (typeof message === "string")
+                detail = message.replace(/[\r\n\x00-\x1f\x7f]/g, " ").slice(0, 300);
+            } catch {
+              // A non-JSON error body is not safe to display in the conversation.
+            }
+            const retryAfter = response.headers.get("retry-after");
+            const retry = /^\d{1,6}$/.test(retryAfter ?? "")
+              ? ` Retry after ${retryAfter} seconds.`
+              : "";
+            throw new Error(
+              `OpenRouter request failed (${response.status}).${detail ? ` ${detail}` : ""}${retry}`,
+            );
+          }
+          if (!response.body?.getReader) throw new Error("OpenRouter did not return a stream.");
+          const reader = response.body.getReader();
+          const cancelReader = () => {
+            void reader.cancel?.().catch(() => {});
           };
-          if (call.id) current.id = call.id;
-          if (call.function?.name) current.function.name += call.function.name;
-          if (call.function?.arguments) current.function.arguments += call.function.arguments;
-          calls.set(call.index, current);
-        }
-      };
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const blocks = buffer.split(/\r?\n\r?\n/);
-          buffer = blocks.pop();
-          for (const block of blocks) consume(block);
-        }
-        buffer += decoder.decode();
-        if (buffer.trim()) consume(buffer);
-      } finally {
-        reader.releaseLock();
-      }
-      if (!finished) throw new Error("OpenRouter stream ended unexpectedly.");
+          requestSignal.addEventListener("abort", cancelReader, { once: true });
+          if (requestSignal.aborted) cancelReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let text = "";
+          const calls = new Map();
+          let finished = false;
+          const consume = (block) => {
+            const data = block
+              .split(/\r?\n/)
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).trimStart())
+              .join("\n");
+            if (!data) return;
+            if (data === "[DONE]") {
+              finished = true;
+              return;
+            }
+            let event;
+            try {
+              event = JSON.parse(data);
+            } catch {
+              throw new Error("OpenRouter returned malformed stream data.");
+            }
+            if (requestSignal.aborted) return;
+            if (event.error)
+              throw new Error(`OpenRouter stream failed (${event.error.code ?? "unknown_error"}).`);
+            const delta = event.choices?.[0]?.delta;
+            if (delta && Object.keys(delta).length) {
+              activity({ output: Boolean(delta.content || delta.tool_calls?.length) });
+              if (attempt > 0 && !retryActivityReported) {
+                retryActivityReported = true;
+                onEvent({ type: "provider_activity", provider: "OpenRouter" });
+              }
+            }
+            if (typeof delta?.content === "string") {
+              text += delta.content;
+              if (onTextDelta) onTextDelta(delta.content);
+              else onText(delta.content);
+            }
+            for (const call of delta?.tool_calls ?? []) {
+              const current = calls.get(call.index) ?? {
+                id: "",
+                function: { name: "", arguments: "" },
+              };
+              if (call.id) current.id = call.id;
+              if (call.function?.name) current.function.name += call.function.name;
+              if (call.function?.arguments) current.function.arguments += call.function.arguments;
+              calls.set(call.index, current);
+            }
+          };
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const blocks = buffer.split(/\r?\n\r?\n/);
+              buffer = blocks.pop();
+              for (const block of blocks) consume(block);
+              if (finished) break;
+            }
+            buffer += decoder.decode();
+            if (buffer.trim()) consume(buffer);
+          } finally {
+            requestSignal.removeEventListener("abort", cancelReader);
+            reader.releaseLock();
+          }
+          if (!finished) throw new Error("OpenRouter stream ended unexpectedly.");
+          return { text, calls };
+        },
+      });
       if (!calls.size) {
         if (
           /\bto=functions?\.[a-zA-Z0-9_-]+/i.test(text) ||

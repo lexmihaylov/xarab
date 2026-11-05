@@ -185,7 +185,7 @@ export function createWorker({
   }
 
   function complete({ tier, instructions, input, ...request }) {
-    return execute({ ...request, tier, instructions, input, tools: {} });
+    return execute({ ...request, tier, instructions, input, tools: {}, inactivityRetries: 0 });
   }
 
   function getTierInfo(tier) {
@@ -250,17 +250,16 @@ export function buildWorkerHistory(messages = [], currentInput) {
       // Keep call/result records paired. In particular, interrupted calls have no
       // result and must not be replayed as dangling function calls.
       if (index < toolBoundary || !part.result) continue;
-      if (EDITING_TOOLS.has(part.toolName)) {
-        history.push({ role: "assistant", content: historicalEditRecord(part) });
-        continue;
-      }
+      const editing = EDITING_TOOLS.has(part.toolName);
+      // Historical edit arguments can contain entire files. Keep the structured
+      // call/result pair, but replay only the result and bounded diff preview.
       history.push({
         type: "tool_call",
         callId: part.callId,
         name: part.toolName,
-        arguments: part.params ?? {},
+        arguments: editing ? {} : (part.params ?? {}),
       });
-      const output = String(part.result.output ?? "");
+      const output = editing ? historicalEditRecord(part) : String(part.result.output ?? "");
       history.push({
         type: "tool_result",
         callId: part.callId,

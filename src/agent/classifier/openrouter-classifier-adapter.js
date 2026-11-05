@@ -10,6 +10,7 @@ export function createOpenRouterClassifierAdapter({ model, getApiKey, fetchImpl 
         instructions,
         input,
         signal,
+        inactivityRetries: 0,
         onText: (chunk) => {
           text += chunk;
         },

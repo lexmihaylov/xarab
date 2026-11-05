@@ -77,7 +77,7 @@ export function createEditTool({ workspace = process.cwd(), onEvent = () => {} }
           error.message,
         );
         onEvent({ type: denied ? "denied" : "error", path: displayPath, message: error.message });
-        return `Error editing ${displayPath}: ${error.code === "ENOENT" ? "file or parent directory does not exist" : error.message}`;
+        return `Error: editing ${displayPath}: ${error.code === "ENOENT" ? "file or parent directory does not exist" : error.message}`;
       }
     },
   };

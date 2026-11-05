@@ -543,6 +543,13 @@ export function createAssistantController({
         input: requestText,
         signal: abortController.signal,
         onEvent(event) {
+          if (event.type === "provider_retry") {
+            updateStatus(
+              `${event.provider} response stalled; retrying (${event.attempt}/${event.maxRetries})…`,
+            );
+            return;
+          }
+          if (status.includes("response stalled; retrying")) updateStatus("Worker generating…");
           if (!tracksUsage || !["response.completed", "response.done"].includes(event.type)) return;
           const response = event.response;
           if (!response || (response.id && usageResponses.has(response.id))) return;
@@ -672,6 +679,8 @@ export function createAssistantController({
         prompt: promptText,
         recentMessages: messages,
         signal: routingController.signal,
+        onRetry: ({ attempt, maxRetries }) =>
+          updateStatus(`Classification timed out; retrying (${attempt}/${maxRetries})…`),
       });
       if (routingController.signal.aborted) return { cancelled: true };
       if (!classification?.valid || ![1, 2, 3].includes(classification.tier))

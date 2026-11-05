@@ -8,6 +8,59 @@ import {
   TIER_CLASSIFIER_INSTRUCTIONS,
 } from "../src/agent/classifier/index.js";
 
+test("classifier retries timed-out attempts and ignores late results", async () => {
+  const signals = [];
+  const retries = [];
+  let finishFirst;
+  const classifier = createClassifier({
+    timeoutMs: 10,
+    retryDelayMs: 0,
+    getAssignment: () => ({ provider: "openai", model: "test" }),
+    openAIAdapterFactory: () => ({
+      run({ signal }) {
+        signals.push(signal);
+        if (signals.length === 1) return new Promise((resolve) => (finishFirst = resolve));
+        return '{"tier":2,"rationale":"bounded"}';
+      },
+    }),
+  });
+  const result = await classifier.classify({
+    prompt: "test",
+    onRetry: (event) => retries.push(event),
+  });
+  finishFirst('{"tier":1,"rationale":"late"}');
+  assert.equal(result.tier, 2);
+  assert.equal(signals[0].aborted, true);
+  assert.equal(signals.length, 2);
+  assert.equal(retries.length, 1);
+  await classifier.dispose();
+});
+
+test("classifier stops after timeout limit and never retries cancellation", async () => {
+  let runs = 0;
+  const classifier = createClassifier({
+    timeoutMs: 5,
+    retryDelayMs: 0,
+    maxRetries: 1,
+    getAssignment: () => ({ provider: "openai", model: "test" }),
+    openAIAdapterFactory: () => ({
+      run: () => {
+        runs++;
+        return new Promise(() => {});
+      },
+    }),
+  });
+  await assert.rejects(classifier.classify({ prompt: "test" }), /timed out/);
+  assert.equal(runs, 2);
+  const controller = new AbortController();
+  const pending = classifier.classify({ prompt: "cancel", signal: controller.signal });
+  await new Promise((resolve) => setImmediate(resolve));
+  controller.abort(new Error("cancelled by user"));
+  await assert.rejects(pending, /cancelled by user/);
+  await classifier.dispose();
+  assert.equal(runs, 3);
+});
+
 test("shared classifier waits for in-flight work before replacing its adapter", async () => {
   let assignment = { provider: "openai", model: "one" };
   let release;

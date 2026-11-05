@@ -3,6 +3,20 @@ import { randomUUID } from "node:crypto";
 const MAX_INPUT = 32 * 1024;
 const MAX_OUTPUT = 16 * 1024;
 
+async function waitForTask(operation, signal) {
+  let abort;
+  const cancelled = new Promise((_, reject) => {
+    abort = () => reject(signal.reason ?? new Error("Task cancelled."));
+    signal.addEventListener("abort", abort, { once: true });
+    if (signal.aborted) abort();
+  });
+  try {
+    return await Promise.race([operation, cancelled]);
+  } finally {
+    signal.removeEventListener("abort", abort);
+  }
+}
+
 function validateTask({ mode, brief, input, instructions, mcpServers, parse, onProgress }) {
   if (!["utility", "agentic"].includes(mode)) throw new Error("Invalid task mode.");
   if (
@@ -114,6 +128,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
     parse = (text) => text,
     onProgress = () => {},
     mcpServers = [],
+    timeoutMs: taskTimeoutMs = timeoutMs,
   }) {
     if (closed) throw new Error("Task runner is closed.");
     validateTask({ mode, brief, input, instructions, mcpServers, parse, onProgress });
@@ -146,7 +161,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
             failureStatus = "timed-out";
             timeoutSnapshot = snapshot();
             controller.abort(new Error("Task timed out."));
-          }, timeoutMs)
+          }, taskTimeoutMs)
         : undefined;
     timer?.unref?.();
     const check = () => {
@@ -181,6 +196,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
         worker = createWorker({
           mode,
           onToolEvent: (name, event) => {
+            if (controller.signal.aborted) return;
             if (name === "approval") approvalPending = event?.type === "pending";
             else if (["invoked", "finished"].includes(event?.type)) {
               lastTool = {
@@ -197,7 +213,7 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
           throw new Error(`Task worker tier ${tier} is not configured.`);
         phase = "running";
         onProgress({ id, type: "status", status: "running" });
-        await executeWorker({
+        const operation = executeWorker({
           worker,
           mode,
           tier,
@@ -207,12 +223,19 @@ export function createTaskRunner({ classify, createWorker, timeoutMs = 120_000, 
           mcpServers,
           signal: controller.signal,
           output,
-          onAssignment: (assignment) => onProgress({ id, type: "assignment", ...assignment }),
+          onAssignment: (assignment) => {
+            if (!controller.signal.aborted) onProgress({ id, type: "assignment", ...assignment });
+          },
         });
+        if (mode === "utility") await waitForTask(operation, controller.signal);
+        else await operation;
         check();
         if (!output.text.trim()) throw new Error("Task returned empty output.");
         phase = "parsing";
-        const value = await parse(output.text.trim());
+        const parsing = Promise.resolve().then(() => parse(output.text.trim()));
+        const value = await (mode === "utility"
+          ? waitForTask(parsing, controller.signal)
+          : parsing);
         check();
         result = { id, status: "completed", value };
       } catch (error) {

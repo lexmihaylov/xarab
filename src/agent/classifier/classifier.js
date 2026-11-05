@@ -9,6 +9,9 @@ export function createClassifier({
   localAdapterFactory,
   openAIAdapterFactory,
   openRouterAdapterFactory,
+  timeoutMs = 30_000,
+  maxRetries = 2,
+  retryDelayMs = 250,
 }) {
   const adapters = new Map();
   let disposed = false;
@@ -83,17 +86,51 @@ export function createClassifier({
         await reconcileAdapters(assignment);
         if (!assignment?.model) return null;
         const adapter = getAdapter(assignment);
-        const output = await adapter.run({
-          instructions: TIER_CLASSIFIER_INSTRUCTIONS,
-          input: [
-            {
-              role: "user",
-              content: buildTierClassificationPrompt(input),
-            },
-          ],
-          signal: input.signal,
-        });
-        return parseTierClassification(output);
+        for (let attempt = 0; ; attempt++) {
+          const controller = new AbortController();
+          const relay = () => controller.abort(input.signal.reason);
+          input.signal?.addEventListener("abort", relay, { once: true });
+          if (input.signal?.aborted) relay();
+          const timeout = new Error(`Classification timed out after ${timeoutMs / 1000} seconds.`);
+          const timer = setTimeout(() => controller.abort(timeout), timeoutMs);
+          let abort;
+          try {
+            const cancelled = new Promise((_, reject) => {
+              abort = () => reject(controller.signal.reason);
+              controller.signal.addEventListener("abort", abort, { once: true });
+              if (controller.signal.aborted) abort();
+            });
+            const output = await Promise.race([
+              adapter.run({
+                instructions: TIER_CLASSIFIER_INSTRUCTIONS,
+                input: [{ role: "user", content: buildTierClassificationPrompt(input) }],
+                signal: controller.signal,
+              }),
+              cancelled,
+            ]);
+            return parseTierClassification(output);
+          } catch (error) {
+            if (input.signal?.aborted) throw input.signal.reason ?? error;
+            if (controller.signal.reason !== timeout || attempt >= maxRetries) throw error;
+            input.onRetry?.({ attempt: attempt + 1, maxRetries });
+            await new Promise((resolve, reject) => {
+              const abortDelay = () => {
+                clearTimeout(delay);
+                reject(input.signal.reason ?? new Error("Classification cancelled."));
+              };
+              const delay = setTimeout(() => {
+                input.signal?.removeEventListener("abort", abortDelay);
+                resolve();
+              }, retryDelayMs);
+              input.signal?.addEventListener("abort", abortDelay, { once: true });
+              if (input.signal?.aborted) abortDelay();
+            });
+          } finally {
+            clearTimeout(timer);
+            controller.signal.removeEventListener("abort", abort);
+            input.signal?.removeEventListener("abort", relay);
+          }
+        }
       }, input.signal);
     },
     getInfo() {

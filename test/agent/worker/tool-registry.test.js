@@ -4,6 +4,30 @@ import { mkdtemp, writeFile, rm, realpath } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { createToolRegistry } from "../../../src/agent/worker/tool-registry.js";
+import { buildWorkerHistory } from "../../../src/agent/worker/worker.js";
+
+test("edit exceptions are stored and replayed as failures", async () => {
+  const messages = [];
+  const agentMessage = { type: "agent", parts: [] };
+  const { tools } = createToolRegistry({
+    workspace: process.cwd(),
+    configStore: { getApiKey: () => undefined },
+    onToolEvent: () => {},
+    getMessages: () => messages,
+    getCurrentAgentMessage: () => agentMessage,
+    sessionChanged: () => {},
+    notify: () => {},
+  });
+  const result = await tools.edit.handler(
+    { path: "../outside.txt", oldString: "a", newString: "b" },
+    { callId: "edit-1" },
+  );
+  assert.equal(result.ok, false);
+  assert.match(result.output, /^Error: editing /);
+  assert.equal(agentMessage.parts[0].status, "error");
+  assert.equal(agentMessage.parts[0].result.ok, false);
+  assert.match(buildWorkerHistory(messages)[1].output, /Status: error/);
+});
 
 test("skill instructions reach the model but are omitted from the feed and stored result", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "xarab-skill-feed-"));

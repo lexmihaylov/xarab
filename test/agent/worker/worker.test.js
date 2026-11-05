@@ -290,15 +290,22 @@ test("worker history replays editing results and diff previews without arguments
     { type: "user", message: "Change the file" },
     { type: "agent", parts },
   ]);
-  assert.equal(history.length, 5);
-  for (const [index, item] of history.slice(1).entries()) {
-    assert.equal(item.role, "assistant");
-    assert.match(item.content, new RegExp(`Historical ${names[index]} tool result`));
-    assert.match(item.content, /Status: success/);
-    assert.match(item.content, /\+new/);
-    assert.doesNotMatch(item.content, /large-secret-argument/);
+  assert.equal(history.length, 9);
+  for (const [index, name] of names.entries()) {
+    const call = history[1 + index * 2];
+    const result = history[2 + index * 2];
+    assert.equal(call.type, "tool_call");
+    assert.equal(call.name, name);
+    assert.deepEqual(call.arguments, {});
+    assert.equal(result.type, "tool_result");
+    assert.equal(result.callId, call.callId);
+    assert.equal(result.ok, true);
+    assert.match(result.output, new RegExp(`Historical ${name} tool result`));
+    assert.match(result.output, /Status: success/);
+    assert.match(result.output, /\+new/);
+    assert.doesNotMatch(JSON.stringify([call, result]), /large-secret-argument/);
   }
-  assert.match(history[1].content, /Preview shortened/);
+  assert.match(history[2].output, /Preview shortened/);
   assert.deepEqual(parts, original);
 });
 
@@ -326,12 +333,15 @@ test("editing history preserves failures and supports older or interrupted sessi
       ],
     },
   ]);
-  assert.equal(history.length, 4);
+  assert.equal(history.length, 6);
   assert.equal(history[0].content, "Before");
-  assert.match(history[1].content, /Status: error\nError: no match/);
-  assert.match(history[2].content, /Wrote file\.js/);
-  assert.doesNotMatch(history[2].content, /Diff preview/);
-  assert.equal(history[3].content, "After");
+  assert.deepEqual(history[1].arguments, {});
+  assert.equal(history[2].callId, history[1].callId);
+  assert.equal(history[2].ok, false);
+  assert.match(history[2].output, /Status: error\nError: no match/);
+  assert.match(history[4].output, /Wrote file\.js/);
+  assert.doesNotMatch(history[4].output, /Diff preview/);
+  assert.equal(history[5].content, "After");
   assert.doesNotMatch(JSON.stringify(history), /private|interrupted/);
 });
 
@@ -357,10 +367,10 @@ test("editing diff previews are not subject to an aggregate replay cap", () => {
       ],
     },
   ]);
-  assert.equal(history.length, 3);
-  assert.match(history[0].content, /Historical write tool result/);
-  assert.equal(history[1].callId, "recent");
+  assert.equal(history.length, 4);
+  assert.match(history[1].output, /Historical write tool result/);
   assert.equal(history[2].callId, "recent");
+  assert.equal(history[3].callId, "recent");
 });
 
 test("worker history retains tool activity from the last ten user turns", () => {

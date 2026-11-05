@@ -1,4 +1,5 @@
 import WebSocket from "ws";
+import { withProviderInactivity } from "./provider-inactivity.js";
 
 const CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex";
 const RESPONSES_URL = `${CODEX_BASE_URL}/responses`;
@@ -7,6 +8,8 @@ export function createOpenAIResponsesWorkerAdapter({
   getCredentials,
   fetchImpl = fetch,
   webSocketFactory = (url, options) => new WebSocket(url, options),
+  inactivityTimeoutMs = 60_000,
+  maxInactivityRetries = 2,
 }) {
   async function run({
     model,
@@ -18,6 +21,7 @@ export function createOpenAIResponsesWorkerAdapter({
     onText = () => {},
     onTextDelta,
     onEvent = () => {},
+    inactivityRetries = maxInactivityRetries,
   }) {
     if (!model) throw new Error("Choose an OpenAI model first.");
     const credentials = await getCredentials();
@@ -68,61 +72,112 @@ export function createOpenAIResponsesWorkerAdapter({
         };
         let streamedChunks;
         let streamedText;
-        if (useWebSocket) {
-          try {
-            const body = previousResponseId
-              ? {
-                  ...requestBody,
-                  input: pendingToolOutputs,
-                  previous_response_id: previousResponseId,
+        completedResponse = undefined;
+        await withProviderInactivity({
+          signal,
+          timeoutMs: inactivityTimeoutMs,
+          maxRetries: inactivityRetries,
+          provider: "OpenAI",
+          onRetry: (retry) => {
+            if (useWebSocket) {
+              socket?.terminate();
+              socket = undefined;
+              previousResponseId = undefined;
+            }
+            onEvent({ type: "provider_retry", provider: "OpenAI", ...retry });
+          },
+          operation: async ({ signal: requestSignal, activity, attempt }) => {
+            if (useWebSocket) {
+              try {
+                if (!socket) {
+                  socket = await openResponsesWebSocket({
+                    webSocketFactory,
+                    credentials,
+                    sessionID,
+                    signal: requestSignal,
+                  });
                 }
-              : requestBody;
-            ({
-              response: completedResponse,
-              streamedChunks,
-              streamedText,
-            } = await requestOverWebSocket(socket, body, {
-              onText,
-              onTextDelta,
-              onEvent,
-              signal,
-            }));
-          } catch (error) {
-            if (signal?.aborted) throw abortError();
-            if (!error.webSocketFallback || error.outputStarted) throw error;
-            useWebSocket = false;
-            socket?.terminate();
-            socket = undefined;
-            continue;
-          }
-        } else {
-          const response = await fetchImpl(RESPONSES_URL, {
-            method: "POST",
-            headers: codexHeaders(credentials, {
-              "content-type": "application/json",
-              accept: "text/event-stream",
-              "openai-beta": "responses=experimental",
-            }),
-            body: JSON.stringify({ ...requestBody, stream: true }),
-            signal,
-          });
-          if (!response.ok) throw await responseError(response, "OpenAI Responses request");
-          streamedChunks = [];
-          streamedText = "";
-          completedResponse = await readResponseStream(response, {
-            onText(chunk) {
-              streamedChunks.push(chunk);
-            },
-            onTextDelta: onTextDelta
-              ? (chunk) => {
-                  streamedText += chunk;
-                  onTextDelta(chunk);
-                }
-              : undefined,
-            onEvent,
-            signal,
-          });
-        }
+                const body = previousResponseId
+                  ? {
+                      ...requestBody,
+                      input: pendingToolOutputs,
+                      previous_response_id: previousResponseId,
+                    }
+                  : requestBody;
+                ({
+                  response: completedResponse,
+                  streamedChunks,
+                  streamedText,
+                } = await requestOverWebSocket(socket, body, {
+                  onText,
+                  onTextDelta,
+                  onEvent: (event) => {
+                    if (requestSignal.aborted) return;
+                    activity({
+                      output:
+                        event.type === "response.output_text.delta" ||
+                        event.type?.includes("function_call") ||
+                        event.item?.type === "function_call",
+                    });
+                    onEvent(event);
+                  },
+                  signal: requestSignal,
+                }));
+              } catch (error) {
+                if (requestSignal.aborted) throw requestSignal.reason;
+                if (signal?.aborted) throw abortError();
+                if (attempt > 0 && !socket) throw error;
+                if (!error.webSocketFallback || error.outputStarted) throw error;
+                useWebSocket = false;
+                socket?.terminate();
+                socket = undefined;
+                return;
+              }
+            } else {
+              const response = await fetchImpl(RESPONSES_URL, {
+                method: "POST",
+                headers: codexHeaders(credentials, {
+                  "content-type": "application/json",
+                  accept: "text/event-stream",
+                  "openai-beta": "responses=experimental",
+                }),
+                body: JSON.stringify({ ...requestBody, stream: true }),
+                signal: requestSignal,
+              });
+              requestSignal.throwIfAborted();
+              if (!response.ok) throw await responseError(response, "OpenAI Responses request");
+              streamedChunks = [];
+              streamedText = "";
+              const receivedResponse = await readResponseStream(response, {
+                onText(chunk) {
+                  if (requestSignal.aborted) return;
+                  streamedChunks.push(chunk);
+                },
+                onTextDelta: onTextDelta
+                  ? (chunk) => {
+                      if (requestSignal.aborted) return;
+                      streamedText += chunk;
+                      onTextDelta(chunk);
+                    }
+                  : undefined,
+                onEvent: (event) => {
+                  if (requestSignal.aborted) return;
+                  activity({
+                    output:
+                      event.type === "response.output_text.delta" ||
+                      event.type?.includes("function_call") ||
+                      event.item?.type === "function_call",
+                  });
+                  onEvent(event);
+                },
+                signal: requestSignal,
+              });
+              requestSignal.throwIfAborted();
+              completedResponse = receivedResponse;
+            }
+          },
+        });
+        if (!useWebSocket && !completedResponse) continue;
         if (!completedResponse?.output || !Array.isArray(completedResponse.output))
           throw new Error("OpenAI stream completed without a response output.");
 
@@ -242,6 +297,11 @@ export function createOpenAIResponsesWorkerAdapter({
 async function readResponseStream(response, { onText, onTextDelta, onEvent, signal }) {
   if (!response.body?.getReader) throw new Error("OpenAI response did not provide a stream.");
   const reader = response.body.getReader();
+  const cancelReader = () => {
+    void reader.cancel?.().catch(() => {});
+  };
+  signal?.addEventListener("abort", cancelReader, { once: true });
+  if (signal?.aborted) cancelReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let completed;
@@ -295,10 +355,11 @@ async function readResponseStream(response, { onText, onTextDelta, onEvent, sign
         buffer = buffer.slice(separator + delimiter.length);
         handleEventBlock(block);
       }
-      if (done) break;
+      if (done || completed) break;
     }
     if (buffer.trim()) handleEventBlock(buffer);
   } finally {
+    signal?.removeEventListener("abort", cancelReader);
     reader.releaseLock?.();
   }
   if (!completed) throw new Error("OpenAI stream ended without response.completed.");
@@ -365,7 +426,10 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
     };
     const onError = (error) => fail(webSocketError(error));
     const onClose = () => fail(webSocketError());
-    const onAbort = () => fail(abortError());
+    const onAbort = () => {
+      fail(abortError());
+      socket.terminate();
+    };
     const onMessage = (data) => {
       try {
         const event = JSON.parse(data.toString());
