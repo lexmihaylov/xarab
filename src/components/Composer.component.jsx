@@ -266,8 +266,8 @@ export function Composer({
           >
             <text fg={colors.hint}>
               {contextTokens === null
-                ? "Context unavailable"
-                : `${contextTokens.toLocaleString("en-US")} tokens`}
+                ? "▤ Context unavailable"
+                : `▤ ${contextTokens.toLocaleString("en-US")} tokens`}
             </text>
           </box>
         )}

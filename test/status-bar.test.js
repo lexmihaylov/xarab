@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { execFileSync } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import React, { act } from "react";
 import { testRender } from "@opentui/react/test-utils";
 import { StatusBar } from "../src/components/StatusBar.component.jsx";
@@ -19,7 +23,7 @@ test("status bar shows title and status left, workspace right", async () => {
     { sessionTitle: "Conversation", status: "Ready", workspace: "/home/project" },
     60,
   );
-  assert.match(line, /^ Conversation\s+\/home\/project\s*$/);
+  assert.match(line, /^ ◷ Conversation\s+⌂ \/home\/project\s*$/);
   assert.doesNotMatch(line, /Session:/);
 });
 
@@ -29,7 +33,7 @@ test("routine ready and worker-generating statuses are omitted", async () => {
       { sessionTitle: "Conversation", status, workspace: "/home/project" },
       60,
     );
-    assert.match(line, /^ Conversation\s+\/home\/project\s*$/);
+    assert.match(line, /^ ◷ Conversation\s+⌂ \/home\/project\s*$/);
     assert.doesNotMatch(line, /Worker generating|Ready|Session:/);
   }
 });
@@ -48,7 +52,7 @@ test("status bar truncates long titles to fit narrow terminals", async () => {
     24,
   );
   assert.doesNotMatch(line, /Ready|Worker generating|Session:/);
-  assert.match(line, /A very l\.\.\./);
+  assert.match(line, /◷ A very\.\.\./);
   assert.match(line, /\/a\//);
   assert.ok(line.length <= 24, line);
 
@@ -71,4 +75,32 @@ test("notice and error do not replace session details", async () => {
   assert.match(line, /Title/);
   assert.match(line, /workspace/);
   assert.doesNotMatch(line, /Notice|Error|Ready/);
+});
+
+test("shows the Git branch beside the workspace within the terminal width", async () => {
+  const workspace = await mkdtemp(path.join(os.tmpdir(), "xarab-status-"));
+  execFileSync("git", ["init", "-b", "feature-long-name"], { cwd: workspace, stdio: "ignore" });
+  const view = await testRender(
+    React.createElement(StatusBar, { workspace, sessionTitle: "Title" }),
+    {
+      width: 60,
+      height: 3,
+    },
+  );
+  try {
+    let line = "";
+    for (let i = 0; i < 50; i++) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      });
+      await view.flush();
+      line = view.captureCharFrame().split("\n")[0];
+      if (line.includes("⎇")) break;
+    }
+    assert.match(line, /⌂ .* ⎇ feature/);
+    assert.ok(line.length <= 60);
+  } finally {
+    await act(async () => view.dispose());
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
