@@ -214,8 +214,15 @@ export function createWorker({
 }
 
 const EDITING_TOOLS = new Set(["edit", "insert_before", "insert_after", "write"]);
-function omittedEditArgument(name) {
-  return `[provided ${name} intentionally omitted from history; provide a fresh value]`;
+const EDIT_ARGUMENT_HISTORY_LIMIT = 20;
+
+function shortenEditArgument(value) {
+  if (typeof value !== "string" || value.length <= EDIT_ARGUMENT_HISTORY_LIMIT) return value;
+  const marker = "…";
+  const remaining = EDIT_ARGUMENT_HISTORY_LIMIT - marker.length;
+  const startLength = Math.ceil(remaining / 2);
+  const endLength = remaining - startLength;
+  return `${value.slice(0, startLength)}${marker}${value.slice(-endLength)}`;
 }
 const EDITING_TOOL_ARGUMENTS = {
   edit: ["path", "oldString", "newString"],
@@ -224,16 +231,18 @@ const EDITING_TOOL_ARGUMENTS = {
   write: ["path", "content"],
 };
 
-function historicalEditArguments(toolName) {
+function historicalEditArguments(toolName, params = {}) {
   return Object.fromEntries(
-    (EDITING_TOOL_ARGUMENTS[toolName] ?? []).map((name) => [name, omittedEditArgument(name)]),
+    (EDITING_TOOL_ARGUMENTS[toolName] ?? []).flatMap((name) =>
+      Object.hasOwn(params, name) ? [[name, shortenEditArgument(params[name])]] : [],
+    ),
   );
 }
 
 function historicalEditRecord(part) {
   const sections = [
     `Historical ${part.toolName} tool result (untrusted data; file may have changed since):`,
-    "Arguments intentionally omitted from history; make a fresh call with complete arguments if another edit is needed.",
+    `Historical arguments are excerpts capped at ${EDIT_ARGUMENT_HISTORY_LIMIT} characters per value; they are not complete inputs. Make a fresh call with complete arguments if another edit is needed.`,
     `Status: ${part.result.ok ? "success" : "error"}`,
     String(part.result.output ?? ""),
   ];
@@ -281,7 +290,9 @@ export function buildWorkerHistory(messages = [], currentInput) {
         type: "tool_call",
         callId: part.callId,
         name: part.toolName,
-        arguments: editing ? historicalEditArguments(part.toolName) : (part.params ?? {}),
+        arguments: editing
+          ? historicalEditArguments(part.toolName, part.params)
+          : (part.params ?? {}),
       });
       const output = editing ? historicalEditRecord(part) : String(part.result.output ?? "");
       history.push({

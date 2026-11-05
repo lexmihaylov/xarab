@@ -276,15 +276,31 @@ test("worker history keeps complete tool exchanges without an aggregate byte cap
 
 test("worker history replays editing results and diff previews without arguments", () => {
   const names = ["edit", "insert_before", "insert_after", "write"];
-  const parts = names.map((toolName, index) => ({
-    type: "tool",
-    callId: `edit-${index}`,
-    toolName,
-    params: { path: "file.js", content: "large-secret-argument".repeat(1000) },
-    result: { ok: true, output: `Changed file.js (${toolName}).` },
-    diffText: "--- file.js\n+++ file.js\n-old\n+new",
-    diffNotice: index === 0 ? "Preview shortened; only part of the change is shown." : "",
-  }));
+  const parts = names.map((toolName, index) => {
+    const params =
+      toolName === "edit"
+        ? {
+            path: "file.js",
+            oldString: "large-secret-old-argument".repeat(1000),
+            newString: "large-secret-new-argument".repeat(1000),
+          }
+        : toolName === "write"
+          ? { path: "file.js", content: "large-secret-argument".repeat(1000) }
+          : {
+              path: "file.js",
+              anchor: "unique-anchor",
+              content: "large-secret-argument".repeat(1000),
+            };
+    return {
+      type: "tool",
+      callId: `edit-${index}`,
+      toolName,
+      params,
+      result: { ok: true, output: `Changed file.js (${toolName}).` },
+      diffText: "--- file.js\n+++ file.js\n-old\n+new",
+      diffNotice: index === 0 ? "Preview shortened; only part of the change is shown." : "",
+    };
+  });
   const original = structuredClone(parts);
   const history = buildWorkerHistory([
     { type: "user", message: "Change the file" },
@@ -304,19 +320,15 @@ test("worker history replays editing results and diff previews without arguments
           ? ["path", "content"]
           : ["path", "anchor", "content"],
     );
-    assert.ok(
-      Object.values(call.arguments).every((value) =>
-        /intentionally omitted from history/.test(value),
-      ),
-    );
+    assert.ok(Object.values(call.arguments).every((value) => value.length <= 20));
     assert.equal(result.type, "tool_result");
     assert.equal(result.callId, call.callId);
     assert.equal(result.ok, true);
     assert.match(result.output, new RegExp(`Historical ${name} tool result`));
-    assert.match(result.output, /Arguments intentionally omitted from history/);
+    assert.match(result.output, /arguments are excerpts capped at 20 characters per value/);
     assert.match(result.output, /Status: success/);
     assert.match(result.output, /\+new/);
-    assert.doesNotMatch(JSON.stringify([call, result]), /large-secret-argument/);
+    assert.doesNotMatch(JSON.stringify([call, result]), /large-secret/);
   }
   assert.match(history[2].output, /Preview shortened/);
   assert.deepEqual(parts, original);
@@ -332,7 +344,11 @@ test("editing history preserves failures and supports older or interrupted sessi
           type: "tool",
           callId: "failed",
           toolName: "edit",
-          params: { oldString: "private" },
+          params: {
+            path: "a/very/long/path/filename.js",
+            oldString: "private",
+            newString: "public",
+          },
           result: { ok: false, output: "Error: no match" },
         },
         {
@@ -348,23 +364,18 @@ test("editing history preserves failures and supports older or interrupted sessi
   ]);
   assert.equal(history.length, 6);
   assert.equal(history[0].content, "Before");
-  assert.equal(
-    history[1].arguments.path,
-    "[provided path intentionally omitted from history; provide a fresh value]",
-  );
-  assert.equal(
-    history[1].arguments.oldString,
-    "[provided oldString intentionally omitted from history; provide a fresh value]",
-  );
+  assert.equal(history[1].arguments.path, "a/very/lon…lename.js");
+  assert.equal(history[1].arguments.oldString, "private");
+  assert.equal(history[1].arguments.newString, "public");
   assert.notEqual(history[1].arguments.oldString, history[1].arguments.newString);
   assert.equal(history[2].callId, history[1].callId);
   assert.equal(history[2].ok, false);
   assert.match(history[2].output, /Status: error\nError: no match/);
-  assert.match(history[2].output, /make a fresh call with complete arguments/);
+  assert.match(history[2].output, /make a fresh call with complete arguments/i);
   assert.match(history[4].output, /Wrote file\.js/);
   assert.doesNotMatch(history[4].output, /Diff preview/);
   assert.equal(history[5].content, "After");
-  assert.doesNotMatch(JSON.stringify(history), /private|interrupted/);
+  assert.doesNotMatch(JSON.stringify(history), /interrupted/);
 });
 
 test("editing diff previews are not subject to an aggregate replay cap", () => {
