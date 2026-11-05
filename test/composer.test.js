@@ -19,14 +19,57 @@ test("shows loading and queue guidance while messages are queued", async () => {
   try {
     await view.flush();
     const frame = view.captureCharFrame();
-    assert.match(frame, /Queued \(1\)/);
-    assert.match(frame, /Follow-up request/);
+    assert.match(frame, /QUEUED · 1/);
+    assert.match(frame, /Ctrl\+X remove newest/);
+    assert.match(frame, /1  Follow-up request/);
     assert.match(frame, /Enter queue/);
     assert.match(frame, /Esc stop/);
     assert.doesNotMatch(frame, /PgUp|PgDn/);
     assert.match(frame, /█████/);
   } finally {
     await act(async () => view.dispose());
+  }
+});
+
+test("queue previews stay compact, explain paused queues, and summarize overflow", async () => {
+  const queuedMessages = Array.from({ length: 5 }, (_, index) => ({
+    id: `queued-${index + 1}`,
+    text: `Task ${index + 1} with\n multiple lines`,
+  }));
+  for (const state of [{ generating: true }, { generating: false }, { disabled: true }]) {
+    const view = await testRender(
+      React.createElement(Composer, {
+        ...state,
+        queuedMessages,
+        onStopGeneration: () => {},
+        onDraftChange: () => {},
+        onSubmit: () => {},
+      }),
+      { width: 36, height: 7 },
+    );
+    try {
+      await view.flush();
+      const lines = view.captureCharFrame().split("\n");
+      const frame = lines.join("\n");
+      assert.match(frame, /QUEUED · 5/);
+      assert.match(frame, /1  Task 1 with multiple lines/);
+      assert.match(frame, state.generating || state.disabled ? /\+3 more/ : /\+4 more/);
+      const queueStart = lines.findIndex((line) => line.includes("QUEUED · 5"));
+      const indicatorStart = lines.findIndex((line) => line.includes("[█████]"));
+      assert.ok(indicatorStart - queueStart <= 4, frame);
+      if (state.disabled) {
+        assert.doesNotMatch(frame, /Ctrl\+X remove newest/);
+      } else {
+        assert.match(frame, /Ctrl\+X remove newest/);
+      }
+      if (!state.generating && !state.disabled) {
+        assert.match(frame, /Paused · send a message to resume/);
+      } else {
+        assert.doesNotMatch(frame, /Paused ·/);
+      }
+    } finally {
+      await act(async () => view.dispose());
+    }
   }
 });
 
@@ -92,7 +135,7 @@ test("disabled state omits the redundant interrupt guidance row", async () => {
   try {
     await view.flush();
     const frame = view.captureCharFrame();
-    assert.match(frame, /Queued \(1\)/);
+    assert.match(frame, /QUEUED · 1/);
     assert.doesNotMatch(frame, /Ctrl\+C interrupt|Ctrl\+X|Esc stop|Enter send|Enter queue/);
   } finally {
     await act(async () => view.dispose());

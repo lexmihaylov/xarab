@@ -54,6 +54,10 @@ export function Composer({
   const selectedSuggestion = suggestions[Math.min(suggestionIndex, suggestions.length - 1)];
   const commandColumnWidth =
     suggestions.reduce((width, suggestion) => Math.max(width, suggestion.command.length), 0) + 3;
+  const queuePaused = queuedMessages.length > 0 && !generating && !disabled;
+  const queuePreviewLimit = queuePaused ? 1 : 2;
+  const queuePreviews = queuedMessages.slice(0, queuePreviewLimit);
+  const hiddenQueueCount = queuedMessages.length - queuePreviews.length;
 
   useEffect(() => {
     if (sessionRef.current === sessionId) return;
@@ -148,12 +152,20 @@ export function Composer({
     <box flexDirection="column" flexShrink={flexShrink}>
       {queuedMessages.length > 0 && (
         <box flexDirection="column" maxHeight={4} overflow="hidden">
-          <text
-            fg={colors.hint}
-          >{`Queued (${queuedMessages.length})${disabled ? "" : " · Ctrl+X removes newest"}${generating || disabled ? "" : " · send a message to resume"}`}</text>
-          {queuedMessages.slice(0, 3).map((item) => (
-            <text key={item.id} fg={colors.hint}>{`  ${item.text.replace(/\s+/g, " ")}`}</text>
+          <box flexDirection="row" justifyContent="space-between" width="100%" overflow="hidden">
+            <text fg={colors.label}>{`QUEUED · ${queuedMessages.length}`}</text>
+            {!disabled ? <text fg={colors.hint}>Ctrl+X remove newest</text> : null}
+          </box>
+          {queuePaused ? <text fg={colors.warning}>Paused · send a message to resume</text> : null}
+          {queuePreviews.map((item, index) => (
+            <text
+              key={item.id}
+              fg={colors.hint}
+            >{` ${index + 1}  ${item.text.replace(/\s+/g, " ")}`}</text>
           ))}
+          {hiddenQueueCount > 0 ? (
+            <text fg={colors.hint}>{` +${hiddenQueueCount} more`}</text>
+          ) : null}
         </box>
       )}
       {suggestions.length > 0 && (
