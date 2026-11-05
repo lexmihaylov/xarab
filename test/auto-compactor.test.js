@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createAutoCompactor } from "../src/agent/auto-compactor.js";
 
-function setup(initial) {
+function setup(initial, complete) {
   let messages = initial;
   let requests = 0;
   let lastRequest;
@@ -16,6 +16,7 @@ function setup(initial) {
       complete: async (request) => {
         requests++;
         lastRequest = request;
+        if (complete) return complete(request, requests);
         request.onTextDelta(`Summary ${requests}`);
       },
     },
@@ -67,6 +68,35 @@ test("auto-compacts at 50 user turns, retaining ten complete turns", async () =>
   assert.equal(await state.compactor.compact(), true);
   assert.equal(state.messages[1].message, "User 90");
   assert.equal(state.requests, 2);
+});
+test("auto-compaction retries timed-out summaries without keeping partial output", async () => {
+  let stale;
+  const state = setup(
+    Array.from({ length: 50 }, (_, i) => turn(i)).flat(),
+    async (request, count) => {
+      if (count === 1) {
+        request.onTextDelta("partial");
+        stale = request.onTextDelta;
+        throw Object.assign(new Error("stalled"), { code: "PROVIDER_INACTIVITY_TIMEOUT" });
+      }
+      stale("late");
+      request.onTextDelta("Recovered summary");
+    },
+  );
+  assert.equal(await state.compactor.compact(), true);
+  assert.equal(state.requests, 2);
+  assert.equal(state.messages[0].message, "Recovered summary");
+});
+
+test("auto-compaction preserves history when all retries time out", async () => {
+  const original = Array.from({ length: 50 }, (_, i) => turn(i)).flat();
+  const state = setup(original, async () => {
+    throw Object.assign(new Error("stalled"), { code: "PROVIDER_INACTIVITY_TIMEOUT" });
+  });
+  assert.equal(await state.compactor.compact(), false);
+  assert.equal(state.requests, 3);
+  assert.equal(state.messages[0].message, "User 0");
+  assert.equal(state.messages.at(-1).type, "system");
 });
 test("auto-compaction includes task final responses but not child activity", async () => {
   const messages = Array.from({ length: 50 }, (_, i) => turn(i)).flat();

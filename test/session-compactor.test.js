@@ -69,3 +69,40 @@ test("compaction transcript includes structured tool calls and results", async (
   assert.doesNotMatch(transcript, /Secret child activity/);
   assert.equal(compactedMessages.at(-1).message, "Summary with the safe mode value.");
 });
+
+test("manual compaction retries a timeout and discards the partial attempt", async () => {
+  let messages = [{ type: "user", message: "Hello" }];
+  let calls = 0;
+  const statuses = [];
+  const compactor = createSessionCompactor({
+    getMessages: () => messages,
+    setMessages: (next) => {
+      messages = next;
+    },
+    setCurrentAgentMessage: () => {},
+    addMessage: (message) => messages.push(message),
+    classifyForRouting: async () => ({ classification: { tier: 1 }, worker: { configured: true } }),
+    worker: {
+      async complete(request) {
+        if (++calls === 1) {
+          request.onTextDelta("partial");
+          throw Object.assign(new Error("stalled"), { code: "PROVIDER_INACTIVITY_TIMEOUT" });
+        }
+        request.onTextDelta("Complete summary");
+      },
+    },
+    sessionChanged: () => {},
+    notify: () => {},
+    updateStatus: (status) => statuses.push(status),
+    isGenerating: () => false,
+    isRouting: () => false,
+    isSessionOperation: () => false,
+    setGenerating: () => {},
+    getAbortController: () => undefined,
+    setAbortController: () => {},
+  });
+  await compactor.compact();
+  assert.equal(calls, 2);
+  assert.equal(messages.at(-1).message, "Complete summary");
+  assert.ok(statuses.some((status) => status.includes("retrying")));
+});

@@ -1,4 +1,5 @@
 import { getTheme } from "../utils/theme-engine.js";
+import { generateCompactionSummary } from "./compaction-summary.js";
 
 export function createSessionCompactor({
   getMessages,
@@ -90,28 +91,22 @@ export function createSessionCompactor({
     }
 
     const controller = new AbortController();
-    const chunks = [];
-    let sawDelta = false;
     setGenerating(true);
     setAbortController(controller);
     updateStatus("Compacting conversation…");
     try {
-      await worker.complete({
-        tier: classification.tier,
-        instructions:
-          "Create a concise Markdown summary of the conversation for a future assistant. Preserve the user's goals, decisions, constraints, important facts, files, commands, errors, and unresolved work. Do not address the user or add commentary; return only the summary.",
-        input: [{ role: "user", content: `Conversation to compact:\n\n${transcript}` }],
+      const summary = await generateCompactionSummary({
+        worker,
         signal: controller.signal,
-        onText(chunk) {
-          if (!sawDelta) chunks.push(chunk);
-        },
-        onTextDelta(chunk) {
-          sawDelta = true;
-          chunks.push(chunk);
+        onRetry: ({ attempt, maxRetries }) =>
+          updateStatus(`Compaction timed out; retrying (${attempt}/${maxRetries})…`),
+        request: {
+          tier: classification.tier,
+          instructions:
+            "Create a concise Markdown summary of the conversation for a future assistant. Preserve the user's goals, decisions, constraints, important facts, files, commands, errors, and unresolved work. Do not address the user or add commentary; return only the summary.",
+          input: [{ role: "user", content: `Conversation to compact:\n\n${transcript}` }],
         },
       });
-      const summary = chunks.join("").trim();
-      if (!summary) throw new Error("The compaction model returned an empty summary.");
       setMessages([
         {
           type: "system",

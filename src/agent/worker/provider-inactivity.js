@@ -14,6 +14,7 @@ export async function withProviderInactivity({
     let timer;
     let outputStarted = false;
     const timeout = new Error(`${provider} response stalled for ${timeoutMs / 1000} seconds.`);
+    timeout.code = "PROVIDER_INACTIVITY_TIMEOUT";
     const activity = ({ output = false } = {}) => {
       if (controller.signal.aborted) return;
       outputStarted ||= output;
@@ -39,9 +40,11 @@ export async function withProviderInactivity({
       if (signal?.aborted) throw signal.reason ?? error;
       if (controller.signal.reason !== timeout) throw error;
       if (outputStarted) {
-        throw new Error(
+        const error = new Error(
           `${timeout.message} Response stopped after partial output; review any displayed text and continue or retry manually.`,
         );
+        error.code = timeout.code;
+        throw error;
       }
       if (attempt >= maxRetries) throw timeout;
       await onRetry({ attempt: attempt + 1, maxRetries });
