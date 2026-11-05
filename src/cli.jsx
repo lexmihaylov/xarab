@@ -57,6 +57,7 @@ function renderApp(state) {
   return (
     <App
       state={state}
+      workspace={workspace}
       syntaxStyle={syntaxStyle}
       onSubmit={(value) => void controller.submit(value)}
       onAnswerQuestions={controller.answerQuestions}

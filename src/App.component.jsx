@@ -88,6 +88,7 @@ export function agentTimelineEntries(message, generating = false) {
 
 export function App({
   state,
+  workspace,
   syntaxStyle,
   onSubmit,
   onAnswerQuestions,
@@ -340,6 +341,7 @@ export function App({
         />
         <StatusBar
           status={state.status}
+          workspace={workspace}
           sessionTitle={state.currentSession?.title}
           sessionError={state.sessionError}
         />

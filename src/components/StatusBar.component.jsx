@@ -1,14 +1,22 @@
 import React, { useState } from "react";
 import { useOnResize, useRenderer } from "@opentui/react";
+import stringWidth from "string-width";
 
-function truncate(value, maxLength) {
-  if (maxLength <= 0) return "";
-  if (value.length <= maxLength) return value;
-  if (maxLength <= 3) return value.slice(0, maxLength);
-  return `${value.slice(0, maxLength - 3)}...`;
+function truncate(value, maxWidth) {
+  if (maxWidth <= 0) return "";
+  if (stringWidth(value) <= maxWidth) return value;
+  const suffix = maxWidth > 3 ? "..." : "";
+  let result = "";
+  for (const { segment } of new Intl.Segmenter(undefined, { granularity: "grapheme" }).segment(
+    value,
+  )) {
+    if (stringWidth(result + segment) > maxWidth - suffix.length) break;
+    result += segment;
+  }
+  return result + suffix;
 }
 
-export function StatusBar({ status, sessionTitle, sessionError, notice }) {
+export function StatusBar({ status, sessionTitle, sessionError, notice, workspace }) {
   const renderer = useRenderer();
   const [width, setWidth] = useState(renderer.width);
   useOnResize((nextWidth) => setWidth(nextWidth));
@@ -22,24 +30,32 @@ export function StatusBar({ status, sessionTitle, sessionError, notice }) {
     );
   }
 
-  const statusText = status || "Ready";
-  const prefix = sessionTitle ? "Session: " : "";
-  const separator = sessionTitle ? "  ·  " : "";
-  // Keep the title bounded even on wide terminals so status-bar information
-  // remains visually secondary to the rest of the bar.
-  const titleLimit = 32;
-  const availableTitleLength = Math.max(
-    0,
-    width - 2 - prefix.length - separator.length - statusText.length,
-  );
-  const visibleTitle = sessionTitle
-    ? truncate(sessionTitle, Math.min(titleLimit, availableTitleLength))
-    : "";
-  const details = `${prefix}${visibleTitle}${separator}${statusText}`;
+  const available = Math.max(0, width - 2);
+  const statusText = truncate(status || "Ready", available);
+  // Reserve room for status first, then share the remaining space with the workspace.
+  const workspaceLimit =
+    workspace && available > stringWidth(statusText) + 1
+      ? Math.min(stringWidth(workspace), Math.floor((available - stringWidth(statusText) - 1) / 2))
+      : 0;
+  const visibleWorkspace = truncate(workspace || "", workspaceLimit);
+  const leftLimit = available - (visibleWorkspace ? stringWidth(visibleWorkspace) + 1 : 0);
+  const separator = "  ·  ";
+  const titleLimit = Math.min(32, leftLimit - stringWidth(statusText) - stringWidth(separator));
+  const visibleTitle = sessionTitle ? truncate(sessionTitle, titleLimit) : "";
+  const details = visibleTitle ? `${visibleTitle}${separator}${statusText}` : statusText;
 
   return (
-    <box height={1} flexShrink={0} paddingLeft={1} paddingRight={1} overflow="hidden">
+    <box
+      height={1}
+      flexShrink={0}
+      paddingLeft={1}
+      paddingRight={1}
+      overflow="hidden"
+      flexDirection="row"
+      justifyContent="space-between"
+    >
       <text fg="#aeb8c4">{details}</text>
+      {visibleWorkspace ? <text fg="#aeb8c4">{visibleWorkspace}</text> : null}
     </box>
   );
 }

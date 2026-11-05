@@ -150,7 +150,7 @@ export function Composer({
         <box flexDirection="column" maxHeight={4} overflow="hidden">
           <text
             fg={colors.hint}
-          >{`Queued (${queuedMessages.length}) · Ctrl+X removes newest${generating ? "" : " · send a message to resume"}`}</text>
+          >{`Queued (${queuedMessages.length})${disabled ? "" : " · Ctrl+X removes newest"}${generating || disabled ? "" : " · send a message to resume"}`}</text>
           {queuedMessages.slice(0, 3).map((item) => (
             <text key={item.id} fg={colors.hint}>{`  ${item.text.replace(/\s+/g, " ")}`}</text>
           ))}
@@ -175,27 +175,18 @@ export function Composer({
           ))}
         </box>
       )}
-      {disabled ? (
-        <box flexDirection="row" paddingLeft={1}>
-          <LoadingIndicator color={colors.green} />
-          <text fg={colors.hint}> · Esc stop · Ctrl+C interrupt</text>
-        </box>
-      ) : generating ? (
-        <box flexDirection="row" paddingLeft={1}>
-          <LoadingIndicator color={colors.green} />
-          <text fg={colors.hint}>
-            {" "}
-            · PgUp/PgDn scroll · Enter queue · Ctrl+J newline · Esc stop
-          </text>
-        </box>
-      ) : (
-        <box flexDirection="row">
-          <text> </text>
-          <text fg={colors.hint}>
-            {suggestions.length
-              ? "↑↓ choose · Tab complete · Enter select/run"
-              : "PgUp/PgDn scroll · Enter send · Ctrl+J newline · Esc stop"}
-          </text>
+      {(disabled || generating || suggestions.length > 0) && (
+        <box flexDirection="row" width="100%" paddingLeft={1} paddingRight={1}>
+          {(disabled || generating) && <LoadingIndicator color={colors.green} />}
+          <box flexGrow={1} flexShrink={1} minWidth={0} alignItems="flex-end">
+            {(disabled || suggestions.length > 0) && (
+              <text fg={colors.hint}>
+                {disabled
+                  ? `${onStopGeneration ? "Esc stop · " : ""}Ctrl+C interrupt`
+                  : `↑↓ choose · Tab complete · Enter select/run${generating && onStopGeneration ? " · Esc stop" : ""}`}
+              </text>
+            )}
+          </box>
         </box>
       )}
       <box
@@ -205,6 +196,7 @@ export function Composer({
         paddingX={1}
         minHeight={3}
         maxHeight={8}
+        overflow="hidden"
       >
         <textarea
           key={placeholderKey.current}
@@ -232,7 +224,13 @@ export function Composer({
           }}
         />
         {contextTokens !== undefined && (
-          <box flexDirection="row" justifyContent="flex-end" width="100%" overflow="hidden">
+          <box
+            flexDirection="row"
+            flexShrink={0}
+            justifyContent="flex-end"
+            width="100%"
+            overflow="hidden"
+          >
             <text fg={colors.hint}>
               {contextTokens === null
                 ? "Context unavailable"
