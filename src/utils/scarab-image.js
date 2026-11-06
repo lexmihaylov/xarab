@@ -36,7 +36,7 @@ function sample(x, y, width, height) {
   return scarabArt.palette[closest];
 }
 
-export function renderScarab({ width = 80, maxRows = 10 } = {}) {
+export function renderScarab({ width = 80, maxRows = 10, palette = scarabArt.palette } = {}) {
   const availableRows = Math.max(1, Math.min(27, Math.floor(maxRows)));
   const columns = Math.max(
     1,
@@ -52,16 +52,27 @@ export function renderScarab({ width = 80, maxRows = 10 } = {}) {
       availableRows,
       Math.ceil((columns * scarabArt.crop.height) / scarabArt.crop.width / 2),
     );
-  const key = `${columns}:${height}`;
+  const key = `${columns}:${height}:${palette.join(",")}`;
   if (cache.has(key)) return cache.get(key);
   const rows = Array.from({ length: height / 2 }, (_, y) => {
     const pixels = [];
     for (let x = 0; x < columns; x++) {
       const top = sample(x, y * 2, columns, height);
       const bottom = sample(x, y * 2 + 1, columns, height);
-      const color = top ?? bottom;
-      const backgroundColor = top && bottom && top !== bottom ? bottom : undefined;
-      const text = !color ? " " : top === bottom ? "█" : top ? "▀" : "▄";
+      const topColor = top == null ? undefined : palette[scarabArt.palette.indexOf(top)];
+      const bottomColor = bottom == null ? undefined : palette[scarabArt.palette.indexOf(bottom)];
+      const color = topColor ?? bottomColor;
+      const backgroundColor =
+        topColor && bottomColor && topColor !== bottomColor ? bottomColor : undefined;
+      const text = !topColor
+        ? bottomColor
+          ? "▄"
+          : " "
+        : !bottomColor
+          ? "▀"
+          : top === bottom
+            ? "█"
+            : "▀";
       const previous = pixels.at(-1);
       if (previous && previous.color === color && previous.backgroundColor === backgroundColor)
         previous.text += text;

@@ -22,7 +22,26 @@ const maxImagePixels = 23;
 export function Welcome() {
   const { width: terminalWidth, height: terminalHeight } = useTerminalDimensions();
   const imageRows = Math.max(1, terminalHeight - appChromeRows - footer.length);
+  const scarabPalette = [
+    undefined,
+    "#c6d9a7",
+    "#b7ce9b",
+    "#a9c292",
+    "#91b68c",
+    "#769f87",
+    "#628981",
+    "#b5d9d4",
+    "#86c5c5",
+    "#5ba6ad",
+    "#438795",
+    "#4f91b3",
+    "#3c7195",
+    "#2d5275",
+    "#20394f",
+    "#172a3a",
+  ];
   const scarab = renderScarab({
+    palette: scarabPalette,
     width: Math.min(maxImageWidth, Math.max(1, terminalWidth - 2)),
     // Each terminal row of the image contains two image pixels.
     maxRows: Math.min(maxImagePixels, imageRows * 2),
