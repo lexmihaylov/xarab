@@ -539,22 +539,41 @@ function serializeWorkerInput(input) {
     : input == null
       ? []
       : [{ role: "user", content: input }];
-  return items.map((item) => {
-    if (item?.type === "tool_call")
+  const seen = new Set();
+  const pending = new Set();
+  const serialized = items.map((item) => {
+    if (item?.type === "tool_call") {
+      if (
+        typeof item.callId !== "string" ||
+        !item.callId.trim() ||
+        typeof item.name !== "string" ||
+        !item.name.trim() ||
+        seen.has(item.callId)
+      )
+        throw new Error("Invalid historical tool call.");
+      seen.add(item.callId);
+      pending.add(item.callId);
       return {
         type: "function_call",
         call_id: item.callId,
         name: item.name,
         arguments: JSON.stringify(item.arguments ?? {}),
       };
-    if (item?.type === "tool_result")
+    }
+    if (item?.type === "tool_result") {
+      if (!pending.delete(item.callId)) throw new Error("Unmatched historical tool result.");
       return {
         type: "function_call_output",
         call_id: item.callId,
-        output: item.output,
+        output: String(item.output ?? ""),
       };
+    }
+    // Tool exchanges may be parallel or interleaved, but cannot span messages.
+    if (pending.size) throw new Error("Unmatched historical tool call.");
     return item;
   });
+  if (pending.size) throw new Error("Unmatched historical tool call.");
+  return serialized;
 }
 
 function normalizeToolResult(result) {

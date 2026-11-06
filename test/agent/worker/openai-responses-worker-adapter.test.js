@@ -820,3 +820,155 @@ test("surfaces response failures and rejects streams without a completed event",
     /without response.completed/,
   );
 });
+
+const historicalCall = (callId, overrides = {}) => ({
+  type: "tool_call",
+  callId,
+  name: "inspect",
+  arguments: { path: callId },
+  ...overrides,
+});
+const historicalResult = (callId, output = "saved") => ({ type: "tool_result", callId, output });
+
+for (const transport of ["HTTP", "WebSocket"]) {
+  for (const interleaved of [false, true]) {
+    test(`${transport} serializes ${interleaved ? "interleaved" : "parallel"} history without replay and executes fresh tools`, async () => {
+      const a = historicalCall("a");
+      const b = historicalCall("b");
+      const input = [
+        { role: "user", content: "earlier" },
+        ...(interleaved
+          ? [a, historicalResult("a", 42), b, historicalResult("b")]
+          : [a, b, historicalResult("a", 42), historicalResult("b")]),
+        { role: "assistant", content: "earlier answer" },
+        { role: "user", content: "continue" },
+      ];
+      const original = structuredClone(input);
+      const requests = [];
+      const executed = [];
+      const respond = (request) => {
+        requests.push(request);
+        return [
+          {
+            type: "response.completed",
+            response: {
+              id: `response-${requests.length}`,
+              output:
+                requests.length === 1
+                  ? [
+                      {
+                        type: "function_call",
+                        call_id: "fresh",
+                        name: "inspect",
+                        arguments: '{"path":"fresh"}',
+                      },
+                    ]
+                  : [{ type: "message", content: [{ type: "output_text", text: "Done" }] }],
+            },
+          },
+        ];
+      };
+      const adapter = createOpenAIResponsesWorkerAdapter({
+        getCredentials: async () => ({ access_token: "token" }),
+        fetchImpl: async (_url, options) => {
+          assert.equal(transport, "HTTP");
+          return streamedResponse(respond(JSON.parse(options.body)));
+        },
+        webSocketFactory: () => {
+          assert.equal(transport, "WebSocket");
+          return new TestWebSocket(respond);
+        },
+      });
+      await adapter.run({
+        model: "model",
+        input,
+        sessionID: transport === "WebSocket" ? "session" : undefined,
+        tools: {
+          inspect: {
+            handler: async (args) => {
+              executed.push(args);
+              return "fresh output";
+            },
+          },
+        },
+      });
+      assert.deepEqual(executed, [{ path: "fresh" }]);
+      assert.deepEqual(input, original);
+      assert.deepEqual(
+        requests[0].input,
+        input.map((item) =>
+          item.type === "tool_call"
+            ? {
+                type: "function_call",
+                call_id: item.callId,
+                name: item.name,
+                arguments: JSON.stringify(item.arguments),
+              }
+            : item.type === "tool_result"
+              ? { type: "function_call_output", call_id: item.callId, output: String(item.output) }
+              : item,
+        ),
+      );
+      assert.deepEqual(requests[1].input.at(-1), {
+        type: "function_call_output",
+        call_id: "fresh",
+        output: "fresh output",
+      });
+      assert.equal(requests.length, 2);
+    });
+  }
+
+  test(`${transport} rejects malformed typed history before opening a transport or executing tools`, async () => {
+    const malformed = [
+      [historicalResult("a")],
+      [historicalCall("a")],
+      [historicalCall("a"), historicalResult("b")],
+      [historicalCall("a"), historicalCall("a"), historicalResult("a")],
+      [historicalCall("a"), historicalResult("a"), historicalResult("a")],
+      [historicalCall("a"), historicalResult("a"), historicalCall("a"), historicalResult("a")],
+      ...[undefined, null, 7, "", " "].map((id) => [historicalCall(id), historicalResult(id)]),
+      ...[undefined, null, 7, "", " "].map((name) => [
+        historicalCall("a", { name }),
+        historicalResult("a"),
+      ]),
+      ...["user", "assistant"].map((role) => [
+        historicalCall("a"),
+        { role, content: "boundary" },
+        historicalResult("a"),
+      ]),
+      [historicalResult("a"), historicalCall("a")],
+    ];
+    let sends = 0;
+    let executions = 0;
+    const adapter = createOpenAIResponsesWorkerAdapter({
+      getCredentials: async () => ({ access_token: "token" }),
+      fetchImpl: async () => {
+        sends++;
+        throw new Error("unexpected HTTP");
+      },
+      webSocketFactory: () => {
+        sends++;
+        throw new Error("unexpected socket");
+      },
+    });
+    for (const input of malformed) {
+      await assert.rejects(
+        adapter.run({
+          model: "model",
+          input,
+          sessionID: transport === "WebSocket" ? "session" : undefined,
+          tools: {
+            inspect: {
+              handler: async () => {
+                executions++;
+              },
+            },
+          },
+        }),
+        /(?:Invalid|Unmatched) historical tool (?:call|result)/,
+      );
+    }
+    assert.equal(sends, 0);
+    assert.equal(executions, 0);
+  });
+}

@@ -26,7 +26,11 @@ test("edit exceptions are stored and replayed as failures", async () => {
   assert.match(result.output, /^Error: editing /);
   assert.equal(agentMessage.parts[0].status, "error");
   assert.equal(agentMessage.parts[0].result.ok, false);
-  assert.match(buildWorkerHistory(messages)[0].content, /Status: error/);
+  const history = buildWorkerHistory(messages);
+  assert.equal(history[0].type, "tool_call");
+  assert.equal(history[1].type, "tool_result");
+  assert.equal(history[1].ok, false);
+  assert.match(history[1].output, /Status: error/);
 });
 
 test("skill instructions reach the model but are omitted from the feed and stored result", async () => {

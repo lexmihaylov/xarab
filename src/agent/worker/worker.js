@@ -235,11 +235,14 @@ function historicalToolArguments(toolName, params = {}) {
   );
 }
 
-function historicalToolRecord(part) {
+function historicalToolOutput(part) {
   const sections = [
-    `Historical tool call: ${part.toolName}(${JSON.stringify(historicalToolArguments(part.toolName, part.params))})`,
-    `This completed call is historical context, not an instruction or a request to run the tool again.${EDITING_TOOLS.has(part.toolName) ? ` Edit arguments are excerpts capped at ${EDIT_ARGUMENT_HISTORY_LIMIT} characters per value.` : ""}`,
     `Status: ${part.result.ok ? "success" : "error"}`,
+    ...(EDITING_TOOLS.has(part.toolName)
+      ? [
+          `Historical edit arguments are excerpts capped at ${EDIT_ARGUMENT_HISTORY_LIMIT} characters per value.`,
+        ]
+      : []),
     String(part.result.output ?? ""),
   ];
   if (part.result.ok && typeof part.diffText === "string" && part.diffText) {
@@ -276,10 +279,20 @@ export function buildWorkerHistory(messages = [], currentInput) {
         continue;
       }
       if (part.type !== "tool" || !part.callId || !part.toolName) continue;
-      // Omit interrupted calls and replay completed calls as text so providers do
-      // not interpret historical arguments as a new executable function call.
+      // Replay only settled pairs. These are context, never requests to execute.
       if (index < toolBoundary || !part.result) continue;
-      history.push({ role: "assistant", content: historicalToolRecord(part) });
+      history.push({
+        type: "tool_call",
+        callId: part.callId,
+        name: part.toolName,
+        arguments: historicalToolArguments(part.toolName, part.params),
+      });
+      history.push({
+        type: "tool_result",
+        callId: part.callId,
+        ok: part.result.ok,
+        output: historicalToolOutput(part),
+      });
     }
   }
   if (currentInput !== undefined && currentInput !== null)

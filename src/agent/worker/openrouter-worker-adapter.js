@@ -2,6 +2,52 @@ import { withProviderInactivity } from "./provider-inactivity.js";
 
 const URL = "https://openrouter.ai/api/v1/chat/completions";
 
+function serializeHistory(input) {
+  const items = Array.isArray(input) ? input : [{ role: "user", content: String(input) }];
+  const messages = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (item?.type === "tool_result") throw new Error("Unmatched historical tool result.");
+    if (item?.type !== "tool_call") {
+      messages.push(item);
+      continue;
+    }
+    const calls = [];
+    const pending = new Set();
+    while (i < items.length && items[i]?.type === "tool_call") {
+      const call = items[i++];
+      if (
+        typeof call.callId !== "string" ||
+        !call.callId ||
+        typeof call.name !== "string" ||
+        !call.name ||
+        pending.has(call.callId)
+      )
+        throw new Error("Invalid historical tool call.");
+      pending.add(call.callId);
+      calls.push({
+        id: call.callId,
+        type: "function",
+        function: { name: call.name, arguments: JSON.stringify(call.arguments ?? {}) },
+      });
+    }
+    const results = [];
+    while (i < items.length && items[i]?.type === "tool_result") {
+      const result = items[i++];
+      if (!pending.delete(result.callId)) throw new Error("Unmatched historical tool result.");
+      results.push({
+        role: "tool",
+        tool_call_id: result.callId,
+        content: String(result.output ?? ""),
+      });
+    }
+    if (pending.size) throw new Error("Unmatched historical tool call.");
+    messages.push({ role: "assistant", content: null, tool_calls: calls }, ...results);
+    i--;
+  }
+  return messages;
+}
+
 export function createOpenRouterWorkerAdapter({
   getApiKey,
   fetchImpl = fetch,
@@ -32,23 +78,7 @@ export function createOpenRouterWorkerAdapter({
             },
           ]
         : []),
-      ...(Array.isArray(input) ? input : [{ role: "user", content: String(input) }]).map((item) => {
-        if (item.type === "tool_call")
-          return {
-            role: "assistant",
-            content: null,
-            tool_calls: [
-              {
-                id: item.callId,
-                type: "function",
-                function: { name: item.name, arguments: JSON.stringify(item.arguments ?? {}) },
-              },
-            ],
-          };
-        if (item.type === "tool_result")
-          return { role: "tool", tool_call_id: item.callId, content: String(item.output ?? "") };
-        return item;
-      }),
+      ...serializeHistory(input),
     ];
     const definitions = Object.entries(tools).map(([name, tool]) => ({
       type: "function",

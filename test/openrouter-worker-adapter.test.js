@@ -150,3 +150,91 @@ test("executes tool calls and returns a follow-up response", async () => {
     ["tool_call", "tool_result"],
   );
 });
+
+test("serializes parallel and interleaved historical calls without executing handlers", async () => {
+  let messages;
+  let executed = 0;
+  const adapter = createOpenRouterWorkerAdapter({
+    getApiKey: () => "key",
+    fetchImpl: async (_, options) => {
+      messages = JSON.parse(options.body).messages;
+      return stream([{ choices: [{ delta: { content: "Done" } }] }]);
+    },
+  });
+  const call = (id) => ({ type: "tool_call", callId: id, name: "read", arguments: { id } });
+  const result = (id) => ({ type: "tool_result", callId: id, output: `result ${id}` });
+  const before = { role: "assistant", content: "Before" };
+  const between = { role: "assistant", content: "Between" };
+  await adapter.run({
+    model: "model",
+    input: [
+      before,
+      call("a"),
+      call("b"),
+      result("a"),
+      result("b"),
+      between,
+      call("c"),
+      result("c"),
+      call("d"),
+      result("d"),
+    ],
+    tools: {
+      read: {
+        handler: () => {
+          executed++;
+        },
+      },
+    },
+  });
+  assert.equal(executed, 0);
+  assert.deepEqual(messages, [
+    before,
+    {
+      role: "assistant",
+      content: null,
+      tool_calls: ["a", "b"].map((id) => ({
+        id,
+        type: "function",
+        function: { name: "read", arguments: JSON.stringify({ id }) },
+      })),
+    },
+    { role: "tool", tool_call_id: "a", content: "result a" },
+    { role: "tool", tool_call_id: "b", content: "result b" },
+    between,
+    ...["c", "d"].flatMap((id) => [
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          { id, type: "function", function: { name: "read", arguments: JSON.stringify({ id }) } },
+        ],
+      },
+      { role: "tool", tool_call_id: id, content: `result ${id}` },
+    ]),
+  ]);
+});
+
+test("rejects malformed historical tool pairs before sending a request", async () => {
+  let fetched = false;
+  const adapter = createOpenRouterWorkerAdapter({
+    getApiKey: () => "key",
+    fetchImpl: async () => {
+      fetched = true;
+    },
+  });
+  const call = { type: "tool_call", callId: "a", name: "read" };
+  const result = { type: "tool_result", callId: "a", output: "ok" };
+  for (const input of [
+    [call],
+    [result],
+    [call, { ...result, callId: "b" }],
+    [call, call, result],
+    [call, { role: "assistant", content: "text" }, result],
+    [call, result, result],
+    [{ ...call, name: "" }, result],
+  ]) {
+    await assert.rejects(adapter.run({ model: "model", input }), /historical tool/);
+  }
+  assert.equal(fetched, false);
+});
