@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#404040">
+  <meta name="description" content="Xarab is a terminal coding agent that routes requests to configured model tiers. You choose the models.">
+  <title>Xarab — The right model for the task</title>
+  <link rel="icon" href="assets/xarab-mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="routing-trace.js" defer></script>
+</head>
+<body>
+  <header class="site-header project-header wrap">
+    <a class="brand" href="#top" aria-label="Xarab home"><span>xarab</span></a>
+    <nav aria-label="Main navigation"><a href="#how">How it works</a><a href="#features">Features</a><a href="#get-started">Get started</a><a class="nav-cta" href="https://github.com/lexmihaylov/xarab">View on GitHub <span aria-hidden="true">↗</span></a></nav>
+  </header>
+  <main id="top">
+    <section class="hero project-hero wrap">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="pulse"></span> A terminal coding agent with a point of view</p>
+        <h1>A coding agent<br>that <em>routes the work.</em></h1>
+        <p class="intro">Xarab is an open-source terminal coding agent that routes requests to the models you choose. Inspect and edit your project, run commands, and delegate focused work.</p>
+        <div class="hero-actions"><a class="button primary hero-primary" href="#get-started">Get started <span aria-hidden="true">→</span></a><a class="project-link" href="https://github.com/lexmihaylov/xarab">Explore the source <span aria-hidden="true">↗</span></a></div>
+        <p class="micro">Open source · Runs in your terminal · You choose the models</p>
+      </div>
+      <figure class="app-preview workbench">
+        <div class="app-screen" aria-label="Sample Xarab conversation, recreated from the terminal components">
+          <div class="app-user"><span class="app-user-text">Find why the websocket reconnects twice</span></div>
+          <div class="app-classifying">Classifying...</div>
+          <div class="app-classification">Tier 2 · configured worker (92%)</div>
+          <div class="app-rationale">Bounded debugging across related modules.</div>
+          <div class="app-answer">I'll trace the connection lifecycle and check the reconnect handler.</div>
+          <div class="app-hint">Queued follow-up: Check the reconnect tests too</div>
+          <div class="app-composer"><span class="app-composer-placeholder">Ask Xarab</span><span class="app-typed-text">Find why the websocket reconnects twice</span><span aria-hidden="true" class="app-cursor">▏</span></div>
+          <div class="app-status">Session: Websocket investigation · Ready</div>
+        </div>
+        <figcaption>Terminal UI recreation · illustrative conversation, not a live session</figcaption>
+      </figure>
+      <div class="hero-foot"><span>MODEL ROUTING, MADE LEGIBLE</span><span>01 / 03 &nbsp; CLASSIFY → ROUTE → WORK</span></div>
+    </section>
+    <section class="manifesto" id="how"><div class="wrap manifesto-inner"><p class="eyebrow">01 / Routing ledger</p><h2>One request.<br><span>Three capability tiers.</span></h2><p class="manifesto-copy">Xarab's configurable classifier estimates what capability a task calls for, then hands the request and relevant context to the worker assigned to that tier. You decide which models do the work.</p>
+      <figure class="routing-trace">
+        <figcaption class="trace-label">ROUTING TRACE <span>ILLUSTRATIVE · NOT LIVE</span></figcaption>
+        <p class="trace-intro">Three example requests. One classifier. Your choice of workers.</p>
+        <div class="trace-controls" hidden aria-label="Choose a routing example"><button type="button" data-route="1" aria-pressed="true">01 / Focused</button><button type="button" data-route="2" aria-pressed="false">02 / Advanced</button><button type="button" data-route="3" aria-pressed="false">03 / Specialized</button><button type="button" data-route="adjustment" aria-pressed="false">↻ Tier adjustment</button><button type="button" class="trace-replay">Replay</button></div>
+        <p class="route-selection" aria-live="polite" aria-atomic="true"><span>Example: </span><strong class="route-prompt">“Explain what this function does”</strong><br><span class="route-caption">Tier 1 → configured worker 1. A straightforward explanation follows a known approach.</span></p>
+        <canvas class="route-canvas" aria-hidden="true" hidden></canvas>
+        <div class="route-diagram" aria-hidden="true">
+          <div class="route-origin"><span class="route-kicker">01 / PROMPT</span><strong>Example request</strong><span class="route-signal">REQUEST →</span></div>
+          <div class="route-context"><span class="route-kicker">02 / CONTEXT</span><strong>Relevant history</strong><small>Partial context</small></div>
+          <div class="route-classifier"><span class="route-orbit">✳</span><span class="route-kicker">03 / DECIDE</span><strong>Classifier</strong><small>Estimates capability</small></div>
+          <div class="route-branches"><div class="route-branch route-active" data-tier="1"><span class="route-tier">TIER 01 <b>Focused</b></span><span class="route-line"><i></i></span><span class="route-worker">Configured worker <b>01 ↗</b></span></div><div class="route-branch" data-tier="2"><span class="route-tier">TIER 02 <b>Advanced</b></span><span class="route-line"><i></i></span><span class="route-worker">Configured worker <b>02 ↗</b></span></div><div class="route-branch" data-tier="3"><span class="route-tier">TIER 03 <b>Specialized</b></span><span class="route-line"><i></i></span><span class="route-worker">Configured worker <b>03 ↗</b></span></div></div>
+          <div class="route-adjustment-fallback">Tier 3 worker → adjustment request → controller checks request → if approved, classifier routes the handoff → Tier 2 worker</div>
+        </div>
+        <noscript><p class="route-caption">Other examples: investigating a bug across modules could route to Tier 2; resolving competing causes in a security design could route to Tier 3. Each tier uses its configured worker.</p></noscript>
+        <p class="route-disclaimer">Illustrative decisions, not a live classifier. Actual routing depends on the request and context. A worker may request a tier adjustment; the controller checks it and only an approved request hands off to another worker.</p>
+      </figure>
+      <div class="tiers routing-ledger"><article><span class="tier-index">01 / FOCUSED</span><h3>Clear, bounded work</h3><p>Explain a concept or make a straightforward change using established patterns.</p></article><article><span class="tier-index">02 / ADVANCED</span><h3>Investigation &amp; judgment</h3><p>Trace a bug across modules or implement a feature after understanding existing conventions.</p></article><article><span class="tier-index">03 / SPECIALIZED</span><h3>Deep, specialized reasoning</h3><p>Navigate difficult performance work, security design, or high-consequence trade-offs.</p></article></div>
+      <div class="tier-explainer"><h3>Request → classify → work → response</h3><p>Choose a classifier and assign a worker to each tier in <code>/route</code>. The classifier considers your request and limited recent context, then the selected worker takes on the task. You can inspect the tier and rationale. A worker can request a checked handoff if the work needs a different capability.</p></div>
+      <p class="routing-caveat">Tiers describe capability—not model size, task length, or file count. Routing is a strategy, not a guarantee of lower cost, faster answers, or better results; metadata labels do not guarantee a model is best suited to a task.</p>
+    </div></section>
+    <section class="get-started install-section" id="get-started"><div class="wrap start-inner"><div><p class="eyebrow">02 / Quick start</p><h2>Run it<br><em>your way.</em></h2><p>Get Xarab from the source. Connect a provider or use local models, then assign workers to your tiers.</p><a class="button primary" href="https://github.com/lexmihaylov/xarab#try-it">Read the getting started guide <span aria-hidden="true">↗</span></a></div><div class="code-card"><div class="code-head"><span>GET STARTED</span><span>NODE.JS 26.4+</span></div><pre><code><span class="code-comment"># Clone and install</span>
+git clone https://github.com/lexmihaylov/xarab.git
+cd xarab
+npm install
+npm start
+
+<span class="code-comment"># In Xarab, connect and configure</span>
+/connect
+/route</code></pre><p class="code-note"><span>↳</span> Installation does not download a classifier by default. Use <code>/download</code> to find local models and <code>/route</code> to assign a classifier and workers. Local inference requires compatible hardware.</p></div></div></section>
+    <section class="features wrap" id="features"><div class="section-heading"><div><p class="eyebrow">03 / Capability index</p><h2>What the agent<br><em>can do.</em></h2></div><p>Routing is a starting point—not a black box. Tune your setup, inspect the choice, and keep working in the project you already have.</p></div>
+      <div class="feature-grid capability-index"><article><span class="feature-mark">01 / ROUTING</span><h3>Choose and understand</h3><p>Configure models independently, see the selected tier and rationale, and evaluate a local classifier against labeled examples.</p></article><article><span class="feature-mark">02 / WORKSPACE</span><h3>Work in your project</h3><p>Inspect and edit files, search code, run commands, and use optional web research. Command risk is assessed; some commands need your approval.</p></article><article><span class="feature-mark">03 / DELEGATION</span><h3>Delegate focused work</h3><p>Delegate isolated subtasks with built-in or project agent profiles. Subtasks share the workspace, not a sandbox; concurrency is not guaranteed.</p></article><article><span class="feature-mark">04 / SESSIONS</span><h3>Keep context moving</h3><p>Restore and compact saved sessions, queue follow-ups while work runs, and review suggested next messages when available.</p></article></div>
+    </section>
+    <section class="features wrap" id="extend">
+      <div class="section-heading"><div><p class="eyebrow">Make it your own</p><h2>Extend the agent.<br><em>Keep your workflow.</em></h2></div><p>Connect additional tools and bring reusable instructions into the projects where you work.</p></div>
+      <div class="architecture-grid">
+        <article><span class="eyebrow">Integrations</span><h3>Connect MCP servers</h3><p>Add local or remote MCP servers to give Xarab access to additional tools. Workspace server connections require approval, and each MCP tool call requires your approval. Servers are not sandboxed by Xarab's workspace file restrictions.</p><a href="https://github.com/lexmihaylov/xarab/blob/main/docs/mcp.md">Explore MCP setup ↗</a></article>
+        <article><span class="eyebrow">Reusable instructions</span><h3>Bring your skills</h3><p>Workers can discover project and personal skills and load their instructions when relevant. Skills do not bypass approval controls.</p><a href="https://github.com/lexmihaylov/xarab/blob/main/docs/agent-skills.md">Explore agent skills ↗</a></article>
+      </div>
+      <p class="section-intro">With a connected Codex account, workers can also generate, edit, and analyze images in your workspace. Image tools consume account usage.</p>
+    </section>
+    <section class="providers wrap" id="providers">
+      <div class="section-heading"><div><p class="eyebrow">Choose where models run</p><h2>Three ways to<br><em>power the agent.</em></h2></div><p>Xarab supports the same provider options for classification and worker execution. Choose independently for each role and tier; the lineup can be all-local, hosted, or mixed.</p></div>
+      <div class="provider-grid model-list">
+        <article class="provider-card"><span class="provider-type">01 / HOSTED · SIGN IN</span><h3>OpenAI</h3><p>Connect with ChatGPT sign-in in <code>/connect</code>. Xarab uses its OpenAI Responses integration for classification or worker requests.</p><span class="provider-note">Auth: ChatGPT sign-in</span></article>
+        <article class="provider-card"><span class="provider-type">02 / HOSTED · API KEY</span><h3>OpenRouter</h3><p>Add an OpenRouter API key in <code>/connect</code>, then choose a model in <code>/route</code>. Access the models available through your OpenRouter account.</p><span class="provider-note">Auth: OpenRouter API key</span></article>
+        <article class="provider-card"><span class="provider-type">03 / LOCAL · GGUF</span><h3>Run models locally</h3><p>Use compatible GGUF models on your own machine through <code>node-llama-cpp</code>. Browse downloads with <code>/download</code> and assign models in <code>/route</code>.</p><span class="provider-note">Needs compatible hardware</span></article>
+      </div>
+      <p class="section-intro">Local inference requires compatible hardware. Separately configured tools and integrations may still use network services; hosted providers may charge for usage.</p>
+    </section>
+    <section class="local-download wrap" id="local-models" aria-labelledby="local-download-heading">
+      <div class="local-download-intro"><p class="eyebrow">LOCAL MODELS / HUGGING FACE</p><h2 id="local-download-heading">Find a model.<br><em>Make it yours.</em></h2><p>Search Hugging Face for local GGUF models from inside Xarab, download a model, and assign it to a classifier or tier worker.</p><a href="https://github.com/lexmihaylov/xarab#try-it">Read the setup guide ↗</a></div>
+      <div class="local-download-flow" aria-label="Local model setup steps"><div><span>01 / SEARCH</span><p><code>/download [query]</code></p><small>Browse Hugging Face for GGUF models.</small></div><div><span>02 / DOWNLOAD</span><p>Choose a model</p><small>Download a compatible model to your machine.</small></div><div><span>03 / ASSIGN</span><p><code>/route</code></p><small>Choose it for the classifier or a tier worker.</small></div></div>
+      <p class="local-download-note">Downloads require a network connection. Local inference requires compatible hardware; other configured tools and integrations may still use the network.</p>
+    </section>
+    <section class="open-source" id="engineering"><div class="wrap">
+      <p class="eyebrow">Open source, open to inspection</p><h2>Understand it. Tune it. Help build it.</h2>
+      <p>Read the routing and worker implementations, evaluate your local classifier against labeled examples, or contribute a focused improvement. The repository includes tests and design notes; larger proposals are best discussed in an issue first.</p>
+      <div class="source-links"><a href="https://github.com/lexmihaylov/xarab">Source code ↗</a><a href="https://github.com/lexmihaylov/xarab/tree/main/test">Tests ↗</a><a href="https://github.com/lexmihaylov/xarab/tree/main/docs">Design notes ↗</a><a href="https://github.com/lexmihaylov/xarab/issues">Discuss an idea ↗</a><a href="https://github.com/lexmihaylov/xarab#contributing">Contribute ↗</a></div>
+      <p class="contributor-commands">Contributor checks: <code>npm test</code> <code>npm run format:check</code> · Classifier evaluation: <code>npm run classifier:evaluate -- /path/to/classifier.gguf</code></p>
+    </div></section>
+
+  </main>
+  <footer class="site-footer project-footer wrap"><a class="brand" href="#top"><span>xarab</span></a><p>Route with intention.</p><a href="https://github.com/lexmihaylov/xarab">Open source on GitHub <span aria-hidden="true">↗</span></a><span class="copyright">© Xarab</span></footer>
+</body>
+</html>
