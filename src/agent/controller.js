@@ -531,6 +531,36 @@ export function createAssistantController({
     const responseSession = getActiveSession();
     const responseVersion = suggestionVersion;
     const usageResponses = new Set();
+    let previewItems = new Map();
+    let pendingItems = new Map();
+    const previewFor = (itemId, outputIndex) => {
+      const entries = [...previewItems.values()];
+      return (
+        (itemId && entries.find((entry) => entry.itemId === itemId)) ||
+        entries.find(
+          (entry) =>
+            outputIndex != null &&
+            entry.outputIndex === outputIndex &&
+            (!itemId || !entry.itemId || entry.itemId === itemId),
+        )
+      );
+    };
+    const bindPreview = (item, outputIndex) => {
+      if (item?.type !== "function_call") return;
+      const entry = previewFor(item.id, outputIndex);
+      if (entry && typeof item.call_id === "string" && item.call_id)
+        entry.part.callId = item.call_id;
+    };
+    const settlePreviews = () => {
+      for (const part of assistantMessage.parts) {
+        if (part.preview && part.status === "running") {
+          part.status = "error";
+          part.title = "Tool call not executed";
+        }
+      }
+      previewItems = new Map();
+      pendingItems = new Map();
+    };
     const tracksUsage =
       configStore.getTierWorker(tier)?.provider === "openai" ||
       (tier == null && Boolean(configStore.getOpenAIModel()));
@@ -544,6 +574,9 @@ export function createAssistantController({
         signal: abortController.signal,
         onEvent(event) {
           if (event.type === "provider_retry") {
+            settlePreviews();
+            sessionChanged();
+            notify();
             updateStatus(
               `${event.provider} response ${event.reason === "empty_response" ? "was empty" : "stalled"}; retrying (${event.attempt}/${event.maxRetries})…`,
             );
@@ -551,6 +584,60 @@ export function createAssistantController({
           }
           if (/response (?:stalled|was empty); retrying/.test(status))
             updateStatus("Worker generating…");
+          if (event.type === "tool_call_started" || event.type === "tool_call_delta") {
+            let entry = previewFor(event.itemId, event.outputIndex);
+            if (!entry && (event.itemId || event.outputIndex != null)) {
+              const name = typeof event.name === "string" ? event.name.slice(0, 100) : "tool";
+              const part = {
+                type: "tool",
+                id: Symbol(name),
+                toolName: name,
+                params: {},
+                label: `Preparing ${name}`,
+                title: `Preparing ${name}`,
+                status: "running",
+                preview: true,
+                previewArguments: "",
+              };
+              entry = { itemId: event.itemId, outputIndex: event.outputIndex, part };
+              previewItems.set(part.id, entry);
+              if (!messages.includes(assistantMessage)) messages.push(assistantMessage);
+              assistantMessage.parts.push(part);
+              bindPreview(pendingItems.get(event.outputIndex), event.outputIndex);
+            }
+            if (entry) {
+              if (event.itemId) entry.itemId = event.itemId;
+              if (event.outputIndex != null) entry.outputIndex = event.outputIndex;
+              if (typeof event.name === "string" && event.name) {
+                entry.part.toolName = event.name.slice(0, 100);
+                entry.part.label = `Preparing ${entry.part.toolName}`;
+                entry.part.title = entry.part.label;
+              }
+              if (typeof event.delta === "string") {
+                entry.part.previewArguments = (entry.part.previewArguments + event.delta).slice(
+                  0,
+                  4096,
+                );
+                entry.part.summary = entry.part.previewArguments;
+              }
+              sessionChanged();
+              notify();
+            }
+            return;
+          }
+          if (
+            event.type === "response.output_item.added" ||
+            event.type === "response.output_item.done"
+          ) {
+            if (event.item?.type === "function_call")
+              pendingItems.set(event.output_index, event.item);
+            bindPreview(event.item, event.output_index);
+          }
+          if (["response.completed", "response.done"].includes(event.type)) {
+            event.response?.output?.forEach((item, index) => bindPreview(item, index));
+            previewItems = new Map();
+            pendingItems = new Map();
+          }
           if (!tracksUsage || !["response.completed", "response.done"].includes(event.type)) return;
           const response = event.response;
           if (!response || (response.id && usageResponses.has(response.id))) return;
@@ -606,6 +693,7 @@ export function createAssistantController({
       if (!abortController.signal.aborted)
         addMessage({ type: "system", message: error.message, severity: "error" });
     } finally {
+      settlePreviews();
       currentAgentMessage = undefined;
       generating = false;
       abortController = undefined;

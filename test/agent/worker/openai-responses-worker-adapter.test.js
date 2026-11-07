@@ -40,6 +40,109 @@ class TestWebSocket extends EventEmitter {
   terminate() {}
 }
 
+for (const transport of ["HTTP", "WebSocket"]) {
+  test(`${transport} emits interleaved tool argument previews before execution`, async () => {
+    const events = [];
+    const executed = [];
+    let requests = 0;
+    const first = [
+      {
+        type: "response.output_item.added",
+        output_index: 0,
+        item: { type: "function_call", id: "item-a", name: "inspect" },
+      },
+      {
+        type: "response.output_item.added",
+        output_index: 1,
+        item: { type: "function_call", id: "item-b", name: "inspect" },
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 1,
+        item_id: "item-b",
+        delta: '{"n":',
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 0,
+        item_id: "item-a",
+        delta: '{"n":1}',
+      },
+      {
+        type: "response.function_call_arguments.delta",
+        output_index: 1,
+        item_id: "item-b",
+        delta: "2}",
+      },
+      {
+        type: "response.completed",
+        response: {
+          id: "response-1",
+          output: [
+            { type: "function_call", name: "inspect", call_id: "a", arguments: '{"n":1}' },
+            { type: "function_call", name: "inspect", call_id: "b", arguments: '{"n":2}' },
+          ],
+        },
+      },
+    ];
+    const next = () =>
+      ++requests === 1
+        ? first
+        : [
+            {
+              type: "response.completed",
+              response: {
+                output: [{ type: "message", content: [{ type: "output_text", text: "done" }] }],
+              },
+            },
+          ];
+    const adapter = createOpenAIResponsesWorkerAdapter({
+      getCredentials: async () => ({ access_token: "token", account_id: "account" }),
+      fetchImpl: async () => streamedResponse(next(), { split: true }),
+      webSocketFactory: () => new TestWebSocket(next),
+    });
+    await adapter.run({
+      model: "model",
+      input: "hi",
+      ...(transport === "WebSocket" ? { sessionID: "session" } : {}),
+      onEvent: (event) => events.push(event),
+      tools: {
+        inspect: {
+          handler: async (args) => {
+            executed.push(args);
+            assert.equal(events.filter((event) => event.type === "tool_call_delta").length, 3);
+            return "ok";
+          },
+        },
+      },
+    });
+    assert.deepEqual(
+      events.filter(
+        (event) => event.type === "tool_call_started" || event.type === "tool_call_delta",
+      ),
+      [
+        { type: "tool_call_started", itemId: "item-a", outputIndex: 0, name: "inspect" },
+        { type: "tool_call_started", itemId: "item-b", outputIndex: 1, name: "inspect" },
+        {
+          type: "tool_call_delta",
+          itemId: "item-b",
+          outputIndex: 1,
+          name: "inspect",
+          delta: '{"n":',
+        },
+        {
+          type: "tool_call_delta",
+          itemId: "item-a",
+          outputIndex: 0,
+          name: "inspect",
+          delta: '{"n":1}',
+        },
+        { type: "tool_call_delta", itemId: "item-b", outputIndex: 1, name: "inspect", delta: "2}" },
+      ],
+    );
+    assert.deepEqual(executed, [{ n: 1 }, { n: 2 }]);
+  });
+}
 test("retries empty responses before any tools or text", async () => {
   let calls = 0;
   const events = [];

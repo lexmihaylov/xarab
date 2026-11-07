@@ -90,6 +90,16 @@ export function createOpenAIResponsesWorkerAdapter({
             onEvent({ type: "provider_retry", provider: "OpenAI", ...retry });
           },
           operation: async ({ signal: requestSignal, activity, attempt }) => {
+            const emitEvent = createStreamEventEmitter((event) => {
+              if (requestSignal.aborted) return;
+              activity({
+                output:
+                  event.type === "response.output_text.delta" ||
+                  event.type?.includes("function_call") ||
+                  event.item?.type === "function_call",
+              });
+              onEvent(event);
+            });
             if (useWebSocket) {
               try {
                 if (!socket) {
@@ -114,16 +124,7 @@ export function createOpenAIResponsesWorkerAdapter({
                 } = await requestOverWebSocket(socket, body, {
                   onText,
                   onTextDelta,
-                  onEvent: (event) => {
-                    if (requestSignal.aborted) return;
-                    activity({
-                      output:
-                        event.type === "response.output_text.delta" ||
-                        event.type?.includes("function_call") ||
-                        event.item?.type === "function_call",
-                    });
-                    onEvent(event);
-                  },
+                  onEvent: emitEvent,
                   signal: requestSignal,
                 }));
               } catch (error) {
@@ -163,16 +164,7 @@ export function createOpenAIResponsesWorkerAdapter({
                       onTextDelta(chunk);
                     }
                   : undefined,
-                onEvent: (event) => {
-                  if (requestSignal.aborted) return;
-                  activity({
-                    output:
-                      event.type === "response.output_text.delta" ||
-                      event.type?.includes("function_call") ||
-                      event.item?.type === "function_call",
-                  });
-                  onEvent(event);
-                },
+                onEvent: emitEvent,
                 signal: requestSignal,
               });
               requestSignal.throwIfAborted();
@@ -455,6 +447,8 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
       try {
         const event = JSON.parse(data.toString());
         collectOutputItem(items, event);
+        if (event.type?.includes("function_call") || event.item?.type === "function_call")
+          outputStarted = true;
         if (event.type === "response.output_text.delta") {
           outputStarted = true;
           const text = event.delta ?? "";
@@ -494,6 +488,32 @@ function requestOverWebSocket(socket, body, { onText, onTextDelta, onEvent, sign
   });
 }
 
+// Keep provider events for existing consumers and emit a transport-independent
+// preview stream without using partial arguments to execute tools.
+function createStreamEventEmitter(onEvent) {
+  const calls = new Map();
+  return (event) => {
+    onEvent(event);
+    if (event.type === "response.output_item.added" && event.item?.type === "function_call") {
+      const call = {
+        itemId: event.item.id,
+        outputIndex: event.output_index,
+        name: event.item.name,
+      };
+      calls.set(event.output_index, call);
+      onEvent({ type: "tool_call_started", ...call });
+    } else if (event.type === "response.function_call_arguments.delta") {
+      const call = calls.get(event.output_index);
+      onEvent({
+        type: "tool_call_delta",
+        itemId: event.item_id ?? call?.itemId,
+        outputIndex: event.output_index,
+        ...(call?.name ? { name: call.name } : {}),
+        delta: event.delta,
+      });
+    }
+  };
+}
 function collectOutputItem(items, event) {
   if (
     event.type !== "response.output_item.done" ||

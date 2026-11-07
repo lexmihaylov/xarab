@@ -60,6 +60,10 @@ export function validateSession(value, expectedId = value?.id) {
                 (part.summary !== undefined && !text(part.summary)) ||
                 (part.taskAgent !== undefined && !text(part.taskAgent)) ||
                 (part.taskExecution !== undefined && !text(part.taskExecution)) ||
+                (part.taskStartedAt !== undefined &&
+                  (!Number.isSafeInteger(part.taskStartedAt) || part.taskStartedAt < 0)) ||
+                (part.taskFinishedAt !== undefined &&
+                  (!Number.isSafeInteger(part.taskFinishedAt) || part.taskFinishedAt < 0)) ||
                 (part.diffText !== undefined && !text(part.diffText)) ||
                 (part.result !== undefined &&
                   (!object(part.result) ||

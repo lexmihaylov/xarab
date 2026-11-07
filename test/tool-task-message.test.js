@@ -2,6 +2,41 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { ToolMessage } from "../src/components/ToolMessage.component.jsx";
 import { ExecutionMessageCard } from "../src/components/ExecutionMessageCard.component.jsx";
+test("partial tool arguments are bounded, literal, and clearly not executed", () => {
+  for (const toolName of ["task", "list_files", "run_command"]) {
+    const part = {
+      toolName,
+      status: "running",
+      preview: true,
+      previewArguments: '{"command":"hello\n\u001b' + "x".repeat(600),
+      summary: "unbounded summary",
+    };
+    const card = ToolMessage({ part });
+    assert.equal(
+      card.props.headerChildren.props.children,
+      "Streaming parameters · not yet executed",
+    );
+    assert.ok(card.props.summary.startsWith('{"command":"hello\\n\\x1b'));
+    assert.ok(card.props.summary.endsWith("… [preview truncated]"));
+    assert.ok(card.props.summary.length < 550);
+    assert.equal(card.props.summaryMarkdown, false);
+    assert.equal(card.props.summaryStreaming, false);
+    const abandoned = ToolMessage({ part: { ...part, status: "error" } });
+    assert.equal(
+      abandoned.props.headerChildren.props.children,
+      "Incomplete parameters · not executed",
+    );
+    assert.equal(abandoned.props.summary, card.props.summary);
+  }
+  const empty = ToolMessage({ part: { toolName: "list_files", status: "running", preview: true } });
+  assert.equal(empty.props.summary, "");
+  const executed = ToolMessage({
+    part: { toolName: "list_files", status: "running", summary: "output", previewArguments: "old" },
+  });
+  assert.equal(executed.props.summary, "");
+  assert.ok(!executed.props.headerChildren);
+});
+
 test("task brief remains visible and provided context expands independently of output", () => {
   for (const status of ["running", "complete", "error"]) {
     const part = {

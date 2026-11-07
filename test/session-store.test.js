@@ -60,6 +60,8 @@ test("task activity stays in memory and legacy activity is ignored on load", asy
     title: "Task",
     status: "complete",
     toolName: "task",
+    taskStartedAt: 100,
+    taskFinishedAt: 200,
     taskActivity: [{ label: "secret command", status: "complete" }],
     result: { ok: true, output: "final response" },
   };
@@ -69,6 +71,8 @@ test("task activity stays in memory and legacy activity is ignored on load", asy
   const filename = path.join(store.directory, `${record.id}.json`);
   const saved = JSON.parse(await readFile(filename, "utf8"));
   assert.equal(saved.messages[0].parts[0].taskActivity, undefined);
+  assert.equal(saved.messages[0].parts[0].taskStartedAt, 100);
+  assert.equal((await store.load(record.id)).messages[0].parts[0].taskFinishedAt, 200);
   assert.equal(saved.messages[0].parts[0].result.output, "final response");
   for (const legacy of [[{ label: "old activity", status: "running" }], "invalid", [null]]) {
     saved.messages[0].parts[0].taskActivity = legacy;

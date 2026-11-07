@@ -19,21 +19,37 @@ export function createToolTimelineObserver({
             : toolProgressLabel(name, params),
         summary: toolProgressSummary(name, params),
         status: "running",
+        ...(name === "task" ? { taskStartedAt: Date.now() } : {}),
       };
       const message = getCurrentAgentMessage();
       const messages = getMessages();
+      const preview =
+        callId &&
+        message?.parts.find(
+          (entry) =>
+            entry.type === "tool" &&
+            entry.preview &&
+            entry.status === "running" &&
+            entry.callId === callId,
+        );
+      if (preview) {
+        Object.assign(preview, part, { id: preview.id });
+        delete preview.preview;
+        delete preview.previewArguments;
+      }
       if (message) {
         if (!messages.includes(message)) messages.push(message);
-        message.parts.push(part);
+        if (!preview) message.parts.push(part);
         sessionChanged();
         notify();
         // Allow the UI to paint before starting the tool.
         await new Promise((resolve) => setImmediate(resolve));
       }
-      return part;
+      return preview || part;
     },
     complete(part, name, params, result) {
       settleTaskActivity(part);
+      if (part.toolName === "task") part.taskFinishedAt = Date.now();
       part.status = result.ok ? "complete" : "error";
       part.result = storedToolResult(result);
       const preservesEventSummary = name === "read_file" || name === "search_content";
@@ -47,6 +63,7 @@ export function createToolTimelineObserver({
     },
     fail(part, result) {
       settleTaskActivity(part);
+      if (part.toolName === "task") part.taskFinishedAt = Date.now();
       part.status = "error";
       part.result = storedToolResult(result);
       part.summary = result.output.slice(0, 240);

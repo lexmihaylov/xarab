@@ -6,6 +6,26 @@ import path from "node:path";
 import { discoverTaskAgents } from "../src/agent/task-definitions.js";
 import { createTaskTool } from "../src/agent/worker/tools/task-tool.js";
 
+test("task description encourages safe parallel delegation without implying approval", () => {
+  const tool = createTaskTool({ workspace: ".", runner: {} });
+  assert.match(tool.description, /Actively consider delegating.*independent work/);
+  assert.match(tool.description, /adjacent task calls in the same response/);
+  assert.match(
+    tool.description,
+    /concurrency depends on the provider and runtime and is not guaranteed/,
+  );
+  assert.match(tool.description, /independent work without overlapping file edits/);
+  assert.match(
+    tool.description,
+    /Local workers may fail explicitly when the shared local runtime is busy/,
+  );
+  assert.match(tool.description, /whether implementation was explicitly approved/);
+  assert.match(
+    tool.description,
+    /does not grant approval or bypass existing application policy or tool-specific authorization/,
+  );
+  assert.match(tool.params.properties.brief.description, /Do not imply approval when absent/);
+});
 test("agent discovery supports built-in and bounded project profiles, not symlink definitions", async (t) => {
   const root = await mkdtemp(path.join(os.tmpdir(), "xarab-task-agents-"));
   t.after(() => rm(root, { recursive: true, force: true }));

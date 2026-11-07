@@ -23,12 +23,21 @@ export function ToolMessage({
   const status = statusStyle[part.status] ?? statusStyle.complete;
   const title = String(part.title ?? part.label ?? "Tool");
   const rawSummary = part.summary == null ? "" : String(part.summary);
+  const previewArguments = typeof part.previewArguments === "string" ? part.previewArguments : "";
+  // Keep partial, untrusted arguments compact and safe to display in a terminal.
+  const safePreview = previewArguments
+    .slice(0, 500)
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, (char) =>
+      char === "\n" ? "\\n" : `\\x${char.charCodeAt(0).toString(16).padStart(2, "0")}`,
+    );
   const hidesOutputBody = part.toolName === "list_files" && part.status !== "error";
-  const summary = hidesOutputBody
-    ? ""
-    : part.toolName === "run_command"
-      ? shellSummary(rawSummary)
-      : rawSummary;
+  const summary = part.preview
+    ? safePreview + (previewArguments.length > 500 ? "… [preview truncated]" : "")
+    : hidesOutputBody
+      ? ""
+      : part.toolName === "run_command"
+        ? shellSummary(rawSummary)
+        : rawSummary;
   const diffText = typeof part.diffText === "string" ? part.diffText : "";
 
   const isError = part.status === "error";
@@ -47,33 +56,42 @@ export function ToolMessage({
       summary={summary}
       error={isError}
       summaryMarkdown={
-        (part.toolName === "task" && (part.status === "running" || part.status === "complete")) ||
-        (["analyze_image", "websearch"].includes(part.toolName) && part.status === "complete")
+        !part.preview &&
+        ((part.toolName === "task" && (part.status === "running" || part.status === "complete")) ||
+          (["analyze_image", "websearch"].includes(part.toolName) && part.status === "complete"))
       }
-      summaryStreaming={part.toolName === "task" && part.status === "running"}
+      summaryStreaming={!part.preview && part.toolName === "task" && part.status === "running"}
       syntaxStyle={syntaxStyle}
       headerChildren={
-        part.toolName === "task" && (
-          <box flexDirection="column">
-            {typeof part.params?.brief === "string" && part.params.brief && (
-              <text fg={colors.text} selectable>{`Task: ${part.params.brief}`}</text>
-            )}
-            {typeof part.params?.context === "string" && part.params.context && (
-              <box flexDirection="column">
-                <text fg={colors.accent} onMouseUp={onToggleContext}>
-                  {`${contextExpanded ? "▾" : "▸"} Provided context · click to toggle · Ctrl+Y all`}
-                </text>
-                {contextExpanded && (
-                  <text fg={colors.text} selectable>
-                    {part.params.context}
+        part.preview ? (
+          <text fg={colors.muted}>
+            {part.status === "running"
+              ? "Streaming parameters · not yet executed"
+              : "Incomplete parameters · not executed"}
+          </text>
+        ) : (
+          part.toolName === "task" && (
+            <box flexDirection="column">
+              {typeof part.params?.brief === "string" && part.params.brief && (
+                <text fg={colors.text} selectable>{`Task: ${part.params.brief}`}</text>
+              )}
+              {typeof part.params?.context === "string" && part.params.context && (
+                <box flexDirection="column">
+                  <text fg={colors.accent} onMouseUp={onToggleContext}>
+                    {`${contextExpanded ? "▾" : "▸"} Provided context · click to toggle · Ctrl+Y all`}
                   </text>
-                )}
-              </box>
-            )}
-            {summary && (
-              <text fg={colors.muted}>{part.status === "running" ? "Progress" : "Result"}</text>
-            )}
-          </box>
+                  {contextExpanded && (
+                    <text fg={colors.text} selectable>
+                      {part.params.context}
+                    </text>
+                  )}
+                </box>
+              )}
+              {summary && (
+                <text fg={colors.muted}>{part.status === "running" ? "Progress" : "Result"}</text>
+              )}
+            </box>
+          )
         )
       }
     >
